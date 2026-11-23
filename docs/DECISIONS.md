@@ -62,9 +62,10 @@ Only simple returns are used (CFA Level 1/2), matching the rest of the app.
 
 **Decision.** Run the pipeline in `.github/workflows/precompute_v2.yml` (a runner,
 not a short serverless function), scheduled at `30 9 * * 1-5` UTC = 16:30 ICT on
-weekdays, with `workflow_dispatch` for manual and heavy-backfill runs. Provide the
-manual equivalent `python -m data.v2.jobs.precompute`. The Vercel cron keeps the
-V1 `/api/v1/data/refresh` only; heavy backfill must never run in the 120-second
+weekdays (after the 15:00 ICT close) and nightly at `0 19 * * *` UTC = 02:00 ICT,
+with `workflow_dispatch` for manual and heavy-backfill runs. Provide the manual
+equivalent `python -m data.v2.jobs.precompute`. The Vercel cron keeps the V1
+`/api/v1/data/refresh` only; heavy backfill must never run in the 120-second
 serverless function.
 
 **Why.** A 3-year backfill of ~700 tickers is ~13,300 pages (about 11 h at the
@@ -72,6 +73,14 @@ app's 20 requests/minute), which fits neither a serverless timeout nor one runne
 job. The pipeline is resumable and chunked, so repeated `mode=full` runs with a
 `--limit` make progress and the daily `mode=incremental` run costs about one page
 per ticker. This satisfies "host heavy backfill on a runner".
+
+**Concurrency.** The job joins the `precompute-v2` concurrency group with
+`cancel-in-progress: false`, so the two crons and manual dispatches never overlap:
+a second trigger queues behind the active run instead of cancelling it or writing
+the same tickers in parallel. Losing a *pending* run is harmless because
+scheduled runs are `incremental` and resume from the committed `v2_progress`.
+The nightly pass exists for the same reason — it repairs a weekday run that
+failed or was truncated by the timeout, and catches late provider corrections.
 
 ## D-005 — Pre-screen, resumable chunks and incremental runs
 

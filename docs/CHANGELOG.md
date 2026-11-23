@@ -8,6 +8,20 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Infrastructure / deployment
 
+- **`precompute_v2.yml` now runs nightly as well as after the close, with the
+  concurrency guard documented.** The workflow had only the post-close cron
+  `30 9 * * 1-5` (09:30 UTC = 16:30 ICT); it now also runs `0 19 * * *`
+  (19:00 UTC = 02:00 ICT), so a weekday run that failed, hit the 350-minute job
+  timeout or missed late provider corrections is repaired the same night. Because
+  a scheduled run sets `MODE=incremental` (`github.event_name == 'schedule'`), the
+  second pass only fetches new dates. Both crons and manual dispatches stay
+  serialized by the existing `concurrency: group: precompute-v2,
+  cancel-in-progress: false`: a second trigger queues behind the active job
+  instead of cancelling it or writing the same tickers in parallel, and dropping a
+  *pending* run is harmless because the pipeline resumes from `v2_progress`.
+  `workflow_dispatch` and its four inputs (`mode`, `start`, `limit`, `profiles`)
+  are untouched. Docs updated: `docs/DECISIONS.md` (D-004), `docs/DEPLOYMENT.md`
+  and `docs/DATA.md`.
 - **Vercel deployment configuration verified and hardened before a Preview deploy.**
   The root `.vercelignore` now covers what the API project must never upload:
   `*.db` plus the SQLite sidecars (`*.db-wal`, `*.db-shm`, `*.db-journal`),

@@ -12,10 +12,20 @@ name: Precompute V2 datasets
 #      mode=full and a limit (e.g. 150) repeatedly; each run resumes where the
 #      previous one stopped because every ticker commits independently.
 #
-# `30 9 * * 1-5` is 09:30 UTC = 16:30 ICT, after the 15:00 ICT close.
+# Two schedules run the same job, so a missed or partial trading-day run is
+# repaired the same night:
+#
+#   1. `30 9 * * 1-5` -> 09:30 UTC = 16:30 ICT, weekdays, right after the
+#      15:00 ICT close (same-session data).
+#   2. `0 19 * * *`   -> 19:00 UTC = 02:00 ICT (UTC+7), nightly, which picks up
+#      late provider corrections plus any weekday run that failed. Because the
+#      scheduled mode is `incremental`, a second pass only fetches new dates.
 on:
   schedule:
+    # Weekdays 09:30 UTC = 16:30 ICT, after the 15:00 ICT close.
     - cron: "30 9 * * 1-5"
+    # Nightly 19:00 UTC = 02:00 AM Vietnam time (UTC+7).
+    - cron: "0 19 * * *"
   workflow_dispatch:
     inputs:
       mode:
@@ -41,6 +51,13 @@ on:
 permissions:
   contents: read
 
+# One run at a time, ever. With `cancel-in-progress: false` a second trigger
+# (the nightly cron landing while the post-close run is still backfilling, or a
+# manual dispatch during a scheduled run) queues behind the active job instead
+# of cancelling it or writing the same tickers concurrently. GitHub keeps at
+# most one pending run per group and drops newer pending ones, which is safe
+# here: scheduled runs are `incremental`, so the surviving run resumes from the
+# committed progress of the one before it.
 concurrency:
   group: precompute-v2
   cancel-in-progress: false

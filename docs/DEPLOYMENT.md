@@ -358,7 +358,11 @@ after the job), so use the same Supabase database as the API.
    after the probe passes on the runner.
 5. **Backfill in chunks** — dispatch `precompute_v2.yml` with `mode=full` and a
    `limit` (e.g. `150`) repeatedly; each run resumes from `v2_progress`. Then let
-   the schedule (`30 9 * * 1-5`) run `--incremental` on trading days.
+   the schedule run `--incremental`: weekdays at `30 9 * * 1-5`
+   (09:30 UTC = 16:30 ICT, after the close) and nightly at `0 19 * * *`
+   (19:00 UTC = 02:00 ICT), which repairs a failed weekday run. Both share the
+   `precompute-v2` concurrency group with `cancel-in-progress: false`, so they
+   queue instead of overlapping.
 
    Budget: SSI `stock-info` pages 40 rows and the adapter walks 366-day windows,
    so a first history from `2023-01-01` costs roughly 25 requests per ticker

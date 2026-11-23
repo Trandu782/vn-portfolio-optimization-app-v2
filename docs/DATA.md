@@ -269,7 +269,9 @@ financial ratios.
   `v2_progress` checkpoint records the last committed date, so a run resumes where
   it stopped.
 - **Daily jobs** — the scheduled GitHub Actions workflow (`precompute_v2.yml`)
-  runs `--incremental` on trading days; the Vercel cron only refreshes the V1
+  runs `--incremental` after the close (weekdays `30 9 * * 1-5` = 16:30 ICT) and
+  nightly (`0 19 * * *` = 02:00 ICT); overlapping triggers queue in the
+  `precompute-v2` concurrency group. The Vercel cron only refreshes the V1
   tables. Manual commands:
 
   ```sh
