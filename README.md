@@ -179,11 +179,12 @@ bundle size, the cron schedule and the full environment-variable table.
 
 | Variable | Where | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | API, migrations, jobs | SQLAlchemy URL (SQLite locally, Postgres in production). |
+| `DATABASE_URL` | API, migrations, jobs | SQLAlchemy URL (SQLite locally, Postgres in production). GitHub Actions reads it from the `DATABASE_URL` **secret**. |
 | `PROVIDER_ORDER` | API | V1 failover order, default `kbs,vci,dnse,tcbs,ssi_iboard` (KBS first). |
-| `VNOPT_V2_*_ORDER` | API / precompute job | V2 failover chains per data type (`ohlcv`, `constituents`, `sector_map`, `ratios`, ...); default `ssi_statistics` first (see `data/v2/config.py`). |
-| `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE` | precompute job | Per-data-type request budget for the V2 adapters (defaults 10-20/min). |
+| `VNOPT_V2_*_ORDER` | API | V2 failover chains per data type (`ohlcv`, `constituents`, `sector_map`, `ratios`, ...); default `ssi_statistics` first (see `data/v2/config.py`). The precompute job wires its adapters explicitly, so it ignores these. |
+| `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE` | API | Per-data-type request budget for the V2 failover runner (defaults 10-20/min). |
 | `VNOPT_V2_BACKFILL_START_DATE` | precompute job | Backfill start date (`2023-01-01`). |
+| `VNOPT_V2_CLIENT_REQUESTS_PER_SECOND` | precompute job | Shared-client throttle (`0.5` = 30 requests/min); set as a repo variable. |
 | `REFRESH_TOKEN` / `VNOPT_REFRESH_TOKEN` | API | Shared secret for `/data/refresh` and `/data/probe`. |
 | `CRON_SECRET` | API | Vercel Cron sends it as `Authorization: Bearer`; set it equal to `REFRESH_TOKEN`. |
 | `API_URL` | Web | Base URL the Next.js server proxies `/api/*` to. |

@@ -205,17 +205,44 @@ after the job), so use the same Supabase database as the API.
    `ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255);` once
    before `alembic upgrade head`.
 
-3. **Set the GitHub repository secrets** used by `precompute_v2.yml`:
-   - `DATABASE_URL` — the Supabase URL the runner will use (session URL).
-   Set the V2 tunables (optional) as repo variables:
-   `VNOPT_V2_BACKFILL_START_DATE`, `VNOPT_V2_*_ORDER`,
-   `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE`.
+3. **Set the GitHub repository secret** used by `precompute_v2.yml`:
+   - `DATABASE_URL` — the Supabase URL the runner will use, as
+     `postgresql+psycopg://postgres.<ref>:<password>@aws-<region>.pooler.supabase.com:5432/postgres`
+     (the **session pooler**, port `5432`), with `?sslmode=require` appended.
+   This is the only secret the workflow references. It installs
+   `packages/data[postgres]`, so `psycopg` is present on the runner (without
+   that extra a Postgres URL fails at connect with `ModuleNotFoundError`).
+
+   Optional repo **variables** are forwarded to the job explicitly:
+   `VNOPT_V2_BACKFILL_START_DATE`, `VNOPT_V2_CLIENT_REQUESTS_PER_SECOND` and
+   the pre-screen knobs `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED` /
+   `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME`. `VNOPT_V2_*_ORDER` and
+   `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE` are **not** read by the precompute job —
+   `data/v2/precompute.py::sources_from_context` wires one adapter per data
+   need (SSI `statistics` for prices/sectors/ratios/profiles, KBS for the
+   pre-screen and membership, VCI for the benchmark bars) — so those two
+   families only configure the API's failover runner.
+
+   Every run uploads the `precompute-report` artifact with
+   `precompute_report.txt` (per-step counts and failures) and
+   `verify_report.txt` (the read-only `scripts/verify_v2_db.py` table/date
+   summary).
 4. **Confirm cloud-IP access** — run the `probe_v2.yml` workflow first; SSI sits
    behind Cloudflare, so only promote `ssi_statistics` into the active V2 chains
    after the probe passes on the runner.
 5. **Backfill in chunks** — dispatch `precompute_v2.yml` with `mode=full` and a
    `limit` (e.g. `150`) repeatedly; each run resumes from `v2_progress`. Then let
    the schedule (`30 9 * * 1-5`) run `--incremental` on trading days.
+
+   Budget: SSI `stock-info` pages 40 rows and the adapter walks 366-day windows,
+   so a first history from `2023-01-01` costs roughly 25 requests per ticker
+   (~50 s at the default `0.5` req/s throttle). A full ~1,500-name backfill is
+   therefore ~20 h and must be chunked (`limit=150` ≈ 2 h, inside the
+   350-minute job timeout), while a steady-state incremental day is about three
+   requests per ticker (~2.5 h, one run). Until the chunked backfill finishes,
+   a scheduled `--incremental` will keep working through the unpriced names
+   instead of only fetching the new session; the `v2_progress` rows and the
+   `verify_report.txt` `unfinished progress rows` count show how far it got.
 6. **Deploy the API and web** as before (`vercel --prod` from the repo root and
    `apps/web`). The API reads the same `DATABASE_URL` (transaction-pooler URL is
    fine for its read path) and needs the `VNOPT_V2_*_ORDER` vars only if you
@@ -229,12 +256,14 @@ after the job), so use the same Supabase database as the API.
 | Variable | Where | Required | Notes |
 | --- | --- | --- | --- |
 | `DATABASE_URL` | API + precompute job | yes | Postgres in production; migrations use the session-pooler URL. |
-| `VNOPT_V2_OHLCV_ORDER` | precompute job | no | V2 price failover chain, default `ssi_statistics,vci,kbs`. |
-| `VNOPT_V2_CONSTITUENTS_ORDER` | precompute job | no | Index membership chain, default `kbs`. |
-| `VNOPT_V2_SECTOR_MAP_ORDER` | precompute job | no | Sector map chain, default `ssi_statistics`. |
-| `VNOPT_V2_RATIOS_ORDER` | precompute job | no | Ratios chain, default `ssi_statistics`. |
-| `VNOPT_V2_BACKFILL_START_DATE` | precompute job | no | Backfill start (`2023-01-01`). |
-| `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE` | precompute job | no | Per-data-type request budget (defaults 10-20/min). |
+| `VNOPT_V2_OHLCV_ORDER` | API | no | V2 price failover chain, default `ssi_statistics,vci,kbs`. |
+| `VNOPT_V2_CONSTITUENTS_ORDER` | API | no | Index membership chain, default `kbs`. |
+| `VNOPT_V2_SECTOR_MAP_ORDER` | API | no | Sector map chain, default `ssi_statistics`. |
+| `VNOPT_V2_RATIOS_ORDER` | API | no | Ratios chain, default `ssi_statistics`. |
+| `VNOPT_V2_BACKFILL_START_DATE` | precompute job (repo variable) | no | Backfill start (`2023-01-01`); also `--start`. |
+| `VNOPT_V2_CLIENT_REQUESTS_PER_SECOND` | precompute job (repo variable) | no | Shared-client throttle, default `0.5` (30/min). |
+| `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED` / `..._MIN_MEDIAN_VOLUME` | precompute job (repo variables) | no | Backfill pre-screen, defaults `true` / `10000`. |
+| `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE` | API | no | Per-data-type request budget for the failover runner (defaults 10-20/min); the precompute job throttles through the shared client instead. |
 
 ### Row-level security on Supabase
 

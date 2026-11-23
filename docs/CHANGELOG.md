@@ -8,6 +8,25 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Infrastructure / deployment
 
+- **`precompute_v2.yml` audited and fixed for the Supabase daily sync.** The job
+  installed `vnopt-data` without its `[postgres]` extra, so `psycopg` was absent
+  on the runner and a Postgres `DATABASE_URL` would have failed at connect with
+  `ModuleNotFoundError`; it now installs `"packages/data[postgres]"`. The
+  documented V2 tunables are forwarded explicitly with `||` defaults
+  (`VNOPT_V2_BACKFILL_START_DATE`, `VNOPT_V2_CLIENT_REQUESTS_PER_SECOND`,
+  `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED`,
+  `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME`), and a new
+  `Verify stored rows` step runs the read-only `scripts/verify_v2_db.py` (with
+  `::add-mask::` on the URL) whose output joins `precompute_report.txt` in the
+  `precompute-report` artifact. Docs now state that `DATABASE_URL` is the only
+  secret the workflow reads and that `VNOPT_V2_*_ORDER` /
+  `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE` configure the API runner but not the
+  precompute job (it wires one adapter per data need in
+  `sources_from_context`). Verified: `30 9 * * 1-5` = 09:30 UTC = 16:30 ICT,
+  1.5 h after the 15:00 ICT close; a scheduled run executes
+  `python -m data.v2.jobs.precompute --incremental` (prices, profiles, liquidity,
+  ratios, sector statistics, ratio/quality checks, adjustment flags).
+
 - **Supabase Postgres provisioned, migrated, secured and seeded (V2 start).** Ran
   Alembic `0001_initial`→`0005_v2_financial_ratios` against the Supabase
   **session-pooler** (port 5432) database; all 17 V1/V2 application tables, their
