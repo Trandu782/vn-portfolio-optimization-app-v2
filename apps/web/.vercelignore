@@ -1,0 +1,14 @@
+# Vercel upload ignores for the **web project** (Root Directory = apps/web).
+#
+# Vercel uses the `.vercelignore` found in the project root (here) and only falls
+# back to the repository-root file when this one is missing. Having this file is
+# what guarantees the root file's `apps/web/` entry (meant for the API project)
+# can never blank out the Next.js upload.
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local

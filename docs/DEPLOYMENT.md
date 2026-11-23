@@ -91,6 +91,42 @@ general limit that applies to other runtimes. The local measurement is a
 projection: run `vercel build` and check the deploy log for the exact figure.
 Keep the bundle lean by not adding pandas, scikit-learn, cvxpy or torch.
 
+## What Vercel uploads (`.vercelignore`)
+
+Two projects share this repository, and each has its own ignore file because the
+patterns are relative to the deployed directory:
+
+- **API project** (Root Directory = repository root) — the root `.vercelignore`.
+  It drops everything that is not runtime code: the SQLite database and its
+  sidecars (`*.db`, `*.db-wal`, `*.db-shm`, `*.db-journal`, `*.sqlite*`, `*.dump`),
+  `.venv/`, `apps/web/`, `docs/`, `scripts/`, `data/reference/`, `tests/` (and
+  `**/tests/`) and the ruff/mypy/pytest caches. It also keeps the local
+  secrets and scratch notes off the upload (`Deployment prerequisite.txt`,
+  `V2 update.txt`, `.env*`): those are gitignored, but a CLI upload is not git.
+- **Web project** (Root Directory = `apps/web`) — `apps/web/.vercelignore`. A
+  project-level file takes precedence over the repository-root one, which Vercel
+  only falls back to when the project has none. Having it guarantees the root
+  file's `apps/web/` entry (there for the API project) cannot blank out the
+  Next.js upload. `node_modules` would be skipped by Vercel's defaults anyway; the
+  file also keeps `.next/`, `*.tsbuildinfo` and `.env.local` out.
+
+`vercel.json`'s `functions.asgi.excludeFiles` is the second line of defence: it
+strips tests, fixtures and caches from the Python function bundle even if a file
+reaches the build context. `apps/api/openapi.json` (195 KB, the generated typed
+client schema) is deliberately left in — it is negligible next to scipy.
+
+Local sizes measured for the excluded artifacts:
+
+| Excluded path | Size on this machine |
+| --- | --- |
+| `apps/web/node_modules` | 415.9 MB |
+| `apps/web/.next` | 368.0 MB |
+| `.venv` | 406.2 MB |
+| `vnopt.db` | 18.2 MB |
+
+What remains for the API is the app plus workspace source (≈ 0.8 MB) on top of the
+≈ 182 MB dependency set, i.e. the ≈ 183 MB bundle measured above.
+
 ## Deploy with the Vercel CLI (no Git)
 
 ```sh
@@ -141,6 +177,88 @@ vercel --prod
 `API_URL` is read by `next.config.mjs` at build time; redeploy the web project
 after changing it.
 
+## Preview deployment checklist
+
+A preview deployment reads only **Preview**-scoped environment variables. The four
+API secrets were production-only for a while, which is why a preview showed an
+empty database and 500s on every data route. Add every variable below to
+**Preview** as well as Production (`vercel env add NAME preview`, or both scopes in
+the dashboard UI).
+
+### API project (Root Directory: repository root)
+
+| Variable | Value | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | `postgresql+psycopg://postgres.<ref>:<password>@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres` | Supabase **transaction pooler**, port **6543**. `data/db/base.py` sets psycopg3's `prepare_threshold=None` for pooled URLs; without it repeated queries die with `DuplicatePreparedStatement` (500s on frontier/risk/P&L/rebalance). Alembic is the exception: migrate over the **session pooler** (5432). |
+| `PROVIDER_ORDER` | `kbs,vci,dnse,tcbs,ssi_iboard` | V1 failover chain, KBS first. |
+| `VNOPT_V2_OHLCV_ORDER` | `ssi_statistics,vci,kbs` | V2 prices; the adjusted closes feed Optimize/Frontier. |
+| `VNOPT_V2_CONSTITUENTS_ORDER` | `kbs` | Index membership. |
+| `VNOPT_V2_SECTOR_MAP_ORDER` | `ssi_statistics` | ICB level-2 sector map. |
+| `VNOPT_V2_RATIOS_ORDER` | `ssi_statistics` | Financial ratios (Fundamentals). |
+| `VNOPT_V2_COMPANY_PROFILE_ORDER` | `ssi_statistics` | Company profiles. |
+| `VNOPT_V2_CORPORATE_ACTIONS_ORDER` | `ssi_statistics` | Corporate actions. |
+| `VNOPT_V2_SYMBOL_MASTER_ORDER` | `ssi_statistics,kbs` | Symbol master. |
+| `VNOPT_V2_OHLCV_RATE_LIMIT_PER_MINUTE` | `20` | Per-data-type request budget of the V2 failover runner. |
+| `VNOPT_V2_CONSTITUENTS_RATE_LIMIT_PER_MINUTE` | `20` | Same, constituents. |
+| `VNOPT_V2_SECTOR_MAP_RATE_LIMIT_PER_MINUTE` | `20` | Same, sector map. |
+| `VNOPT_V2_RATIOS_RATE_LIMIT_PER_MINUTE` | `10` | Same, ratios. |
+| `VNOPT_V2_COMPANY_PROFILE_RATE_LIMIT_PER_MINUTE` | `10` | Same, company profile. |
+| `VNOPT_V2_CORPORATE_ACTIONS_RATE_LIMIT_PER_MINUTE` | `10` | Same, corporate actions. |
+| `VNOPT_V2_SYMBOL_MASTER_RATE_LIMIT_PER_MINUTE` | `10` | Same, symbol master. |
+| `REFRESH_TOKEN` | long random secret | Protects `/data/refresh` and `/data/probe`. |
+| `VNOPT_REFRESH_TOKEN` | the same value | The `VNOPT_`-prefixed spelling named by `require_token`'s 503 detail; both are accepted (`AliasChoices`), the bare name wins when both are set. |
+| `CRON_SECRET` | the same value | Never read by the app: Vercel Cron sends `Authorization: Bearer $CRON_SECRET` and `require_token` compares it with `refresh_token`, so all three must match. |
+
+The seven V2 chains (and their seven rate-limit budgets) default to exactly these
+values on the server (`data/v2/config.py::VERIFIED_PROVIDERS`); set them explicitly
+anyway so a preview cannot silently inherit a stale dashboard value.
+`VNOPT_V2_BACKFILL_START_DATE`, `VNOPT_V2_CLIENT_REQUESTS_PER_SECOND` and the
+`VNOPT_V2_PRECOMPUTE_*` knobs belong to the GitHub Actions precompute job, not to
+Vercel.
+
+Optional API variables (all have in-code defaults): `VNOPT_ENVIRONMENT=production`,
+`VNOPT_SYNC_BATCH_SIZE`, `VNOPT_SYNC_TIME_BUDGET_SECONDS`,
+`VNOPT_ON_DEMAND_HISTORY_DAYS`, `VNOPT_FRONTIER_MAX_PORTFOLIOS`,
+`VNOPT_FRONTIER_TIME_BUDGET`, `VNOPT_MAX_OPTIMIZE_STOCKS`.
+
+Vercel Cron runs against production only; a preview never triggers
+`/api/v1/data/refresh` by itself.
+
+### Web project (Root Directory: `apps/web`)
+
+| Variable | Value | Notes |
+| --- | --- | --- |
+| `API_URL` | the API deployment's base URL, no trailing slash | `next.config.mjs` reads it **at build time** to rewrite `/api/*`, so changing it requires a redeploy. For a preview, point it at the preview API URL (or at production if the preview UI should exercise the production backend). |
+
+### Preview smoke test
+
+A protected preview needs the automation bypass header on every request; the script
+reads it from `--bypass` or `VERCEL_AUTOMATION_BYPASS_SECRET` (`vercel curl` injects
+the same header automatically). Neither the refresh token nor the bypass secret is
+ever printed.
+
+```sh
+VNOPT_REFRESH_TOKEN=... VERCEL_AUTOMATION_BYPASS_SECRET=... \
+  python scripts/smoke_test.py \
+    --api-url https://<api-preview-host> \
+    --web-url https://<web-preview-host> \
+    --start 2023-11-24
+```
+
+`--end` defaults to today. Expected results — every line below was reproduced
+locally against the migrated database (2026-11-23 session):
+
+| Check | Expect |
+| --- | --- |
+| `GET /api/v1/data/freshness` | 200; `latest_date` = the newest stored session, `primary: "ssi_statistics"` (V2 owns the freshest bar), `stale: false` |
+| `POST /api/v1/portfolio/evaluate` with `FPT, HPG, VHM, LPB, PVD, DCM` | 200; every holding has `latest_price` and `latest_date` = the global latest session, `source: "ssi_statistics"`, `warnings: []` — no `stale (…)` and no `suspended` note |
+| `POST /api/v1/optimize/frontier` with the same six | 200; `tangency` is one of the plotted `frontier` points (identical `volatility` and `expected_return`), so the Max-Sharpe marker sits on the line; the returns come from the V2 adjusted closes (`get_prices_preferring_v2_adjusted`) |
+| `GET /v2/coverage`, `/v2/sectors`, `/v2/analytics?benchmark=VNINDEX&timeframe=1Y`, `/v2/fundamentals/FPT` | 200 with `data_as_of`; 11-420 ms warm (budget 2 s), zero 500s |
+
+`assumptions.prices_adjusted` still echoes `false` and `data_sources` is read from
+the V1 store even though the frontier consumes V2 adjusted closes; the API tests pin
+that behaviour, so verify the marker geometry rather than the flag.
+
 ## Post-deploy verification
 
 ```sh
@@ -158,27 +276,35 @@ curl https://<api>/api/v1/data/freshness
 curl -H "Authorization: Bearer $REFRESH_TOKEN" https://<api>/api/v1/data/refresh
 ```
 
-Then open the deployed web app and complete the vertical slice: search tickers
-(Universe), build a selection (Portfolio), run Optimize, view Risk & Backtest,
-run a Simulation, and generate a Rebalance order list. Every page shows the
+Then open the deployed web app and complete the vertical slice: Portfolio (live
+spot prices for the holdings), Optimize (efficient frontier with the Max-Sharpe
+marker), Risk, Sector Analysis, Fundamentals and Rebalance. Every page shows the
 inline disclaimer; the header badge shows the latest price date and the active
-provider (KBS by default).
+provider (`ssi_statistics` once the V2 precompute is current). The
+`scripts/smoke_test.py` run in the Preview checklist above automates this.
 
 ## Environment variables
 
 | Variable | Scope | Required | Notes |
 | --- | --- | --- | --- |
-| `DATABASE_URL` | API | yes | SQLAlchemy URL; Postgres in production. |
+| `DATABASE_URL` | API | yes | SQLAlchemy URL; Postgres in production (transaction pooler, port 6543). |
 | `PROVIDER_ORDER` | API | recommended | `kbs,vci,dnse,tcbs,ssi_iboard` (KBS first). |
 | `REFRESH_TOKEN` | API | yes | Protects `/data/refresh` and `/data/probe`. |
+| `VNOPT_REFRESH_TOKEN` | API | yes | Same value as `REFRESH_TOKEN`; both spellings are accepted. |
 | `CRON_SECRET` | API | yes | Vercel Cron auth; equal to `REFRESH_TOKEN`. |
-| `API_URL` | Web | yes | Base URL for the `/api/*` rewrite. |
+| `VNOPT_V2_*_ORDER` | API | recommended | Seven V2 failover chains; defaults in `data/v2/config.py`. |
+| `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE` | API | no | Per-data-type budget for the V2 runner (defaults 10-20/min). |
+| `API_URL` | Web | yes | Base URL for the `/api/*` rewrite (build time). |
 | `VNOPT_ENVIRONMENT` | API | no | `production` on Vercel. |
 | `VNOPT_SYNC_BATCH_SIZE` | API | no | Symbols per sync batch (default 50). |
 | `VNOPT_SYNC_TIME_BUDGET_SECONDS` | API | no | Wall-clock budget per batch (default 45). |
 | `VNOPT_ON_DEMAND_HISTORY_DAYS` | API | no | History depth for first fetch (default 365). |
 | `VNOPT_FRONTIER_MAX_PORTFOLIOS` | API | no | Hard cap on the random-portfolio cloud (default 20000). |
 | `VNOPT_FRONTIER_TIME_BUDGET` | API | no | Wall-clock budget for a frontier run (default 30s). |
+
+Every API variable must be present in **both** the Production and Preview scopes;
+see the Preview deployment checklist above for the exact values (including the V2
+chains and their rate-limit budgets).
 
 No credential is needed for any data source: KBS, VCI, DNSE, TCBS and SSI
 iBoard are anonymous public endpoints. If one starts requiring a login the

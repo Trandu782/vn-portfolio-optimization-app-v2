@@ -8,6 +8,39 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Infrastructure / deployment
 
+- **Vercel deployment configuration verified and hardened before a Preview deploy.**
+  The root `.vercelignore` now covers what the API project must never upload:
+  `*.db` plus the SQLite sidecars (`*.db-wal`, `*.db-shm`, `*.db-journal`),
+  `*.sqlite*`, `*.dump`, `tests/` and `**/tests/`, `.venv/`, `apps/web/` (415.9 MB
+  of `node_modules` + 368.0 MB of `.next` locally), `docs/`, `scripts/`,
+  `data/reference/` and the tool caches — plus the gitignored local secrets
+  (`Deployment prerequisite.txt`, `V2 update.txt`, `.env*`), which a CLI upload
+  would otherwise ship because it does not read `.gitignore`. New
+  `apps/web/.vercelignore` gives the web project (Root Directory `apps/web`) its
+  own list; Vercel only falls back to the repository-root file when the project has
+  none, so the root `apps/web/` entry can no longer blank out the Next.js upload.
+  What stays in the build context is the app + workspace source (≈ 0.8 MB) on top
+  of the ≈ 182 MB dependency set, i.e. the ≈ 183 MB bundle already measured
+  against Vercel's 500 MB Python limit. `docs/DEPLOYMENT.md` gains a "What Vercel
+  uploads" section with the measured sizes.
+- **Preview environment checklist documented** (`docs/DEPLOYMENT.md`): a preview
+  reads only Preview-scoped variables, so the same values must be added there —
+  `DATABASE_URL` on the Supabase **transaction pooler** (port `6543`,
+  `prepare_threshold=None`), `PROVIDER_ORDER`, the seven `VNOPT_V2_*_ORDER` chains
+  and their seven `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE` budgets, `REFRESH_TOKEN` /
+  `VNOPT_REFRESH_TOKEN` / `CRON_SECRET` (all three equal — the cron secret is
+  compared against `refresh_token` by `require_token`), and `API_URL` for the web
+  project (build-time rewrite).
+- **`scripts/smoke_test.py` now covers the V2-backed views.** Added checks for
+  `/data/freshness` (latest stored session + serving source), Portfolio valuation of
+  the six V2 reference tickers (`FPT, HPG, VHM, LPB, PVD, DCM`, no `stale`/
+  `suspended` warning), the Max-Sharpe marker being one of the plotted
+  `frontier` points, and `/v2/coverage`, `/v2/sectors`, `/v2/analytics`,
+  `/v2/fundamentals/{symbol}` answering 200 with `data_as_of` inside a 2 s warm
+  budget. Verified against the migrated database (2026-11-23 session): freshness
+  `primary=ssi_statistics`, all six holdings at spot prices with `warnings: []`,
+  `on_line=True`, V2 routes 11-420 ms.
+
 - **`precompute_v2.yml` audited and fixed for the Supabase daily sync.** The job
   installed `vnopt-data` without its `[postgres]` extra, so `psycopg` was absent
   on the runner and a Postgres `DATABASE_URL` would have failed at connect with

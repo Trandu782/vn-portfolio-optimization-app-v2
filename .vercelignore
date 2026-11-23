@@ -1,23 +1,56 @@
-# Vercel build/upload ignores. The API function's own `excludeFiles` (vercel.json)
-# already drops tests/fixtures/caches from the bundle; this file prevents the large
-# local artifacts from being uploaded as part of the build context at all.
+# Vercel build/upload ignores for the **API project** (Root Directory = repository
+# root). The API function's own `excludeFiles` (vercel.json) already drops
+# tests/fixtures/caches from the bundle; this file stops the large local artifacts
+# from being uploaded as part of the build context at all, which keeps the Python
+# serverless bundle (about 183 MB with scipy/numpy) inside Vercel's 500 MB limit.
+# The web project (Root Directory `apps/web`) uses its own
+# `apps/web/.vercelignore`, which takes precedence for that project.
+
+# Databases and their SQLite sidecars (local dev only; production is Postgres)
 *.db
-*.sqlite
-*.sqlite3
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite*
+*.dump
+
+# Frontend, never read by the API runtime (415 MB node_modules + 368 MB .next here)
 node_modules/
 .next/
+out/
+apps/web/
+
+# Python artifacts and tool caches
 .venv/
+venv/
 *.py[cod]
 __pycache__/
+*.egg-info/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Tests are not part of the runtime bundle (vercel.json excludes them as well)
+tests/
+**/tests/
+
+# Never upload local secrets or scratch notes (these hold a real DATABASE_URL
+# password and refresh token; both are gitignored but the upload is not git)
 .env
+.env.*
 .env.local
+Deployment prerequisite.txt
+V2 update.txt
+
+# Repository metadata, docs and operator scripts are not needed at runtime
 .git/
+.github/
 .vercel/
+.clinerules/
 docs/
 data/reference/
 scripts/
-apps/web/
-*.egg-info/
+
+# Other generated / log artifacts
+*.tsbuildinfo
+*.log
