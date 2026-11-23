@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+# Temporary output of `make client-check` (the committed file is schema.d.ts)
+apps/web/lib/schema.check.d.ts
+
+# Environment / secrets ------------------------------------------------------
+# Real values never leave this machine. `.env.example` is the committed
+# template and holds placeholders only (`REFRESH_TOKEN=change-me`), so it is
+# re-included after the catch-all below.
+.env
+.env.local
+.env.*.local
+.env*
+!.env.example
+
+# Local deployment cheatsheet: plaintext DATABASE_URL (with password) and
+# REFRESH_TOKEN. Never commit it; rotate both values if it ever gets pushed.
+Deployment prerequisite.txt
+
+# Local scratch notes that must not ship.
+V2 update.txt
+
+# Vercel
+.vercel
+
+# Databases (local dev only; production uses Postgres via DATABASE_URL)
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+*.db-journal
+*.dump
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

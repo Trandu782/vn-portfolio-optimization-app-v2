@@ -1,0 +1,62 @@
+name: Probe V2 providers
+
+# Manually triggered. The project is local-only and not on GitHub yet, so this
+# file is a forward-looking artifact: it runs scripts/probe_v2.py and
+# scripts/probe_v2_candidates.py on a GitHub runner and uploads
+# docs/PROVIDER_PROBE.md and docs/V2_CANDIDATES_PROBE.md. It does no git
+# commit/push. Run it before promoting any SSI endpoint on a cloud IP.
+on:
+  workflow_dispatch:
+    inputs:
+      tickers:
+        description: "Comma-separated tickers to probe"
+        required: false
+        default: "VCB,FPT,HPG"
+      years:
+        description: "Years of history to request"
+        required: false
+        default: "2"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install packages
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e packages/core -e packages/data
+
+      - name: Run provider probe
+        env:
+          GITHUB_ACTIONS: "true"
+        run: |
+          python scripts/probe_v2.py \
+            --environment ci \
+            --tickers "${{ inputs.tickers }}" \
+            --years "${{ inputs.years }}"
+
+      - name: Run candidate probe
+        env:
+          GITHUB_ACTIONS: "true"
+        run: |
+          python scripts/probe_v2_candidates.py | tee docs/V2_CANDIDATES_PROBE.md
+
+      - name: Upload provider probe report
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-probe-report
+          path: |
+            docs/PROVIDER_PROBE.md
+            docs/V2_CANDIDATES_PROBE.md
+          if-no-files-found: error

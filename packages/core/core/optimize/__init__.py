@@ -1,0 +1,130 @@
+"""Optimization engine: pluggable estimators, objectives, constraints and solvers.
+
+Importing this package registers every built-in implementation. The public entry
+point is :func:`core.optimize.engine.optimize`, alongside the registries and the
+factory helpers the API and tests use.
+"""
+
+from __future__ import annotations
+
+from core.optimize import constraints as _constraints  # noqa: F401
+from core.optimize import covariance_estimators as _covariance_estimators  # noqa: F401
+from core.optimize import objectives as _objectives  # noqa: F401
+from core.optimize import return_estimators as _return_estimators  # noqa: F401
+from core.optimize import risk_free_rate as _risk_free_rate  # noqa: F401
+from core.optimize import solvers as _solvers  # noqa: F401
+from core.optimize.engine import lot_size_for, optimize
+from core.optimize.frontier import (
+    DEFAULT_FRONTIER_POINTS,
+    DEFAULT_RANDOM_PORTFOLIOS,
+    MAX_RANDOM_PORTFOLIOS,
+    FrontierAssumptions,
+    FrontierResult,
+    PortfolioPoint,
+    RandomCloud,
+    build_efficient_frontier,
+    sample_random_portfolios,
+)
+from core.optimize.guardrails import (
+    HARD_MAX_STOCKS,
+    MAX_RELIABLE_STOCKS,
+    MIN_MEANINGFUL_STOCKS,
+    default_max_weight,
+    exceeds_hard_max,
+    feasible_max_weight,
+    universe_size_warnings,
+)
+from core.optimize.interfaces import (
+    DEFAULT_COVARIANCE_ESTIMATOR,
+    DEFAULT_MAX_WEIGHT,
+    DEFAULT_OBJECTIVE,
+    DEFAULT_RETURN_ESTIMATOR,
+    DEFAULT_SOLVER,
+    DEFAULT_TRADING_DAYS,
+    Constraint,
+    ConstraintSpec,
+    CovarianceEstimator,
+    InfeasibleConstraintsError,
+    Matrix,
+    Objective,
+    OptimizeAssumptions,
+    OptimizeContext,
+    OptimizeResult,
+    ReturnEstimator,
+    RiskFreeRateProvider,
+    Solver,
+    SolverReport,
+    Vector,
+    build_constraint,
+    build_constraints,
+    build_covariance_estimator,
+    build_objective,
+    build_return_estimator,
+    build_risk_free_rate_provider,
+    build_solver,
+    constraints,
+    covariance_estimators,
+    objectives,
+    resolve_risk_free_rate,
+    return_estimators,
+    risk_free_rate_providers,
+    solvers,
+)
+from core.optimize.lot_rounding import LotRoundingResult, round_to_lots
+
+__all__ = [
+    "DEFAULT_COVARIANCE_ESTIMATOR",
+    "DEFAULT_FRONTIER_POINTS",
+    "DEFAULT_MAX_WEIGHT",
+    "DEFAULT_OBJECTIVE",
+    "DEFAULT_RANDOM_PORTFOLIOS",
+    "DEFAULT_RETURN_ESTIMATOR",
+    "DEFAULT_SOLVER",
+    "DEFAULT_TRADING_DAYS",
+    "HARD_MAX_STOCKS",
+    "MAX_RANDOM_PORTFOLIOS",
+    "MAX_RELIABLE_STOCKS",
+    "MIN_MEANINGFUL_STOCKS",
+    "Constraint",
+    "ConstraintSpec",
+    "CovarianceEstimator",
+    "FrontierAssumptions",
+    "FrontierResult",
+    "InfeasibleConstraintsError",
+    "LotRoundingResult",
+    "Matrix",
+    "Objective",
+    "OptimizeAssumptions",
+    "OptimizeContext",
+    "OptimizeResult",
+    "PortfolioPoint",
+    "RandomCloud",
+    "ReturnEstimator",
+    "RiskFreeRateProvider",
+    "Solver",
+    "SolverReport",
+    "Vector",
+    "build_constraint",
+    "build_constraints",
+    "build_covariance_estimator",
+    "build_efficient_frontier",
+    "build_objective",
+    "build_return_estimator",
+    "build_risk_free_rate_provider",
+    "build_solver",
+    "constraints",
+    "covariance_estimators",
+    "default_max_weight",
+    "exceeds_hard_max",
+    "feasible_max_weight",
+    "lot_size_for",
+    "objectives",
+    "optimize",
+    "resolve_risk_free_rate",
+    "return_estimators",
+    "risk_free_rate_providers",
+    "round_to_lots",
+    "sample_random_portfolios",
+    "solvers",
+    "universe_size_warnings",
+]

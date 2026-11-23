@@ -1,0 +1,93 @@
+{
+  "code": "SUCCESS",
+  "message": "Get corporate actions data success",
+  "data": [
+    {
+      "symbol": "VCB",
+      "eventName": "Kết quả kinh doanh quý",
+      "exrightDate": null,
+      "recordDate": null,
+      "issueDate": "30/10/2026",
+      "eventTitle": "VCB - BCTC Quý 3/2026",
+      "publicDate": "30/10/2026",
+      "exchange": "HOSE",
+      "eventListCode": "KQQY",
+      "value": "0",
+      "ratio": "0",
+      "eventDescription": "VCB - BCTC Quý 3/2026",
+      "eventCode": null,
+      "sortExrightDate": null
+    },
+    {
+      "symbol": "VCB",
+      "eventName": "Kết quả kinh doanh quý",
+      "exrightDate": null,
+      "recordDate": null,
+      "issueDate": "30/10/2026",
+      "eventTitle": "VCB - BCTC Riêng lẻ Quý 3/2026",
+      "publicDate": "30/10/2026",
+      "exchange": "HOSE",
+      "eventListCode": "KQQY",
+      "value": "0",
+      "ratio": "0",
+      "eventDescription": "VCB - BCTC Riêng lẻ Quý 3/2026",
+      "eventCode": null,
+      "sortExrightDate": null
+    },
+    {
+      "symbol": "VCB",
+      "eventName": "Kết quả kinh doanh quý",
+      "exrightDate": null,
+      "recordDate": null,
+      "issueDate": "31/07/2026",
+      "eventTitle": "VCB - BCTC Riêng lẻ Quý 2/2026",
+      "publicDate": "31/07/2026",
+      "exchange": "HOSE",
+      "eventListCode": "KQQY",
+      "value": "0",
+      "ratio": "0",
+      "eventDescription": "VCB - BCTC Riêng lẻ Quý 2/2026",
+      "eventCode": null,
+      "sortExrightDate": null
+    },
+    {
+      "symbol": "VCB",
+      "eventName": "Kết quả kinh doanh quý",
+      "exrightDate": null,
+      "recordDate": null,
+      "issueDate": "30/07/2026",
+      "eventTitle": "VCB - BCTC Quý 2/2026",
+      "publicDate": "30/07/2026",
+      "exchange": "HOSE",
+      "eventListCode": "KQQY",
+      "value": "0",
+      "ratio": "0",
+      "eventDescription": "VCB - BCTC Quý 2/2026",
+      "eventCode": null,
+      "sortExrightDate": null
+    },
+    {
+      "symbol": "VCB",
+      "eventName": "Trả cổ tức bằng tiền mặt",
+      "exrightDate": "23/07/2026",
+      "recordDate": "24/07/2026",
+      "issueDate": "27/08/2026",
+      "eventTitle": "VCB - Trả cổ tức Cả năm năm 2025 bằng tiền 450 đồng/cổ phiếu",
+      "publicDate": "14/07/2026",
+      "exchange": "HOSE",
+      "eventListCode": "DIV",
+      "value": "450",
+      "ratio": "0.045",
+      "eventDescription": "\r\nNgân hàng Thương mại Cổ phần Ngoại thương Việt Nam (VCB) trả cổ tức Cả năm năm 2025 bằng tiền:<br />\r\nNgày giao dịch không hưởng quyền: 23/07/2026<br />\r\nNgày đăng ký cuối cùng: 24/07/2026<br />\r\nThời gian thanh toán: 27/08/2026<br />\r\nTỷ lệ thực hiện: 4,5%/mệnh giá (450 đồng/cổ phiếu).</p>",
+      "eventCode": null,
+      "sortExrightDate": "23/07/2026"
+    }
+  ],
+  "paging": {
+    "totalPage": 1,
+    "total": 5,
+    "page": 1,
+    "pageSize": 10
+  },
+  "status": "ok"
+}

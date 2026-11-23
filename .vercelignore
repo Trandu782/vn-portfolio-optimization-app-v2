@@ -1,0 +1,23 @@
+# Vercel build/upload ignores. The API function's own `excludeFiles` (vercel.json)
+# already drops tests/fixtures/caches from the bundle; this file prevents the large
+# local artifacts from being uploaded as part of the build context at all.
+*.db
+*.sqlite
+*.sqlite3
+node_modules/
+.next/
+.venv/
+*.py[cod]
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.env
+.env.local
+.git/
+.vercel/
+docs/
+data/reference/
+scripts/
+apps/web/
+*.egg-info/

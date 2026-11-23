@@ -1,0 +1,47 @@
+"""Trading-calendar helpers."""
+
+from __future__ import annotations
+
+from datetime import date
+
+from data.calendar import (
+    is_trading_day,
+    last_trading_day,
+    trading_days_between,
+    trading_days_from_dates,
+)
+
+HOLIDAYS = frozenset({date(2024, 1, 1)})
+
+
+def test_weekend_is_not_a_trading_day() -> None:
+    assert not is_trading_day(date(2024, 1, 6), HOLIDAYS)  # Saturday
+    assert is_trading_day(date(2024, 1, 8), HOLIDAYS)  # Monday
+
+
+def test_holiday_is_not_a_trading_day() -> None:
+    assert not is_trading_day(date(2024, 1, 1), HOLIDAYS)
+
+
+def test_last_trading_day_skips_weekend_and_holiday() -> None:
+    assert last_trading_day(date(2024, 1, 7), HOLIDAYS) == date(2024, 1, 5)
+    assert last_trading_day(date(2024, 1, 1), HOLIDAYS) == date(2023, 12, 29)
+
+
+def test_trading_days_between_excludes_weekends_and_holidays() -> None:
+    days = trading_days_between(date(2024, 1, 1), date(2024, 1, 8), HOLIDAYS)
+    assert date(2024, 1, 1) not in days
+    assert date(2024, 1, 6) not in days
+    assert days[0] == date(2024, 1, 2)
+    assert days[-1] == date(2024, 1, 8)
+
+
+def test_trading_days_between_reversed_range_is_empty() -> None:
+    assert trading_days_between(date(2024, 1, 8), date(2024, 1, 1), HOLIDAYS) == []
+
+
+def test_trading_days_from_dates_keeps_the_observed_sessions() -> None:
+    observed = [date(2024, 1, 2), date(2024, 1, 3), date(2024, 1, 2)]
+    calendar = trading_days_from_dates(observed)
+    assert calendar == frozenset({date(2024, 1, 2), date(2024, 1, 3)})
+    assert trading_days_from_dates([]) == frozenset()

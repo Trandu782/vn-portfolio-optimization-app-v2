@@ -1,0 +1,7086 @@
+{
+  "components": {
+    "schemas": {
+      "AdjustmentAnomalyRecord": {
+        "description": "One dated anomaly behind a ticker's adjustment-quality flag.\n\n``exclude`` marks a return-corrupting anomaly (the group indices drop it by\ndefault). ``category`` separates a genuine data glitch from a move on a\nvery-low-liquidity session (\"thin trading\"), so the Sector tab can explain what\nhappened in plain language. ``reason`` is plain-language (no jargon).",
+        "properties": {
+          "category": {
+            "default": "data_glitch",
+            "enum": [
+              "data_glitch",
+              "thin_trading"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "exclude": {
+            "default": false,
+            "title": "Exclude",
+            "type": "boolean"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date"
+        ],
+        "title": "AdjustmentAnomalyRecord",
+        "type": "object"
+      },
+      "AdjustmentQualityFlag": {
+        "description": "Per-ticker adjustment-quality flag surfaced in the analytics payload.",
+        "properties": {
+          "anomalies": {
+            "items": {
+              "$ref": "#/components/schemas/AdjustmentAnomalyRecord"
+            },
+            "title": "Anomalies",
+            "type": "array"
+          },
+          "dates": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "title": "Dates",
+            "type": "array"
+          },
+          "exclude_from_group_indices": {
+            "default": false,
+            "title": "Exclude From Group Indices",
+            "type": "boolean"
+          },
+          "flagged": {
+            "default": false,
+            "title": "Flagged",
+            "type": "boolean"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "severity": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker"
+        ],
+        "title": "AdjustmentQualityFlag",
+        "type": "object"
+      },
+      "AnalyticsResponse": {
+        "description": "The analytics payload plus the per-response cache/timing metadata.",
+        "properties": {
+          "adjustment_flags": {
+            "items": {
+              "$ref": "#/components/schemas/AdjustmentQualityFlag"
+            },
+            "title": "Adjustment Flags",
+            "type": "array"
+          },
+          "benchmark": {
+            "title": "Benchmark",
+            "type": "string"
+          },
+          "benchmark_returns": {
+            "items": {
+              "$ref": "#/components/schemas/ReturnPoint"
+            },
+            "title": "Benchmark Returns",
+            "type": "array"
+          },
+          "correlation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CorrelationResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "data_as_of": {
+            "format": "date",
+            "title": "Data As Of",
+            "type": "string"
+          },
+          "default_excluded": {
+            "items": {
+              "$ref": "#/components/schemas/DefaultExcludedTicker"
+            },
+            "title": "Default Excluded",
+            "type": "array"
+          },
+          "default_excluded_outside_window": {
+            "items": {
+              "$ref": "#/components/schemas/DefaultExcludedTicker"
+            },
+            "title": "Default Excluded Outside Window",
+            "type": "array"
+          },
+          "elapsed_ms": {
+            "default": 0.0,
+            "title": "Elapsed Ms",
+            "type": "number"
+          },
+          "flags_available": {
+            "default": false,
+            "title": "Flags Available",
+            "type": "boolean"
+          },
+          "flags_policy_current": {
+            "default": false,
+            "title": "Flags Policy Current",
+            "type": "boolean"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "grouping": {
+            "title": "Grouping",
+            "type": "string"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/GroupAnalytics"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "include_default_excluded": {
+            "default": false,
+            "title": "Include Default Excluded",
+            "type": "boolean"
+          },
+          "liquidity_preset": {
+            "title": "Liquidity Preset",
+            "type": "string"
+          },
+          "market_cap_basis": {
+            "default": "full",
+            "title": "Market Cap Basis",
+            "type": "string"
+          },
+          "market_cap_note": {
+            "default": "Full market cap (free-float is unavailable keyless; ADTV and ADV are the real liquidity guards).",
+            "title": "Market Cap Note",
+            "type": "string"
+          },
+          "price_adjustment_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Adjustment Basis"
+          },
+          "served_from_cache": {
+            "default": false,
+            "title": "Served From Cache",
+            "type": "boolean"
+          },
+          "volume_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume Basis"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "weighting": {
+            "title": "Weighting",
+            "type": "string"
+          },
+          "window": {
+            "$ref": "#/components/schemas/Window"
+          }
+        },
+        "required": [
+          "data_as_of",
+          "generated_at",
+          "grouping",
+          "weighting",
+          "benchmark",
+          "window",
+          "liquidity_preset"
+        ],
+        "title": "AnalyticsResponse",
+        "type": "object"
+      },
+      "Assumptions": {
+        "description": "The user settings actually used to produce a result.",
+        "properties": {
+          "brokerage_fee_rate": {
+            "title": "Brokerage Fee Rate",
+            "type": "number"
+          },
+          "risk_free_rate": {
+            "title": "Risk Free Rate",
+            "type": "number"
+          }
+        },
+        "required": [
+          "brokerage_fee_rate",
+          "risk_free_rate"
+        ],
+        "title": "Assumptions",
+        "type": "object"
+      },
+      "AssumptionsResponse": {
+        "description": "Every setting used to produce the result, for reproducibility.",
+        "properties": {
+          "capital": {
+            "title": "Capital",
+            "type": "integer"
+          },
+          "cash_reserve": {
+            "title": "Cash Reserve",
+            "type": "number"
+          },
+          "constraints": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Constraints",
+            "type": "array"
+          },
+          "covariance_estimator": {
+            "additionalProperties": true,
+            "title": "Covariance Estimator",
+            "type": "object"
+          },
+          "data_sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data Sources",
+            "type": "array"
+          },
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "investable_capital": {
+            "title": "Investable Capital",
+            "type": "integer"
+          },
+          "lot_sizes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Lot Sizes",
+            "type": "object"
+          },
+          "objective": {
+            "title": "Objective",
+            "type": "string"
+          },
+          "prices_adjusted": {
+            "title": "Prices Adjusted",
+            "type": "boolean"
+          },
+          "return_estimator": {
+            "additionalProperties": true,
+            "title": "Return Estimator",
+            "type": "object"
+          },
+          "risk_free_rate": {
+            "title": "Risk Free Rate",
+            "type": "number"
+          },
+          "risk_free_rate_provider": {
+            "title": "Risk Free Rate Provider",
+            "type": "string"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "objective",
+          "return_estimator",
+          "covariance_estimator",
+          "constraints",
+          "capital",
+          "investable_capital",
+          "cash_reserve",
+          "risk_free_rate",
+          "risk_free_rate_provider",
+          "start",
+          "end",
+          "data_sources",
+          "prices_adjusted",
+          "lot_sizes"
+        ],
+        "title": "AssumptionsResponse",
+        "type": "object"
+      },
+      "BackfillRequest": {
+        "description": "Symbols to backfill on demand (the Universe page's Refresh data action).",
+        "properties": {
+          "history_days": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "History depth to fetch when a symbol has no stored bars.",
+            "title": "History Days"
+          },
+          "symbols": {
+            "description": "Ticker codes to sync.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "title": "BackfillRequest",
+        "type": "object"
+      },
+      "BackfillResponse": {
+        "description": "Per-symbol outcome of an on-demand backfill.",
+        "properties": {
+          "requested": {
+            "title": "Requested",
+            "type": "integer"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/BackfillSymbolResult"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "synced": {
+            "title": "Synced",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "requested",
+          "synced",
+          "results"
+        ],
+        "title": "BackfillResponse",
+        "type": "object"
+      },
+      "BackfillSymbolResult": {
+        "description": "Outcome of syncing one symbol.",
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "rows": {
+            "default": 0,
+            "title": "Rows",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "ok",
+          "status"
+        ],
+        "title": "BackfillSymbolResult",
+        "type": "object"
+      },
+      "BenchmarkMetrics": {
+        "description": "A group's performance and risk against the selected benchmark.",
+        "properties": {
+          "annualized_volatility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annualized Volatility"
+          },
+          "benchmark": {
+            "title": "Benchmark",
+            "type": "string"
+          },
+          "benchmark_period_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Period Return"
+          },
+          "beta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta"
+          },
+          "constituent_count": {
+            "default": 0,
+            "title": "Constituent Count",
+            "type": "integer"
+          },
+          "correlation": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation"
+          },
+          "excess_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excess Return"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "low_reliability": {
+            "default": true,
+            "title": "Low Reliability",
+            "type": "boolean"
+          },
+          "observation_count": {
+            "default": 0,
+            "title": "Observation Count",
+            "type": "integer"
+          },
+          "period_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Return"
+          },
+          "r_squared": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R Squared"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "group",
+          "benchmark"
+        ],
+        "title": "BenchmarkMetrics",
+        "type": "object"
+      },
+      "BenchmarkOption": {
+        "description": "A benchmark index the user can compare the portfolio against.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "exchange": {
+            "title": "Exchange",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "exchange"
+        ],
+        "title": "BenchmarkOption",
+        "type": "object"
+      },
+      "Bound": {
+        "description": "Inclusive range allowed for a user setting, as a fraction.",
+        "properties": {
+          "max": {
+            "title": "Max",
+            "type": "number"
+          },
+          "min": {
+            "title": "Min",
+            "type": "number"
+          }
+        },
+        "required": [
+          "min",
+          "max"
+        ],
+        "title": "Bound",
+        "type": "object"
+      },
+      "ComparePortfolioBlock": {
+        "description": "One portfolio's weights, metrics and growth series in the comparison.",
+        "properties": {
+          "metrics": {
+            "additionalProperties": true,
+            "title": "Metrics",
+            "type": "object"
+          },
+          "performance": {
+            "$ref": "#/components/schemas/PerformanceResponse"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Weights",
+            "type": "object"
+          }
+        },
+        "required": [
+          "weights",
+          "metrics",
+          "performance"
+        ],
+        "title": "ComparePortfolioBlock",
+        "type": "object"
+      },
+      "ConstraintSelection": {
+        "description": "One constraint to apply, with its parameters.",
+        "properties": {
+          "id": {
+            "description": "Constraint id from /optimize/options.",
+            "title": "Id",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "ConstraintSelection",
+        "type": "object"
+      },
+      "CorrelationResult": {
+        "description": "Pairwise Pearson correlation of the group return series.\n\n``labels`` is the stable order of both ``matrix`` rows/columns; ``ordered_labels``\nis the hierarchical-clustering display order (the UI reorders with it).",
+        "properties": {
+          "average_pairwise_correlation": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Pairwise Correlation"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Labels",
+            "type": "array"
+          },
+          "matrix": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Matrix",
+            "type": "array"
+          },
+          "ordered_labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ordered Labels",
+            "type": "array"
+          }
+        },
+        "title": "CorrelationResult",
+        "type": "object"
+      },
+      "CostRequest": {
+        "description": "Inputs for the rebalance cost estimate. Settings default when omitted.",
+        "properties": {
+          "notional": {
+            "description": "Traded value in VND (for example, 100000000).",
+            "minimum": 0.0,
+            "title": "Notional",
+            "type": "integer"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User settings. Defaults apply when omitted."
+          }
+        },
+        "required": [
+          "notional"
+        ],
+        "title": "CostRequest",
+        "type": "object"
+      },
+      "CostResponse": {
+        "description": "Estimated commission and the settings used to compute it.",
+        "properties": {
+          "assumptions": {
+            "$ref": "#/components/schemas/Assumptions"
+          },
+          "commission": {
+            "title": "Commission",
+            "type": "integer"
+          },
+          "round_trip_commission": {
+            "title": "Round Trip Commission",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "commission",
+          "round_trip_commission",
+          "assumptions"
+        ],
+        "title": "CostResponse",
+        "type": "object"
+      },
+      "CoverageSummary": {
+        "description": "Sector coverage for the cleaned universe (never guessed).",
+        "properties": {
+          "covered": {
+            "default": 0,
+            "title": "Covered",
+            "type": "integer"
+          },
+          "missing": {
+            "default": 0,
+            "title": "Missing",
+            "type": "integer"
+          },
+          "missing_tickers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Tickers",
+            "type": "array"
+          }
+        },
+        "title": "CoverageSummary",
+        "type": "object"
+      },
+      "DataFreshness": {
+        "description": "Latest stored price date plus every provider's current health.",
+        "properties": {
+          "latest_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Date"
+          },
+          "primary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderStatus"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "stale": {
+            "default": false,
+            "title": "Stale",
+            "type": "boolean"
+          }
+        },
+        "title": "DataFreshness",
+        "type": "object"
+      },
+      "DefaultExcludedTicker": {
+        "description": "A ticker the engine excludes from group indices by default.\n\nThe precompute job marks return-corrupting anomalies with\n``exclude_from_group_indices=True``; the Sector tab lists them here so the user can\nsee what was dropped and opt back in with ``include_default_excluded``.\n\nThe Sector tab is **window-aware**: a ticker is only listed in this model when one of\nits return-corrupting anomalies falls inside the analysis window. ``reason`` is the\nplain-language main reason, ``category`` separates a data glitch from thin trading,\nand ``affected_dates`` are the anomaly dates inside the window.",
+        "properties": {
+          "affected_dates": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "title": "Affected Dates",
+            "type": "array"
+          },
+          "category": {
+            "default": "data_glitch",
+            "enum": [
+              "data_glitch",
+              "thin_trading"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "severity": {
+            "default": "ok",
+            "enum": [
+              "ok",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker"
+        ],
+        "title": "DefaultExcludedTicker",
+        "type": "object"
+      },
+      "DroppedTickerResponse": {
+        "description": "A ticker removed from the universe, with the reason and responsible filter.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filter"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "reason"
+        ],
+        "title": "DroppedTickerResponse",
+        "type": "object"
+      },
+      "FilterOption": {
+        "description": "Registry metadata for one universe filter.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parameter_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameter Schema"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "parameter_schema"
+        ],
+        "title": "FilterOption",
+        "type": "object"
+      },
+      "Freshness": {
+        "description": "Data freshness for the evaluated portfolio.",
+        "properties": {
+          "latest_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Date"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Primary provider serving the latest bar.",
+            "title": "Source"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "stale": {
+            "default": false,
+            "title": "Stale",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "Freshness",
+        "type": "object"
+      },
+      "FrontierAssumptionsResponse": {
+        "description": "Every setting the frontier used, echoed for reproducibility.",
+        "properties": {
+          "covariance_estimator": {
+            "title": "Covariance Estimator",
+            "type": "string"
+          },
+          "data_sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data Sources",
+            "type": "array"
+          },
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "frontier_points": {
+            "title": "Frontier Points",
+            "type": "integer"
+          },
+          "lot_sizes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Lot Sizes",
+            "type": "object"
+          },
+          "max_sector_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Sector Weight"
+          },
+          "max_weight": {
+            "title": "Max Weight",
+            "type": "number"
+          },
+          "portfolios_generated": {
+            "title": "Portfolios Generated",
+            "type": "integer"
+          },
+          "portfolios_requested": {
+            "title": "Portfolios Requested",
+            "type": "integer"
+          },
+          "prices_adjusted": {
+            "title": "Prices Adjusted",
+            "type": "boolean"
+          },
+          "return_estimator": {
+            "title": "Return Estimator",
+            "type": "string"
+          },
+          "risk_free_rate": {
+            "title": "Risk Free Rate",
+            "type": "number"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "skipped_targets": {
+            "title": "Skipped Targets",
+            "type": "integer"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "trading_days": {
+            "title": "Trading Days",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data_sources",
+          "start",
+          "end",
+          "prices_adjusted",
+          "risk_free_rate",
+          "return_estimator",
+          "covariance_estimator",
+          "seed",
+          "max_weight",
+          "portfolios_requested",
+          "portfolios_generated",
+          "frontier_points",
+          "skipped_targets",
+          "trading_days",
+          "lot_sizes"
+        ],
+        "title": "FrontierAssumptionsResponse",
+        "type": "object"
+      },
+      "FrontierDefaults": {
+        "description": "Defaults and limits for the efficient-frontier view.",
+        "properties": {
+          "frontier_points": {
+            "title": "Frontier Points",
+            "type": "integer"
+          },
+          "max_portfolios": {
+            "title": "Max Portfolios",
+            "type": "integer"
+          },
+          "max_stocks": {
+            "title": "Max Stocks",
+            "type": "integer"
+          },
+          "portfolios": {
+            "title": "Portfolios",
+            "type": "integer"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          }
+        },
+        "required": [
+          "portfolios",
+          "max_portfolios",
+          "frontier_points",
+          "max_stocks"
+        ],
+        "title": "FrontierDefaults",
+        "type": "object"
+      },
+      "FrontierPointResponse": {
+        "description": "A marked or swept portfolio with weights, statistics and integer lots.",
+        "properties": {
+          "expected_return": {
+            "title": "Expected Return",
+            "type": "number"
+          },
+          "lots": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Lots",
+            "type": "object"
+          },
+          "residual_cash": {
+            "title": "Residual Cash",
+            "type": "integer"
+          },
+          "shares": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Shares",
+            "type": "object"
+          },
+          "sharpe": {
+            "title": "Sharpe",
+            "type": "number"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Values",
+            "type": "object"
+          },
+          "volatility": {
+            "title": "Volatility",
+            "type": "number"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Weights",
+            "type": "object"
+          }
+        },
+        "required": [
+          "weights",
+          "expected_return",
+          "volatility",
+          "sharpe",
+          "lots",
+          "shares",
+          "values",
+          "residual_cash"
+        ],
+        "title": "FrontierPointResponse",
+        "type": "object"
+      },
+      "FrontierRequest": {
+        "description": "Inputs for one efficient-frontier run. Settings default when omitted.",
+        "properties": {
+          "capital": {
+            "description": "Capital to invest in VND (for lots and cash).",
+            "minimum": 0.0,
+            "title": "Capital",
+            "type": "integer"
+          },
+          "current_weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "The user's current portfolio weights, plotted as a marker.",
+            "title": "Current Weights",
+            "type": "object"
+          },
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "max_sector_weight": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional maximum weight per sector as a fraction (0.30 == 30%). Applied to the exact frontier and the random cloud.",
+            "title": "Max Sector Weight"
+          },
+          "max_weight": {
+            "default": 0.25,
+            "description": "Maximum weight per stock as a fraction (0.25 == 25%).",
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "Max Weight",
+            "type": "number"
+          },
+          "num_portfolios": {
+            "default": 5000,
+            "description": "Number of random portfolios drawn for the cloud.",
+            "minimum": 1.0,
+            "title": "Num Portfolios",
+            "type": "integer"
+          },
+          "risk_free_rate_provider": {
+            "default": "user_settings",
+            "description": "Risk-free-rate provider id (user settings today).",
+            "title": "Risk Free Rate Provider",
+            "type": "string"
+          },
+          "sectors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional ticker -> sector map for the maximum-sector-weight constraint. Symbols missing from the map are grouped as 'Unknown'.",
+            "title": "Sectors"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seed for the random cloud.",
+            "title": "Seed"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User settings. Defaults apply when omitted."
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "symbols": {
+            "description": "Ticker codes to optimize.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "capital"
+        ],
+        "title": "FrontierRequest",
+        "type": "object"
+      },
+      "FrontierResponse": {
+        "description": "The random cloud, the exact frontier, the marked portfolios and assumptions.",
+        "properties": {
+          "assumptions": {
+            "$ref": "#/components/schemas/FrontierAssumptionsResponse"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FrontierPointResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "equal_weight": {
+            "$ref": "#/components/schemas/FrontierPointResponse"
+          },
+          "frontier": {
+            "items": {
+              "$ref": "#/components/schemas/FrontierPointResponse"
+            },
+            "title": "Frontier",
+            "type": "array"
+          },
+          "min_variance": {
+            "$ref": "#/components/schemas/FrontierPointResponse"
+          },
+          "random_cloud": {
+            "items": {
+              "$ref": "#/components/schemas/RandomCloudPointResponse"
+            },
+            "title": "Random Cloud",
+            "type": "array"
+          },
+          "risk_free_rate": {
+            "title": "Risk Free Rate",
+            "type": "number"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          },
+          "tangency": {
+            "$ref": "#/components/schemas/FrontierPointResponse"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "symbols",
+          "risk_free_rate",
+          "random_cloud",
+          "frontier",
+          "min_variance",
+          "tangency",
+          "equal_weight",
+          "current",
+          "assumptions"
+        ],
+        "title": "FrontierResponse",
+        "type": "object"
+      },
+      "FundamentalsComparison": {
+        "description": "The full per-ratio peer comparison for one ticker, period and peer variant.",
+        "properties": {
+          "data_as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data As Of"
+          },
+          "period": {
+            "format": "date",
+            "title": "Period",
+            "type": "string"
+          },
+          "period_type": {
+            "title": "Period Type",
+            "type": "string"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "ratio_group": {
+            "title": "Ratio Group",
+            "type": "string"
+          },
+          "ratios": {
+            "items": {
+              "$ref": "#/components/schemas/RatioPeerComparison"
+            },
+            "title": "Ratios",
+            "type": "array"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "variant": {
+            "title": "Variant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "ratio_group",
+          "period",
+          "period_type",
+          "variant"
+        ],
+        "title": "FundamentalsComparison",
+        "type": "object"
+      },
+      "GroupAnalytics": {
+        "description": "One group's index plus its benchmark metrics.",
+        "properties": {
+          "default_excluded_count": {
+            "default": 0,
+            "title": "Default Excluded Count",
+            "type": "integer"
+          },
+          "index": {
+            "$ref": "#/components/schemas/GroupIndexResult"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/BenchmarkMetrics"
+          }
+        },
+        "required": [
+          "index",
+          "metrics"
+        ],
+        "title": "GroupAnalytics",
+        "type": "object"
+      },
+      "GroupIndexResult": {
+        "description": "A built group index: its constituents, target weights and cumulative path.",
+        "properties": {
+          "constituent_count": {
+            "title": "Constituent Count",
+            "type": "integer"
+          },
+          "constituents": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Constituents",
+            "type": "array"
+          },
+          "cumulative_returns": {
+            "items": {
+              "$ref": "#/components/schemas/ReturnPoint"
+            },
+            "title": "Cumulative Returns",
+            "type": "array"
+          },
+          "excluded": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Excluded",
+            "type": "object"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "insufficient"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Weights",
+            "type": "object"
+          }
+        },
+        "required": [
+          "group",
+          "status",
+          "constituent_count"
+        ],
+        "title": "GroupIndexResult",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "description": "Payload returned by the health check.",
+        "properties": {
+          "service": {
+            "title": "Service",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "version"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "Holding": {
+        "description": "One portfolio line: a ticker, a whole share count and an optional average cost.",
+        "properties": {
+          "avg_cost": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional average cost per share in whole VND, as shown in the broker app (brokers already adjust it for stock dividends). Feeds the P&L page.",
+            "title": "Avg Cost"
+          },
+          "buy_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional ISO date the holding was bought. When present, the P&L page compares the stock's price return since then with VN-Index.",
+            "title": "Buy Date"
+          },
+          "shares": {
+            "description": "Whole number of shares held (0 means a wishlist ticker).",
+            "minimum": 0.0,
+            "title": "Shares",
+            "type": "integer"
+          },
+          "symbol": {
+            "description": "Ticker code; normalised to upper case.",
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "shares"
+        ],
+        "title": "Holding",
+        "type": "object"
+      },
+      "HoldingPnLResponse": {
+        "description": "One holding's market value, cost basis, P&L and buy-date comparison.",
+        "properties": {
+          "avg_cost": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Cost"
+          },
+          "beat_market": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beat Market"
+          },
+          "benchmark_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Return"
+          },
+          "buy_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Date"
+          },
+          "buy_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Price"
+          },
+          "cost_basis": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis"
+          },
+          "latest_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Price"
+          },
+          "market_value": {
+            "title": "Market Value",
+            "type": "number"
+          },
+          "missing_avg_cost": {
+            "title": "Missing Avg Cost",
+            "type": "boolean"
+          },
+          "missing_price": {
+            "title": "Missing Price",
+            "type": "boolean"
+          },
+          "net_of_costs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Of Costs"
+          },
+          "pnl_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pnl Share"
+          },
+          "price_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Return"
+          },
+          "sell_fee": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sell Fee"
+          },
+          "sell_tax": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sell Tax"
+          },
+          "shares": {
+            "title": "Shares",
+            "type": "integer"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "unrealized_pnl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl"
+          },
+          "unrealized_pnl_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl Pct"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "shares",
+          "avg_cost",
+          "buy_date",
+          "latest_price",
+          "cost_basis",
+          "market_value",
+          "weight",
+          "unrealized_pnl",
+          "unrealized_pnl_pct",
+          "pnl_share",
+          "sell_fee",
+          "sell_tax",
+          "net_of_costs",
+          "missing_avg_cost",
+          "missing_price"
+        ],
+        "title": "HoldingPnLResponse",
+        "type": "object"
+      },
+      "HoldingValuation": {
+        "description": "One holding valued at the latest price.",
+        "properties": {
+          "avg_cost": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Cost"
+          },
+          "latest_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Date"
+          },
+          "latest_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Price"
+          },
+          "market_value": {
+            "title": "Market Value",
+            "type": "number"
+          },
+          "shares": {
+            "title": "Shares",
+            "type": "integer"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          },
+          "wishlist": {
+            "description": "True when shares == 0 (wanted, not owned).",
+            "title": "Wishlist",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "symbol",
+          "shares",
+          "avg_cost",
+          "wishlist",
+          "latest_price",
+          "latest_date",
+          "market_value",
+          "weight",
+          "source"
+        ],
+        "title": "HoldingValuation",
+        "type": "object"
+      },
+      "LiquidityRecord": {
+        "description": "Rolling-median liquidity for one ticker at ``as_of``.",
+        "properties": {
+          "adtv_median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adtv Median"
+          },
+          "adv_median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adv Median"
+          },
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "data_as_of": {
+            "format": "date",
+            "title": "Data As Of",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "volume_basis": {
+            "default": "total",
+            "enum": [
+              "matched",
+              "total"
+            ],
+            "title": "Volume Basis",
+            "type": "string"
+          },
+          "window": {
+            "default": 20,
+            "title": "Window",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "symbol",
+          "as_of",
+          "source",
+          "data_as_of"
+        ],
+        "title": "LiquidityRecord",
+        "type": "object"
+      },
+      "MatrixResponse": {
+        "description": "A date x symbol matrix serialised as rows (``null`` marks a missing value).",
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "data": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "dates": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dates",
+            "type": "array"
+          }
+        },
+        "required": [
+          "dates",
+          "columns",
+          "data"
+        ],
+        "title": "MatrixResponse",
+        "type": "object"
+      },
+      "OptimizeDefaults": {
+        "description": "The conservative defaults the UI should preselect.",
+        "properties": {
+          "max_weight": {
+            "title": "Max Weight",
+            "type": "number"
+          },
+          "objective": {
+            "title": "Objective",
+            "type": "string"
+          },
+          "solver": {
+            "title": "Solver",
+            "type": "string"
+          }
+        },
+        "required": [
+          "objective",
+          "solver",
+          "max_weight"
+        ],
+        "title": "OptimizeDefaults",
+        "type": "object"
+      },
+      "OptimizeOptionsResponse": {
+        "description": "Every optimizer concept, published for the UI to render.",
+        "properties": {
+          "constraints": {
+            "items": {
+              "$ref": "#/components/schemas/app__api__v1__optimize__OptionResponse"
+            },
+            "title": "Constraints",
+            "type": "array"
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/OptimizeDefaults"
+          },
+          "frontier_defaults": {
+            "$ref": "#/components/schemas/FrontierDefaults"
+          },
+          "objectives": {
+            "items": {
+              "$ref": "#/components/schemas/app__api__v1__optimize__OptionResponse"
+            },
+            "title": "Objectives",
+            "type": "array"
+          },
+          "risk_free_rate_providers": {
+            "items": {
+              "$ref": "#/components/schemas/app__api__v1__optimize__OptionResponse"
+            },
+            "title": "Risk Free Rate Providers",
+            "type": "array"
+          },
+          "solvers": {
+            "items": {
+              "$ref": "#/components/schemas/app__api__v1__optimize__OptionResponse"
+            },
+            "title": "Solvers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "objectives",
+          "constraints",
+          "solvers",
+          "risk_free_rate_providers",
+          "defaults",
+          "frontier_defaults"
+        ],
+        "title": "OptimizeOptionsResponse",
+        "type": "object"
+      },
+      "OptimizeRequest": {
+        "description": "Inputs for one optimization run. Settings default when omitted.",
+        "properties": {
+          "capital": {
+            "description": "Capital to invest in VND.",
+            "minimum": 0.0,
+            "title": "Capital",
+            "type": "integer"
+          },
+          "constraints": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintSelection"
+            },
+            "title": "Constraints",
+            "type": "array"
+          },
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "objective": {
+            "default": "min_variance",
+            "description": "Objective id.",
+            "title": "Objective",
+            "type": "string"
+          },
+          "risk_free_rate_provider": {
+            "default": "user_settings",
+            "description": "Risk-free-rate provider id (user settings today).",
+            "title": "Risk Free Rate Provider",
+            "type": "string"
+          },
+          "sectors": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional ticker -> sector map for the maximum-sector-weight constraint. Symbols missing from the map are grouped as 'Unknown'.",
+            "title": "Sectors"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User settings. Defaults apply when omitted."
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "symbols": {
+            "description": "Ticker codes to optimize.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "capital"
+        ],
+        "title": "OptimizeRequest",
+        "type": "object"
+      },
+      "OptimizeResponse": {
+        "description": "Weights, integer lots, statistics and assumptions for one optimization.",
+        "properties": {
+          "assumptions": {
+            "$ref": "#/components/schemas/AssumptionsResponse"
+          },
+          "binding_constraints": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Binding Constraints",
+            "type": "array"
+          },
+          "cash_reserve": {
+            "title": "Cash Reserve",
+            "type": "number"
+          },
+          "cash_reserve_value": {
+            "title": "Cash Reserve Value",
+            "type": "integer"
+          },
+          "expected_return": {
+            "title": "Expected Return",
+            "type": "number"
+          },
+          "lots": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Lots",
+            "type": "object"
+          },
+          "residual_cash": {
+            "title": "Residual Cash",
+            "type": "integer"
+          },
+          "shares": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Shares",
+            "type": "object"
+          },
+          "sharpe": {
+            "title": "Sharpe",
+            "type": "number"
+          },
+          "solver_message": {
+            "title": "Solver Message",
+            "type": "string"
+          },
+          "solver_status": {
+            "title": "Solver Status",
+            "type": "string"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          },
+          "total_cash": {
+            "title": "Total Cash",
+            "type": "integer"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Values",
+            "type": "object"
+          },
+          "volatility": {
+            "title": "Volatility",
+            "type": "number"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Weights",
+            "type": "object"
+          }
+        },
+        "required": [
+          "symbols",
+          "weights",
+          "lots",
+          "shares",
+          "values",
+          "residual_cash",
+          "cash_reserve",
+          "cash_reserve_value",
+          "total_cash",
+          "expected_return",
+          "volatility",
+          "sharpe",
+          "solver_status",
+          "solver_message",
+          "binding_constraints",
+          "assumptions"
+        ],
+        "title": "OptimizeResponse",
+        "type": "object"
+      },
+      "PeerStatistic": {
+        "description": "The peer distribution a ticker is compared against, for one ratio.\n\nThe summary statistics feed the detail table; the quartiles and extremes let the\nUI draw a box plot of the sector distribution with the ticker marked.",
+        "properties": {
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          },
+          "mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean"
+          },
+          "median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "n": {
+            "default": 0,
+            "title": "N",
+            "type": "integer"
+          },
+          "p5": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P5"
+          },
+          "p95": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95"
+          },
+          "percentile_rank": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentile Rank"
+          },
+          "q1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Q1"
+          },
+          "q3": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Q3"
+          },
+          "winsorized_mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winsorized Mean"
+          }
+        },
+        "title": "PeerStatistic",
+        "type": "object"
+      },
+      "PerformanceResponse": {
+        "description": "Growth of 100 over the window with the headline return statistics.",
+        "properties": {
+          "annualized_return": {
+            "title": "Annualized Return",
+            "type": "number"
+          },
+          "dates": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dates",
+            "type": "array"
+          },
+          "growth": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Growth",
+            "type": "array"
+          },
+          "max_drawdown": {
+            "title": "Max Drawdown",
+            "type": "number"
+          },
+          "total_return": {
+            "title": "Total Return",
+            "type": "number"
+          }
+        },
+        "required": [
+          "dates",
+          "growth",
+          "total_return",
+          "annualized_return",
+          "max_drawdown"
+        ],
+        "title": "PerformanceResponse",
+        "type": "object"
+      },
+      "PnLRequest": {
+        "description": "Holdings, cash and the user settings that drive the cost estimate.",
+        "properties": {
+          "cash": {
+            "default": 0,
+            "description": "Cash balance in whole VND.",
+            "minimum": 0.0,
+            "title": "Cash",
+            "type": "integer"
+          },
+          "holdings": {
+            "description": "Holdings (with optional average cost and buy date).",
+            "items": {
+              "$ref": "#/components/schemas/Holding"
+            },
+            "title": "Holdings",
+            "type": "array"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User settings (brokerage fee). Defaults apply when omitted."
+          }
+        },
+        "title": "PnLRequest",
+        "type": "object"
+      },
+      "PnLResponse": {
+        "description": "Per-holding rows and totals, with the settings and market rules used.",
+        "properties": {
+          "assumptions": {
+            "$ref": "#/components/schemas/Assumptions"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingPnLResponse"
+            },
+            "title": "Holdings",
+            "type": "array"
+          },
+          "sell_tax": {
+            "title": "Sell Tax",
+            "type": "number"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/PnLSummary"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "summary",
+          "holdings",
+          "assumptions",
+          "sell_tax"
+        ],
+        "title": "PnLResponse",
+        "type": "object"
+      },
+      "PnLSummary": {
+        "description": "The headline figures shown as cards above the P&L table.",
+        "properties": {
+          "cash": {
+            "title": "Cash",
+            "type": "integer"
+          },
+          "cost_basis_total": {
+            "title": "Cost Basis Total",
+            "type": "integer"
+          },
+          "excluded_count": {
+            "title": "Excluded Count",
+            "type": "integer"
+          },
+          "market_value_total": {
+            "title": "Market Value Total",
+            "type": "number"
+          },
+          "net_of_costs_total": {
+            "title": "Net Of Costs Total",
+            "type": "number"
+          },
+          "sell_fee_total": {
+            "title": "Sell Fee Total",
+            "type": "integer"
+          },
+          "sell_tax_total": {
+            "title": "Sell Tax Total",
+            "type": "integer"
+          },
+          "total_value": {
+            "title": "Total Value",
+            "type": "number"
+          },
+          "unrealized_pnl_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl Pct"
+          },
+          "unrealized_pnl_total": {
+            "title": "Unrealized Pnl Total",
+            "type": "number"
+          }
+        },
+        "required": [
+          "market_value_total",
+          "cost_basis_total",
+          "unrealized_pnl_total",
+          "unrealized_pnl_pct",
+          "sell_fee_total",
+          "sell_tax_total",
+          "net_of_costs_total",
+          "cash",
+          "total_value",
+          "excluded_count"
+        ],
+        "title": "PnLSummary",
+        "type": "object"
+      },
+      "Portfolio": {
+        "description": "A set of holdings plus a cash balance (all VND amounts as whole integers).",
+        "properties": {
+          "cash": {
+            "default": 0,
+            "description": "Cash balance in whole VND.",
+            "minimum": 0.0,
+            "title": "Cash",
+            "type": "integer"
+          },
+          "holdings": {
+            "description": "One entry per ticker; symbols must be unique.",
+            "items": {
+              "$ref": "#/components/schemas/Holding"
+            },
+            "title": "Holdings",
+            "type": "array"
+          }
+        },
+        "title": "Portfolio",
+        "type": "object"
+      },
+      "PortfolioEvaluationResponse": {
+        "description": "Valuation, weights, freshness and warnings for the whole portfolio.",
+        "properties": {
+          "cash": {
+            "title": "Cash",
+            "type": "integer"
+          },
+          "cash_weight": {
+            "title": "Cash Weight",
+            "type": "number"
+          },
+          "freshness": {
+            "$ref": "#/components/schemas/Freshness"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/HoldingValuation"
+            },
+            "title": "Holdings",
+            "type": "array"
+          },
+          "market_value_total": {
+            "title": "Market Value Total",
+            "type": "number"
+          },
+          "market_values": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Market Values",
+            "type": "object"
+          },
+          "total_value": {
+            "title": "Total Value",
+            "type": "number"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Weights",
+            "type": "object"
+          }
+        },
+        "required": [
+          "cash",
+          "market_value_total",
+          "total_value",
+          "cash_weight",
+          "market_values",
+          "weights",
+          "holdings",
+          "freshness"
+        ],
+        "title": "PortfolioEvaluationResponse",
+        "type": "object"
+      },
+      "PresetOption": {
+        "description": "A curated index-based universe preset.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description"
+        ],
+        "title": "PresetOption",
+        "type": "object"
+      },
+      "PresetResponse": {
+        "description": "The member codes of a curated preset.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "index_code": {
+            "title": "Index Code",
+            "type": "string"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "index_code",
+          "symbols",
+          "count"
+        ],
+        "title": "PresetResponse",
+        "type": "object"
+      },
+      "PriceBar": {
+        "description": "One daily bar in the standard format.",
+        "properties": {
+          "adj_close": {
+            "title": "Adj Close",
+            "type": "number"
+          },
+          "close": {
+            "title": "Close",
+            "type": "number"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "high": {
+            "title": "High",
+            "type": "number"
+          },
+          "low": {
+            "title": "Low",
+            "type": "number"
+          },
+          "open": {
+            "title": "Open",
+            "type": "number"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "volume": {
+            "title": "Volume",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "open",
+          "high",
+          "low",
+          "close",
+          "adj_close",
+          "volume",
+          "source"
+        ],
+        "title": "PriceBar",
+        "type": "object"
+      },
+      "PriceSeries": {
+        "description": "A price series returned by the API, with provenance and warnings.",
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/PriceBar"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "status": {
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "symbol",
+          "source",
+          "stale"
+        ],
+        "title": "PriceSeries",
+        "type": "object"
+      },
+      "ProbeReport": {
+        "description": "Probe results across every provider, plus the recommended order.",
+        "properties": {
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "index_code": {
+            "title": "Index Code",
+            "type": "string"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderProbe"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "recommended_order": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Recommended Order",
+            "type": "array"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tickers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "generated_at",
+          "tickers",
+          "index_code",
+          "start",
+          "end",
+          "providers",
+          "recommended_order"
+        ],
+        "title": "ProbeReport",
+        "type": "object"
+      },
+      "ProbeSample": {
+        "description": "Outcome of probing one provider for one symbol/index.",
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "error_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Type"
+          },
+          "first_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Date"
+          },
+          "history_depth_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "History Depth Days"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "last_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Date"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "looks_adjusted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Looks Adjusted"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "rows": {
+            "default": 0,
+            "title": "Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "label",
+          "ok"
+        ],
+        "title": "ProbeSample",
+        "type": "object"
+      },
+      "ProviderCatalogueEntry": {
+        "description": "Registry metadata for one provider (id, name, description, params).",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parameter_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameter Schema"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "parameter_schema"
+        ],
+        "title": "ProviderCatalogueEntry",
+        "type": "object"
+      },
+      "ProviderProbe": {
+        "description": "Probe results for a single provider.",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/ProbeSample"
+            },
+            "title": "Samples",
+            "type": "array"
+          }
+        },
+        "required": [
+          "provider",
+          "ok",
+          "samples"
+        ],
+        "title": "ProviderProbe",
+        "type": "object"
+      },
+      "ProviderStatus": {
+        "description": "Health snapshot for one provider in the failover chain.",
+        "properties": {
+          "consecutive_failures": {
+            "title": "Consecutive Failures",
+            "type": "integer"
+          },
+          "cooldown_until": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Until"
+          },
+          "healthy": {
+            "title": "Healthy",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "in_cooldown": {
+            "title": "In Cooldown",
+            "type": "boolean"
+          },
+          "in_order": {
+            "default": true,
+            "title": "In Order",
+            "type": "boolean"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "last_error_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error Type"
+          },
+          "last_failure_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Failure At"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "returns_adjusted_prices": {
+            "title": "Returns Adjusted Prices",
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "closed",
+              "open",
+              "half_open"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "supports_indexes": {
+            "title": "Supports Indexes",
+            "type": "boolean"
+          },
+          "unofficial": {
+            "title": "Unofficial",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "unofficial",
+          "returns_adjusted_prices",
+          "supports_indexes",
+          "healthy",
+          "state",
+          "consecutive_failures",
+          "in_cooldown"
+        ],
+        "title": "ProviderStatus",
+        "type": "object"
+      },
+      "QualityFinding": {
+        "description": "One problem (or note) produced by a quality check.",
+        "properties": {
+          "check": {
+            "title": "Check",
+            "type": "string"
+          },
+          "dates": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "title": "Dates",
+            "type": "array"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "check",
+          "severity",
+          "message"
+        ],
+        "title": "QualityFinding",
+        "type": "object"
+      },
+      "QualityFlagsResponse": {
+        "description": "Data-quality signals for a kept symbol.",
+        "properties": {
+          "delisted": {
+            "title": "Delisted",
+            "type": "boolean"
+          },
+          "illiquid": {
+            "title": "Illiquid",
+            "type": "boolean"
+          },
+          "missing_data": {
+            "title": "Missing Data",
+            "type": "boolean"
+          },
+          "suspended": {
+            "title": "Suspended",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "suspended",
+          "delisted",
+          "missing_data",
+          "illiquid"
+        ],
+        "title": "QualityFlagsResponse",
+        "type": "object"
+      },
+      "QualityReport": {
+        "description": "Aggregated quality findings for one symbol.",
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "checks_run": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Checks Run",
+            "type": "array"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/QualityFinding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "ok",
+          "checked_at",
+          "checks_run"
+        ],
+        "title": "QualityReport",
+        "type": "object"
+      },
+      "RandomCloudPointResponse": {
+        "description": "One random portfolio plotted on the scatter (no weights).",
+        "properties": {
+          "expected_return": {
+            "title": "Expected Return",
+            "type": "number"
+          },
+          "sharpe": {
+            "title": "Sharpe",
+            "type": "number"
+          },
+          "volatility": {
+            "title": "Volatility",
+            "type": "number"
+          }
+        },
+        "required": [
+          "expected_return",
+          "volatility",
+          "sharpe"
+        ],
+        "title": "RandomCloudPointResponse",
+        "type": "object"
+      },
+      "RatioPeerComparison": {
+        "description": "One ratio's value for a ticker plus its peer distribution and rank.",
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "category_label": {
+            "title": "Category Label",
+            "type": "string"
+          },
+          "direction": {
+            "default": "neutral",
+            "title": "Direction",
+            "type": "string"
+          },
+          "is_percentage": {
+            "default": false,
+            "title": "Is Percentage",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "not_meaningful": {
+            "default": false,
+            "title": "Not Meaningful",
+            "type": "boolean"
+          },
+          "peers": {
+            "$ref": "#/components/schemas/PeerStatistic"
+          },
+          "ratio": {
+            "title": "Ratio",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "ratio",
+          "label",
+          "category",
+          "category_label"
+        ],
+        "title": "RatioPeerComparison",
+        "type": "object"
+      },
+      "RebalanceAssumptions": {
+        "description": "The settings, market rules and data provenance used to plan the orders.",
+        "properties": {
+          "brokerage_fee_rate": {
+            "title": "Brokerage Fee Rate",
+            "type": "number"
+          },
+          "cost_model": {
+            "title": "Cost Model",
+            "type": "string"
+          },
+          "data_sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data Sources",
+            "type": "array"
+          },
+          "latest_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Date"
+          },
+          "lot_sizes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Lot Sizes",
+            "type": "object"
+          },
+          "min_notional": {
+            "title": "Min Notional",
+            "type": "integer"
+          },
+          "policy": {
+            "title": "Policy",
+            "type": "string"
+          },
+          "prices_adjusted": {
+            "title": "Prices Adjusted",
+            "type": "boolean"
+          },
+          "sell_tax": {
+            "title": "Sell Tax",
+            "type": "number"
+          }
+        },
+        "required": [
+          "brokerage_fee_rate",
+          "sell_tax",
+          "min_notional",
+          "cost_model",
+          "policy",
+          "data_sources",
+          "latest_date",
+          "prices_adjusted",
+          "lot_sizes"
+        ],
+        "title": "RebalanceAssumptions",
+        "type": "object"
+      },
+      "RebalanceDefaults": {
+        "description": "Defaults the UI should preselect.",
+        "properties": {
+          "cost_model": {
+            "title": "Cost Model",
+            "type": "string"
+          },
+          "min_notional": {
+            "title": "Min Notional",
+            "type": "integer"
+          },
+          "policy": {
+            "title": "Policy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cost_model",
+          "policy",
+          "min_notional"
+        ],
+        "title": "RebalanceDefaults",
+        "type": "object"
+      },
+      "RebalanceOptionsResponse": {
+        "description": "Cost models and policies, published for the UI to render.",
+        "properties": {
+          "cost_models": {
+            "items": {
+              "$ref": "#/components/schemas/app__api__v1__rebalance__OptionResponse"
+            },
+            "title": "Cost Models",
+            "type": "array"
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/RebalanceDefaults"
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/app__api__v1__rebalance__OptionResponse"
+            },
+            "title": "Policies",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cost_models",
+          "policies",
+          "defaults"
+        ],
+        "title": "RebalanceOptionsResponse",
+        "type": "object"
+      },
+      "RebalanceOrderResponse": {
+        "description": "One placeable order with its estimated fee and tax.",
+        "properties": {
+          "fee": {
+            "title": "Fee",
+            "type": "integer"
+          },
+          "lots": {
+            "title": "Lots",
+            "type": "integer"
+          },
+          "reference_price": {
+            "title": "Reference Price",
+            "type": "number"
+          },
+          "shares": {
+            "title": "Shares",
+            "type": "integer"
+          },
+          "side": {
+            "title": "Side",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "tax": {
+            "title": "Tax",
+            "type": "integer"
+          },
+          "value": {
+            "title": "Value",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "symbol",
+          "side",
+          "lots",
+          "shares",
+          "reference_price",
+          "value",
+          "fee",
+          "tax"
+        ],
+        "title": "RebalanceOrderResponse",
+        "type": "object"
+      },
+      "RebalancePositionResponse": {
+        "description": "One symbol's current position next to its target.",
+        "properties": {
+          "current_shares": {
+            "title": "Current Shares",
+            "type": "integer"
+          },
+          "current_value": {
+            "title": "Current Value",
+            "type": "number"
+          },
+          "current_weight": {
+            "title": "Current Weight",
+            "type": "number"
+          },
+          "delta_value": {
+            "title": "Delta Value",
+            "type": "number"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "target_value": {
+            "title": "Target Value",
+            "type": "number"
+          },
+          "target_weight": {
+            "title": "Target Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "symbol",
+          "current_shares",
+          "current_value",
+          "current_weight",
+          "target_weight",
+          "target_value",
+          "delta_value"
+        ],
+        "title": "RebalancePositionResponse",
+        "type": "object"
+      },
+      "RebalanceRequest": {
+        "description": "Inputs for one rebalance. Settings default when omitted.",
+        "properties": {
+          "cash": {
+            "default": 0,
+            "description": "Cash balance in whole VND.",
+            "minimum": 0.0,
+            "title": "Cash",
+            "type": "integer"
+          },
+          "cost_model": {
+            "default": "vn",
+            "description": "Cost model id.",
+            "title": "Cost Model",
+            "type": "string"
+          },
+          "holdings": {
+            "description": "Current holdings.",
+            "items": {
+              "$ref": "#/components/schemas/Holding"
+            },
+            "title": "Holdings",
+            "type": "array"
+          },
+          "min_notional": {
+            "default": 1000000,
+            "description": "Skip orders whose value is below this many VND.",
+            "minimum": 0.0,
+            "title": "Min Notional",
+            "type": "integer"
+          },
+          "policy": {
+            "default": "full",
+            "description": "Rebalance policy id.",
+            "title": "Policy",
+            "type": "string"
+          },
+          "policy_params": {
+            "additionalProperties": true,
+            "title": "Policy Params",
+            "type": "object"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User settings. Defaults apply when omitted."
+          },
+          "target_weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Target weight per symbol as a fraction of total value (the remainder is target cash).",
+            "title": "Target Weights",
+            "type": "object"
+          }
+        },
+        "title": "RebalanceRequest",
+        "type": "object"
+      },
+      "RebalanceResponse": {
+        "description": "The order list, current-versus-target positions and the cost summary.",
+        "properties": {
+          "assumptions": {
+            "$ref": "#/components/schemas/RebalanceAssumptions"
+          },
+          "cash_weight": {
+            "title": "Cash Weight",
+            "type": "number"
+          },
+          "cost_model": {
+            "title": "Cost Model",
+            "type": "string"
+          },
+          "initial_cash": {
+            "title": "Initial Cash",
+            "type": "integer"
+          },
+          "orders": {
+            "items": {
+              "$ref": "#/components/schemas/RebalanceOrderResponse"
+            },
+            "title": "Orders",
+            "type": "array"
+          },
+          "policy": {
+            "title": "Policy",
+            "type": "string"
+          },
+          "policy_params": {
+            "additionalProperties": true,
+            "title": "Policy Params",
+            "type": "object"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/RebalancePositionResponse"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "residual_cash": {
+            "title": "Residual Cash",
+            "type": "integer"
+          },
+          "target_cash_weight": {
+            "title": "Target Cash Weight",
+            "type": "number"
+          },
+          "total_cost": {
+            "title": "Total Cost",
+            "type": "integer"
+          },
+          "total_fee": {
+            "title": "Total Fee",
+            "type": "integer"
+          },
+          "total_tax": {
+            "title": "Total Tax",
+            "type": "integer"
+          },
+          "total_value": {
+            "title": "Total Value",
+            "type": "number"
+          },
+          "turnover": {
+            "title": "Turnover",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "total_value",
+          "initial_cash",
+          "cash_weight",
+          "target_cash_weight",
+          "positions",
+          "orders",
+          "total_fee",
+          "total_tax",
+          "total_cost",
+          "turnover",
+          "residual_cash",
+          "cost_model",
+          "policy",
+          "policy_params",
+          "assumptions",
+          "warnings"
+        ],
+        "title": "RebalanceResponse",
+        "type": "object"
+      },
+      "RefreshResult": {
+        "description": "Progress of one incremental refresh batch.",
+        "properties": {
+          "cursor": {
+            "title": "Cursor",
+            "type": "integer"
+          },
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "failures": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Failures",
+            "type": "object"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "processed": {
+            "title": "Processed",
+            "type": "integer"
+          },
+          "remaining": {
+            "title": "Remaining",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "symbols_done": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols Done",
+            "type": "array"
+          }
+        },
+        "required": [
+          "done",
+          "status",
+          "processed",
+          "remaining",
+          "cursor"
+        ],
+        "title": "RefreshResult",
+        "type": "object"
+      },
+      "ReturnPoint": {
+        "description": "One serialisable daily simple return.",
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "value"
+        ],
+        "title": "ReturnPoint",
+        "type": "object"
+      },
+      "RiskCompareRequest": {
+        "description": "Inputs for the side-by-side risk comparison on the Risk page.\n\n``symbols`` and the date range describe the shared universe; the optional\nweight sets are projected onto it. Equal weight is computed server-side and\nthe benchmark is measured as a one-asset portfolio.",
+        "properties": {
+          "benchmark": {
+            "default": "VNINDEX",
+            "description": "Benchmark index code (VNINDEX, VN30, HNXINDEX, UPCOMINDEX).",
+            "title": "Benchmark",
+            "type": "string"
+          },
+          "current_weights": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Current portfolio weights (fractions of holdings).",
+            "title": "Current Weights"
+          },
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "metric_params": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Metric Params",
+            "type": "object"
+          },
+          "metrics": {
+            "description": "Metric ids; empty computes every metric.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "optimized_weights": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Chosen optimized portfolio weights (fractions).",
+            "title": "Optimized Weights"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User settings (risk-free rate). Defaults apply when omitted."
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "symbols": {
+            "description": "Shared universe tickers to analyse.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "RiskCompareRequest",
+        "type": "object"
+      },
+      "RiskCompareResponse": {
+        "description": "Current, optimized, equal-weight and benchmark compared on one universe.",
+        "properties": {
+          "assumptions": {
+            "$ref": "#/components/schemas/Assumptions"
+          },
+          "benchmark": {
+            "title": "Benchmark",
+            "type": "string"
+          },
+          "benchmark_portfolio": {
+            "$ref": "#/components/schemas/ComparePortfolioBlock"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComparePortfolioBlock"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dates": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dates",
+            "type": "array"
+          },
+          "equal_weight": {
+            "$ref": "#/components/schemas/ComparePortfolioBlock"
+          },
+          "optimized": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComparePortfolioBlock"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/app__api__v1__risk__OptionResponse"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "symbols",
+          "dates",
+          "benchmark",
+          "current",
+          "optimized",
+          "equal_weight",
+          "benchmark_portfolio",
+          "options",
+          "assumptions"
+        ],
+        "title": "RiskCompareResponse",
+        "type": "object"
+      },
+      "RiskDefaults": {
+        "description": "Defaults the UI should preselect.",
+        "properties": {
+          "benchmark": {
+            "title": "Benchmark",
+            "type": "string"
+          },
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          }
+        },
+        "required": [
+          "benchmark",
+          "confidence"
+        ],
+        "title": "RiskDefaults",
+        "type": "object"
+      },
+      "RiskOptionsResponse": {
+        "description": "Every risk metric and benchmark, published for the UI to render.",
+        "properties": {
+          "benchmarks": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkOption"
+            },
+            "title": "Benchmarks",
+            "type": "array"
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/RiskDefaults"
+          },
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/app__api__v1__risk__OptionResponse"
+            },
+            "title": "Metrics",
+            "type": "array"
+          }
+        },
+        "required": [
+          "metrics",
+          "benchmarks",
+          "defaults"
+        ],
+        "title": "RiskOptionsResponse",
+        "type": "object"
+      },
+      "RiskRequest": {
+        "description": "Inputs for one risk analysis.\n\n``symbols`` and the date range describe the analysed universe; ``weights`` is\nthe portfolio (the current or the optimized one) measured against it.",
+        "properties": {
+          "benchmark": {
+            "default": "VNINDEX",
+            "description": "Benchmark index code (VNINDEX, VN30, HNXINDEX, UPCOMINDEX).",
+            "title": "Benchmark",
+            "type": "string"
+          },
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "metric_params": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Metric Params",
+            "type": "object"
+          },
+          "metrics": {
+            "description": "Metric ids; empty computes every metric.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User settings (risk-free rate). Defaults apply when omitted."
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "symbols": {
+            "description": "Universe tickers to analyse.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Portfolio weight per symbol (fractions; cash is the remainder).",
+            "title": "Weights",
+            "type": "object"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "RiskRequest",
+        "type": "object"
+      },
+      "RiskResponse": {
+        "description": "Every selected metric's payload plus the growth series and the catalogue.",
+        "properties": {
+          "assumptions": {
+            "$ref": "#/components/schemas/Assumptions"
+          },
+          "benchmark": {
+            "title": "Benchmark",
+            "type": "string"
+          },
+          "metrics": {
+            "additionalProperties": true,
+            "title": "Metrics",
+            "type": "object"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/app__api__v1__risk__OptionResponse"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "performance": {
+            "$ref": "#/components/schemas/PerformanceResponse"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Weights",
+            "type": "object"
+          }
+        },
+        "required": [
+          "symbols",
+          "weights",
+          "benchmark",
+          "metrics",
+          "performance",
+          "assumptions",
+          "options"
+        ],
+        "title": "RiskResponse",
+        "type": "object"
+      },
+      "SectorListResponse": {
+        "description": "The sector list (for the multi-select) with counts and provenance.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "data_as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data As Of"
+          },
+          "preset_id": {
+            "default": "standard_retail",
+            "title": "Preset Id",
+            "type": "string"
+          },
+          "sectors": {
+            "items": {
+              "$ref": "#/components/schemas/V2SectorCount"
+            },
+            "title": "Sectors",
+            "type": "array"
+          },
+          "total_without_sector": {
+            "default": 0,
+            "title": "Total Without Sector",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "SectorListResponse",
+        "type": "object"
+      },
+      "SettingsBounds": {
+        "description": "Allowed ranges for the user-controlled rates.",
+        "properties": {
+          "brokerage_fee_rate": {
+            "$ref": "#/components/schemas/Bound"
+          },
+          "risk_free_rate": {
+            "$ref": "#/components/schemas/Bound"
+          }
+        },
+        "required": [
+          "brokerage_fee_rate",
+          "risk_free_rate"
+        ],
+        "title": "SettingsBounds",
+        "type": "object"
+      },
+      "SettingsDefaults": {
+        "description": "Default values of the user-controlled rates, as fractions.",
+        "properties": {
+          "brokerage_fee_rate": {
+            "title": "Brokerage Fee Rate",
+            "type": "number"
+          },
+          "risk_free_rate": {
+            "title": "Risk Free Rate",
+            "type": "number"
+          }
+        },
+        "required": [
+          "brokerage_fee_rate",
+          "risk_free_rate"
+        ],
+        "title": "SettingsDefaults",
+        "type": "object"
+      },
+      "SettingsResponse": {
+        "description": "Defaults and bounds the UI needs to render the Settings page.",
+        "properties": {
+          "bounds": {
+            "$ref": "#/components/schemas/SettingsBounds"
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/SettingsDefaults"
+          }
+        },
+        "required": [
+          "defaults",
+          "bounds"
+        ],
+        "title": "SettingsResponse",
+        "type": "object"
+      },
+      "SharpeRequest": {
+        "description": "Inputs for the Sharpe ratio calculation. Settings default when omitted.",
+        "properties": {
+          "mean_return": {
+            "description": "Expected annual return as a fraction (0.10 == 10%).",
+            "title": "Mean Return",
+            "type": "number"
+          },
+          "settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "User settings. Defaults apply when omitted."
+          },
+          "volatility": {
+            "description": "Annualized volatility as a fraction (0.20 == 20%).",
+            "title": "Volatility",
+            "type": "number"
+          }
+        },
+        "required": [
+          "mean_return",
+          "volatility"
+        ],
+        "title": "SharpeRequest",
+        "type": "object"
+      },
+      "SharpeResponse": {
+        "description": "Sharpe ratio and the settings used to compute it.",
+        "properties": {
+          "assumptions": {
+            "$ref": "#/components/schemas/Assumptions"
+          },
+          "sharpe": {
+            "title": "Sharpe",
+            "type": "number"
+          }
+        },
+        "required": [
+          "sharpe",
+          "assumptions"
+        ],
+        "title": "SharpeResponse",
+        "type": "object"
+      },
+      "SymbolInfo": {
+        "description": "A tradable symbol and the provider that reported it.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "exchange": {
+            "title": "Exchange",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "required": [
+          "code",
+          "exchange",
+          "source"
+        ],
+        "title": "SymbolInfo",
+        "type": "object"
+      },
+      "SymbolListResponse": {
+        "description": "Symbols stored in the database, optionally filtered by exchange.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
+          },
+          "symbols": {
+            "items": {
+              "$ref": "#/components/schemas/SymbolInfo"
+            },
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "exchange",
+          "count",
+          "symbols"
+        ],
+        "title": "SymbolListResponse",
+        "type": "object"
+      },
+      "TickerSnapshot": {
+        "description": "The acceptance helper's answer for one ticker and range.\n\nBundles adjusted simple returns, liquidity medians, market cap and the ICB\nlevel-2 sector, plus the provenance/basis flags for every dataset.",
+        "properties": {
+          "data_as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data As Of"
+          },
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "liquidity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LiquidityRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap"
+          },
+          "market_cap_basis": {
+            "anyOf": [
+              {
+                "const": "full",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap Basis"
+          },
+          "price_adjustment_basis": {
+            "anyOf": [
+              {
+                "enum": [
+                  "ssi_adjusted",
+                  "corporate_actions",
+                  "price_gap_heuristic",
+                  "raw"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Adjustment Basis"
+          },
+          "returns": {
+            "items": {
+              "$ref": "#/components/schemas/ReturnPoint"
+            },
+            "title": "Returns",
+            "type": "array"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "sector_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector Source"
+          },
+          "shares_outstanding": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Outstanding"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "volume_basis": {
+            "anyOf": [
+              {
+                "enum": [
+                  "matched",
+                  "total"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume Basis"
+          }
+        },
+        "required": [
+          "symbol",
+          "start",
+          "end"
+        ],
+        "title": "TickerSnapshot",
+        "type": "object"
+      },
+      "UniverseBuildRequest": {
+        "description": "Inputs for building the universe.",
+        "properties": {
+          "adv_sessions": {
+            "default": 20,
+            "description": "Sessions used for the ADV metric.",
+            "minimum": 1.0,
+            "title": "Adv Sessions",
+            "type": "integer"
+          },
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/UniverseFilterRequest"
+            },
+            "title": "Filters",
+            "type": "array"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Index preset, for example VN30.",
+            "title": "Preset"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "symbols": {
+            "description": "Explicit ticker codes.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "UniverseBuildRequest",
+        "type": "object"
+      },
+      "UniverseBuildResponse": {
+        "description": "The aligned universe dataset plus provenance for kept and dropped tickers.",
+        "properties": {
+          "adv_by_symbol": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Adv By Symbol",
+            "type": "object"
+          },
+          "dropped": {
+            "items": {
+              "$ref": "#/components/schemas/DroppedTickerResponse"
+            },
+            "title": "Dropped",
+            "type": "array"
+          },
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "filters_applied": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Filters Applied",
+            "type": "array"
+          },
+          "price_matrix": {
+            "$ref": "#/components/schemas/MatrixResponse"
+          },
+          "quality_flags": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/QualityFlagsResponse"
+            },
+            "title": "Quality Flags",
+            "type": "object"
+          },
+          "returns_matrix": {
+            "$ref": "#/components/schemas/MatrixResponse"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          },
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "symbols",
+          "adv_by_symbol",
+          "quality_flags",
+          "dropped",
+          "filters_applied",
+          "price_matrix",
+          "returns_matrix"
+        ],
+        "title": "UniverseBuildResponse",
+        "type": "object"
+      },
+      "UniverseFilterRequest": {
+        "description": "One filter to apply, with its parameters.",
+        "properties": {
+          "id": {
+            "description": "Filter id from /universe/options.",
+            "title": "Id",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "UniverseFilterRequest",
+        "type": "object"
+      },
+      "UniverseFilterResponse": {
+        "description": "The kept/rejected universe plus provenance, warnings and stored flags.",
+        "properties": {
+          "adjustment_flags": {
+            "items": {
+              "$ref": "#/components/schemas/AdjustmentQualityFlag"
+            },
+            "title": "Adjustment Flags",
+            "type": "array"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "basis": {
+            "$ref": "#/components/schemas/V2Basis"
+          },
+          "data_as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data As Of"
+          },
+          "flags_available": {
+            "default": false,
+            "title": "Flags Available",
+            "type": "boolean"
+          },
+          "flags_policy_current": {
+            "default": false,
+            "title": "Flags Policy Current",
+            "type": "boolean"
+          },
+          "kept": {
+            "items": {
+              "$ref": "#/components/schemas/V2UniverseTicker"
+            },
+            "title": "Kept",
+            "type": "array"
+          },
+          "preset_id": {
+            "default": "standard_retail",
+            "title": "Preset Id",
+            "type": "string"
+          },
+          "rejected": {
+            "items": {
+              "$ref": "#/components/schemas/V2RejectedTicker"
+            },
+            "title": "Rejected",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "UniverseFilterResponse",
+        "type": "object"
+      },
+      "UniverseOptionsResponse": {
+        "description": "Filter catalogue and available presets, published for the UI to render.",
+        "properties": {
+          "filters": {
+            "items": {
+              "$ref": "#/components/schemas/FilterOption"
+            },
+            "title": "Filters",
+            "type": "array"
+          },
+          "presets": {
+            "items": {
+              "$ref": "#/components/schemas/PresetOption"
+            },
+            "title": "Presets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "filters",
+          "presets"
+        ],
+        "title": "UniverseOptionsResponse",
+        "type": "object"
+      },
+      "UserSettings": {
+        "description": "Values supplied by the user and sent with every API request.\n\nBoth defaults are **placeholders** that the user is expected to replace: the\nfee default is a typical Vietnamese retail brokerage rate and the risk-free\ndefault is a convenient round number. Core functions receive these values as\nparameters; they are never read from global configuration or market rules.",
+        "properties": {
+          "brokerage_fee_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "default": "0.0015",
+            "description": "Brokerage commission charged per side as a fraction of trade value (0.0015 == 0.15%). Default is a placeholder; check your broker's fee schedule.",
+            "title": "Brokerage Fee Rate"
+          },
+          "risk_free_rate": {
+            "default": 0.03,
+            "description": "Annualized risk-free rate as a fraction (0.03 == 3%). Default is a placeholder; use a government bond yield appropriate for your horizon.",
+            "title": "Risk Free Rate",
+            "type": "number"
+          }
+        },
+        "title": "UserSettings",
+        "type": "object"
+      },
+      "V2Basis": {
+        "description": "The basis flags for the datasets behind one universe response.",
+        "properties": {
+          "market_cap_basis": {
+            "default": "full",
+            "title": "Market Cap Basis",
+            "type": "string"
+          },
+          "market_cap_note": {
+            "default": "Full market cap (free-float is unavailable keyless; ADTV and ADV are the real liquidity guards).",
+            "title": "Market Cap Note",
+            "type": "string"
+          },
+          "price_adjustment_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Adjustment Basis"
+          },
+          "volume_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume Basis"
+          }
+        },
+        "title": "V2Basis",
+        "type": "object"
+      },
+      "V2RejectedTicker": {
+        "description": "One ticker that failed the filter, with a plain-language reason.",
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "reason"
+        ],
+        "title": "V2RejectedTicker",
+        "type": "object"
+      },
+      "V2SectorCount": {
+        "description": "One ICB level-2 sector with total and preset-passing constituent counts.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "passing": {
+            "title": "Passing",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "total",
+          "passing"
+        ],
+        "title": "V2SectorCount",
+        "type": "object"
+      },
+      "V2UniverseTicker": {
+        "description": "One ticker that passed the preset and facet filters.",
+        "properties": {
+          "adtv_median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adtv Median"
+          },
+          "adv_median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adv Median"
+          },
+          "exchange": {
+            "title": "Exchange",
+            "type": "string"
+          },
+          "index_memberships": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Index Memberships",
+            "type": "array"
+          },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "volume_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume Basis"
+          }
+        },
+        "required": [
+          "ticker",
+          "exchange"
+        ],
+        "title": "V2UniverseTicker",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "Window": {
+        "description": "The effective analysis window, in trading days.",
+        "properties": {
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "start",
+          "end"
+        ],
+        "title": "Window",
+        "type": "object"
+      },
+      "app__api__v1__optimize__OptionResponse": {
+        "description": "Registry metadata for one optimizer option.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parameter_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameter Schema"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "parameter_schema"
+        ],
+        "title": "OptionResponse",
+        "type": "object"
+      },
+      "app__api__v1__rebalance__OptionResponse": {
+        "description": "Registry metadata for one cost model or rebalance policy.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parameter_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameter Schema"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "parameter_schema"
+        ],
+        "title": "OptionResponse",
+        "type": "object"
+      },
+      "app__api__v1__risk__OptionResponse": {
+        "description": "Registry metadata for one risk metric.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parameter_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameter Schema"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "parameter_schema"
+        ],
+        "title": "OptionResponse",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Decision support only. Not financial advice.",
+    "title": "VN Portfolio Optimizer API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/data/backfill": {
+      "post": {
+        "description": "Run an incremental on-demand backfill for the requested symbols.",
+        "operationId": "backfill_api_v1_data_backfill_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackfillRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackfillResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Backfill",
+        "tags": [
+          "data"
+        ]
+      }
+    },
+    "/api/v1/data/freshness": {
+      "get": {
+        "description": "Return the latest stored price date and the freshest price source.",
+        "operationId": "data_freshness_api_v1_data_freshness_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataFreshness"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Data Freshness",
+        "tags": [
+          "data"
+        ]
+      }
+    },
+    "/api/v1/data/index/{index_code}": {
+      "get": {
+        "description": "Return daily prices for a benchmark index (VNINDEX, VN30, ...).",
+        "operationId": "get_index_prices_api_v1_data_index__index_code__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "index_code",
+            "required": true,
+            "schema": {
+              "title": "Index Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceSeries"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Index Prices",
+        "tags": [
+          "data"
+        ]
+      }
+    },
+    "/api/v1/data/probe": {
+      "get": {
+        "description": "Call every provider and report what works on the current (hosted) network.",
+        "operationId": "probe_providers_api_v1_data_probe_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tickers",
+            "required": false,
+            "schema": {
+              "default": "VNM,FPT,ACB",
+              "title": "Tickers",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "index_code",
+            "required": false,
+            "schema": {
+              "default": "VNINDEX",
+              "title": "Index Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "in": "query",
+            "name": "years",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "maximum": 20,
+              "minimum": 1,
+              "title": "Years",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-refresh-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Refresh-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProbeReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Probe Providers",
+        "tags": [
+          "data"
+        ]
+      }
+    },
+    "/api/v1/data/providers": {
+      "get": {
+        "description": "Publish the provider catalogue from the registry.",
+        "operationId": "list_providers_api_v1_data_providers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderCatalogueEntry"
+                  },
+                  "title": "Response List Providers Api V1 Data Providers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Providers",
+        "tags": [
+          "data"
+        ]
+      }
+    },
+    "/api/v1/data/providers/status": {
+      "get": {
+        "description": "Return each provider's health, last error and circuit-breaker state.",
+        "operationId": "providers_status_api_v1_data_providers_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderStatus"
+                  },
+                  "title": "Response Providers Status Api V1 Data Providers Status Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Providers Status",
+        "tags": [
+          "data"
+        ]
+      }
+    },
+    "/api/v1/data/quality/{symbol}": {
+      "get": {
+        "description": "Run every registered quality check for ``symbol``.",
+        "operationId": "get_quality_api_v1_data_quality__symbol__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "title": "Symbol",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Quality",
+        "tags": [
+          "data"
+        ]
+      }
+    },
+    "/api/v1/data/refresh": {
+      "get": {
+        "description": "Run a bounded incremental sync batch and report what remains.",
+        "operationId": "refresh_api_v1_data_refresh_get",
+        "parameters": [
+          {
+            "description": "Resume from a prior call.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "description": "Resume from a prior call.",
+              "minimum": 0,
+              "title": "Cursor",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "in": "query",
+            "name": "time_budget",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Time Budget"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-refresh-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Refresh-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh",
+        "tags": [
+          "data"
+        ]
+      },
+      "post": {
+        "description": "Run a bounded incremental sync batch and report what remains.",
+        "operationId": "refresh_api_v1_data_refresh_post",
+        "parameters": [
+          {
+            "description": "Resume from a prior call.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "description": "Resume from a prior call.",
+              "minimum": 0,
+              "title": "Cursor",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "in": "query",
+            "name": "time_budget",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Time Budget"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-refresh-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Refresh-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh",
+        "tags": [
+          "data"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "description": "Report that the API is up and serving requests.",
+        "operationId": "read_health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Health",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/optimize": {
+      "post": {
+        "description": "Optimize the requested symbols and return weights, lots and assumptions.",
+        "operationId": "run_optimize_api_v1_optimize_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OptimizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptimizeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Optimize",
+        "tags": [
+          "optimize"
+        ]
+      }
+    },
+    "/api/v1/optimize/frontier": {
+      "post": {
+        "description": "Build the random cloud, the exact frontier and the marked portfolios.",
+        "operationId": "run_frontier_api_v1_optimize_frontier_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FrontierRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FrontierResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Frontier",
+        "tags": [
+          "optimize"
+        ]
+      }
+    },
+    "/api/v1/optimize/options": {
+      "get": {
+        "description": "Publish every optimizer concept and the conservative defaults.",
+        "operationId": "read_optimize_options_api_v1_optimize_options_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OptimizeOptionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Optimize Options",
+        "tags": [
+          "optimize"
+        ]
+      }
+    },
+    "/api/v1/pnl/evaluate": {
+      "post": {
+        "description": "Value each holding at the latest close and report unrealized P&L.",
+        "operationId": "evaluate_pnl_api_v1_pnl_evaluate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PnLRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PnLResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Evaluate Pnl",
+        "tags": [
+          "pnl"
+        ]
+      }
+    },
+    "/api/v1/portfolio/evaluate": {
+      "post": {
+        "description": "Value the portfolio's holdings at the latest prices.\n\nPrices prefer the V2 **spot** (raw) closes so a holding values at the actual\nmarket price of its freshest bar; a ticker without V2 data falls back to the V1\nseries. Each holding's latest bar date is compared against the global latest\nsession across the whole database, so a ticker that trails the market is flagged\nas stale in its ``Notes``.",
+        "operationId": "evaluate_portfolio_api_v1_portfolio_evaluate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Portfolio"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioEvaluationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Evaluate Portfolio",
+        "tags": [
+          "portfolio"
+        ]
+      }
+    },
+    "/api/v1/prices/{symbol}": {
+      "get": {
+        "description": "Return daily prices for a symbol, backfilling once if it is unknown.",
+        "operationId": "get_prices_api_v1_prices__symbol__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "title": "Symbol",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceSeries"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Prices",
+        "tags": [
+          "data"
+        ]
+      }
+    },
+    "/api/v1/rebalance": {
+      "post": {
+        "description": "Plan a rebalance and return a placeable order list.",
+        "operationId": "run_rebalance_api_v1_rebalance_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RebalanceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RebalanceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Rebalance",
+        "tags": [
+          "rebalance"
+        ]
+      }
+    },
+    "/api/v1/rebalance/cost": {
+      "post": {
+        "description": "Estimate the brokerage commission using the request's (or default) fee.",
+        "operationId": "estimate_cost_api_v1_rebalance_cost_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CostRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Estimate Cost",
+        "tags": [
+          "rebalance"
+        ]
+      }
+    },
+    "/api/v1/rebalance/options": {
+      "get": {
+        "description": "Return the cost-model and policy catalogues and the defaults.",
+        "operationId": "rebalance_options_api_v1_rebalance_options_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RebalanceOptionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Rebalance Options",
+        "tags": [
+          "rebalance"
+        ]
+      }
+    },
+    "/api/v1/risk": {
+      "post": {
+        "description": "Compute the selected risk metrics for one portfolio over the universe.",
+        "operationId": "analyse_risk_api_v1_risk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RiskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analyse Risk",
+        "tags": [
+          "risk"
+        ]
+      }
+    },
+    "/api/v1/risk/compare": {
+      "post": {
+        "description": "Compare the current, optimized, equal-weight and benchmark portfolios.\n\nEvery portfolio is measured on the same universe and window: one build of the\nreturns matrix plus one aligned benchmark series. Equal weight is one over the\nnumber of kept tickers; the benchmark is analysed as a one-asset portfolio.",
+        "operationId": "compare_risk_api_v1_risk_compare_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RiskCompareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskCompareResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Compare Risk",
+        "tags": [
+          "risk"
+        ]
+      }
+    },
+    "/api/v1/risk/options": {
+      "get": {
+        "description": "Publish every risk metric, the benchmark list and the defaults.",
+        "operationId": "read_risk_options_api_v1_risk_options_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskOptionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Risk Options",
+        "tags": [
+          "risk"
+        ]
+      }
+    },
+    "/api/v1/risk/sharpe": {
+      "post": {
+        "description": "Compute the Sharpe ratio using the request's (or default) risk-free rate.",
+        "operationId": "compute_sharpe_api_v1_risk_sharpe_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SharpeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharpeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Compute Sharpe",
+        "tags": [
+          "risk"
+        ]
+      }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "description": "Return the default user settings and the ranges accepted by the API.",
+        "operationId": "read_settings_api_v1_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Settings",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/v1/symbols": {
+      "get": {
+        "description": "Return the stored symbols.",
+        "operationId": "list_symbols_api_v1_symbols_get",
+        "parameters": [
+          {
+            "description": "HOSE, HNX or UPCoM",
+            "in": "query",
+            "name": "exchange",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "HOSE, HNX or UPCoM",
+              "title": "Exchange"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SymbolListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Symbols",
+        "tags": [
+          "data"
+        ]
+      }
+    },
+    "/api/v1/universe/build": {
+      "post": {
+        "description": "Filter the requested symbols (and preset) and return the aligned universe.",
+        "operationId": "build_universe_endpoint_api_v1_universe_build_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UniverseBuildRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UniverseBuildResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Build Universe Endpoint",
+        "tags": [
+          "universe"
+        ]
+      }
+    },
+    "/api/v1/universe/options": {
+      "get": {
+        "description": "Publish the filter catalogue (from the registry) and the available presets.",
+        "operationId": "read_universe_options_api_v1_universe_options_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UniverseOptionsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Universe Options",
+        "tags": [
+          "universe"
+        ]
+      }
+    },
+    "/api/v1/universe/presets/{index_code}": {
+      "get": {
+        "description": "Return a curated preset's members, populating them on first use.",
+        "operationId": "read_preset_api_v1_universe_presets__index_code__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "index_code",
+            "required": true,
+            "schema": {
+              "title": "Index Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresetResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Preset",
+        "tags": [
+          "universe"
+        ]
+      }
+    },
+    "/api/v1/v2/analytics": {
+      "get": {
+        "description": "Return the Sector Analysis payload for the selected benchmark, window and facets.",
+        "operationId": "get_analytics_api_v1_v2_analytics_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "benchmark",
+            "required": false,
+            "schema": {
+              "default": "VNINDEX",
+              "title": "Benchmark",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timeframe",
+            "required": false,
+            "schema": {
+              "default": "1Y",
+              "title": "Timeframe",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "custom_start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Custom Start"
+            }
+          },
+          {
+            "in": "query",
+            "name": "custom_end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Custom End"
+            }
+          },
+          {
+            "in": "query",
+            "name": "grouping",
+            "required": false,
+            "schema": {
+              "default": "sector",
+              "title": "Grouping",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "liquidity_preset",
+            "required": false,
+            "schema": {
+              "default": "standard_retail",
+              "title": "Liquidity Preset",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "indexes",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Indexes"
+            }
+          },
+          {
+            "in": "query",
+            "name": "exchange",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Exchange"
+            }
+          },
+          {
+            "in": "query",
+            "name": "weighting",
+            "required": false,
+            "schema": {
+              "default": "market_cap",
+              "title": "Weighting",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cap_percent",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cap Percent"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_default_excluded",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Default Excluded",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "exclude_adjustment_flagged",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Exclude Adjustment Flagged",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Analytics",
+        "tags": [
+          "v2"
+        ]
+      }
+    },
+    "/api/v1/v2/coverage": {
+      "get": {
+        "description": "Return the precomputed universe's sector coverage, with every gap listed.",
+        "operationId": "get_sector_coverage_api_v1_v2_coverage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoverageSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Sector Coverage",
+        "tags": [
+          "v2"
+        ]
+      }
+    },
+    "/api/v1/v2/fundamentals/{symbol}": {
+      "get": {
+        "description": "Return a ticker's ratio comparison against its sector peers.\n\nDefaults to the ticker's latest stored period and the \"all peers\" variant; a\n``peer_variant`` of ``liquidity``/``vn100`` narrows the peer set (never across\nsectors, so financials are not compared with non-financials).",
+        "operationId": "get_fundamentals_api_v1_v2_fundamentals__symbol__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "title": "Symbol",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period"
+            }
+          },
+          {
+            "in": "query",
+            "name": "period_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "peer_variant",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "title": "Peer Variant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "preset",
+            "required": false,
+            "schema": {
+              "default": "standard_retail",
+              "title": "Preset",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundamentalsComparison"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Fundamentals",
+        "tags": [
+          "v2"
+        ]
+      }
+    },
+    "/api/v1/v2/sectors": {
+      "get": {
+        "description": "Return ICB level-2 sectors with total and preset-passing constituent counts.",
+        "operationId": "get_sectors_api_v1_v2_sectors_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "preset",
+            "required": false,
+            "schema": {
+              "default": "standard_retail",
+              "title": "Preset",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SectorListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Sectors",
+        "tags": [
+          "v2"
+        ]
+      }
+    },
+    "/api/v1/v2/ticker/{symbol}": {
+      "get": {
+        "description": "Return adjusted returns, liquidity, market cap and sector for ``symbol``.",
+        "operationId": "get_ticker_snapshot_api_v1_v2_ticker__symbol__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "title": "Symbol",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "in": "query",
+            "name": "end",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TickerSnapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ticker Snapshot",
+        "tags": [
+          "v2"
+        ]
+      }
+    },
+    "/api/v1/v2/universe": {
+      "get": {
+        "description": "Return the tickers that pass the preset and facets, using ``filter_universe``.",
+        "operationId": "get_universe_api_v1_v2_universe_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "preset",
+            "required": false,
+            "schema": {
+              "default": "standard_retail",
+              "title": "Preset",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sectors",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sectors"
+            }
+          },
+          {
+            "in": "query",
+            "name": "indexes",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Indexes"
+            }
+          },
+          {
+            "in": "query",
+            "name": "exchange",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Exchange"
+            }
+          },
+          {
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          },
+          {
+            "in": "query",
+            "name": "exclude_adjustment_flagged",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Exclude Adjustment Flagged",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UniverseFilterResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Universe",
+        "tags": [
+          "v2"
+        ]
+      }
+    }
+  }
+}

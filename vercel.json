@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "fastapi",
+  "regions": ["sin1"],
+  "functions": {
+    "asgi.py": {
+      "excludeFiles": "{apps/web/**,**/node_modules/**,**/.next/**,apps/api/tests/**,packages/**/tests/**,**/test_*.py,**/*.test.py,**/__pycache__/**,**/.pytest_cache/**,**/.mypy_cache/**,**/.ruff_cache/**}",
+      "maxDuration": 120
+    }
+  },
+  "crons": [
+    { "path": "/api/v1/data/refresh", "schedule": "30 8 * * 1-5" }
+  ]
+}

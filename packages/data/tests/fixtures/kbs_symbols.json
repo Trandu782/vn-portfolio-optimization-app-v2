@@ -1,0 +1,178 @@
+[
+  {
+    "symbol": "VNM",
+    "nameEn": "Vietnam Dairy Products Joint Stock Company",
+    "exchange": "HOSE",
+    "re": 51100,
+    "ceiling": 54600,
+    "floor": 47550,
+    "type": "stock",
+    "index": 1,
+    "name": "CTCP Sữa Việt Nam"
+  },
+  {
+    "symbol": "FPT",
+    "nameEn": "FPT Corporation",
+    "exchange": "HOSE",
+    "re": 45700,
+    "ceiling": 48850,
+    "floor": 42550,
+    "type": "stock",
+    "index": 1,
+    "name": "CTCP FPT"
+  },
+  {
+    "symbol": "ACB",
+    "nameEn": "Asia Commercial Joint Stock Bank",
+    "exchange": "HOSE",
+    "re": 20050,
+    "ceiling": 21450,
+    "floor": 18650,
+    "type": "stock",
+    "index": 1,
+    "name": "Ngân hàng TMCP Á Châu"
+  },
+  {
+    "symbol": "HPG",
+    "nameEn": "Hoa Phat Group Joint Stock Company",
+    "exchange": "HOSE",
+    "re": 20450,
+    "ceiling": 21850,
+    "floor": 19050,
+    "type": "stock",
+    "index": 1,
+    "name": "CTCP Tập đoàn Hòa Phát"
+  },
+  {
+    "symbol": "VCB",
+    "nameEn": "Joint Stock Commercial Bank for Foreign Trade of Vietnam",
+    "exchange": "HOSE",
+    "re": 50800,
+    "ceiling": 54300,
+    "floor": 47250,
+    "type": "stock",
+    "index": 1,
+    "name": "Ngân hàng TMCP Ngoại thương Việt Nam"
+  },
+  {
+    "symbol": "DGC",
+    "nameEn": "DucGiang Chemicals Group Joint Stock Company",
+    "exchange": "HOSE",
+    "re": 31350,
+    "ceiling": 33500,
+    "floor": 29200,
+    "type": "stock",
+    "index": 1,
+    "name": "CTCP Tập đoàn Hóa chất Đức Giang"
+  },
+  {
+    "symbol": "PNJ",
+    "nameEn": "Phu Nhuan Jewelry Joint Stock Company",
+    "exchange": "HOSE",
+    "re": 13800,
+    "ceiling": 14750,
+    "floor": 12850,
+    "type": "stock",
+    "index": 1,
+    "name": "CTCP Vàng bạc Đá quý Phú Nhuận"
+  },
+  {
+    "symbol": "SSI",
+    "nameEn": "SSI Securities Corporation",
+    "exchange": "HOSE",
+    "re": 19550,
+    "ceiling": 20900,
+    "floor": 18200,
+    "type": "stock",
+    "index": 1,
+    "name": "CTCP Chứng khoán SSI"
+  },
+  {
+    "symbol": "SHS",
+    "nameEn": "Saigon - Hanoi Securities Joint Stock Company",
+    "exchange": "HNX",
+    "re": 13200,
+    "ceiling": 14500,
+    "floor": 11900,
+    "type": "stock",
+    "index": 1,
+    "name": "CTCP Chứng khoán Sài Gòn - Hà Nội"
+  },
+  {
+    "symbol": "PVS",
+    "nameEn": "PetroVietnam Technical Services Corporation",
+    "exchange": "HNX",
+    "re": 26600,
+    "ceiling": 29200,
+    "floor": 24000,
+    "type": "stock",
+    "index": 1,
+    "name": "Tổng Công ty cổ phần Dịch vụ Kỹ thuật Dầu khí Việt Nam"
+  },
+  {
+    "symbol": "IDC",
+    "nameEn": "IDICO Corporation - JSC",
+    "exchange": "HNX",
+    "re": 34200,
+    "ceiling": 37600,
+    "floor": 30800,
+    "type": "stock",
+    "index": 1,
+    "name": "Tổng Công ty IDICO - CTCP"
+  },
+  {
+    "symbol": "CEO",
+    "nameEn": "C.E.O Group Joint Stock Company",
+    "exchange": "HNX",
+    "re": 11800,
+    "ceiling": 12900,
+    "floor": 10700,
+    "type": "stock",
+    "index": 1,
+    "name": "CTCP Tập đoàn C.E.O"
+  },
+  {
+    "symbol": "ACV",
+    "nameEn": "Airports Corporation of Vietnam",
+    "exchange": "UPCOM",
+    "re": 37700,
+    "ceiling": 43300,
+    "floor": 32100,
+    "type": "stock",
+    "index": 1,
+    "name": "Tổng Công ty Cảng Hàng không Việt Nam - CTCP"
+  },
+  {
+    "symbol": "QNS",
+    "nameEn": "Quang Ngai Sugar Joint Stock Company",
+    "exchange": "UPCOM",
+    "re": 48100,
+    "ceiling": 55300,
+    "floor": 40900,
+    "type": "stock",
+    "index": 1,
+    "name": "CTCP Đường Quảng Ngãi"
+  },
+  {
+    "symbol": "VEA",
+    "nameEn": "Viet Nam Engine and Agricultural Machinery Corporation",
+    "exchange": "UPCOM",
+    "re": 30000,
+    "ceiling": 34500,
+    "floor": 25500,
+    "type": "stock",
+    "index": 1,
+    "name": "Tổng Công ty Máy động lực và Máy nông nghiệp Việt Nam – CTCP"
+  },
+  {
+    "symbol": "E1VFVN30",
+    "nameEn": "DCVFMVN30 ETF",
+    "exchange": "HOSE",
+    "re": 32390,
+    "ceiling": 34650,
+    "floor": 30130,
+    "type": "fund",
+    "index": 3,
+    "name": "Quỹ ETF DCVFMVN30"
+  }
+]

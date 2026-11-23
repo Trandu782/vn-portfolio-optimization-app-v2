@@ -1,0 +1,6160 @@
+{
+  "code": "SUCCESS",
+  "message": "Get sectors data success",
+  "data": [
+    {
+      "industryName": {
+        "vi": "Dầu khí",
+        "vn": "Dầu khí",
+        "en": "Oil & Gas"
+      },
+      "industryCode": "0500",
+      "listCompany": [
+        {
+          "symbol": "PVC"
+        },
+        {
+          "symbol": "PVE"
+        },
+        {
+          "symbol": "PVB"
+        },
+        {
+          "symbol": "POS"
+        },
+        {
+          "symbol": "TOS"
+        },
+        {
+          "symbol": "PVS"
+        },
+        {
+          "symbol": "PVD"
+        },
+        {
+          "symbol": "PEQ"
+        },
+        {
+          "symbol": "PLX"
+        },
+        {
+          "symbol": "OIL"
+        },
+        {
+          "symbol": "BSR"
+        },
+        {
+          "symbol": "PTV"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "121.49"
+    },
+    {
+      "industryName": {
+        "vi": "Hóa chất",
+        "vn": "Hóa chất",
+        "en": "Chemicals"
+      },
+      "industryCode": "1300",
+      "listCompany": [
+        {
+          "symbol": "VTZ"
+        },
+        {
+          "symbol": "SPC"
+        },
+        {
+          "symbol": "PCE"
+        },
+        {
+          "symbol": "DPM"
+        },
+        {
+          "symbol": "NHH"
+        },
+        {
+          "symbol": "LNC"
+        },
+        {
+          "symbol": "PAT"
+        },
+        {
+          "symbol": "DRI"
+        },
+        {
+          "symbol": "DOC"
+        },
+        {
+          "symbol": "BT1"
+        },
+        {
+          "symbol": "RBC"
+        },
+        {
+          "symbol": "PMB"
+        },
+        {
+          "symbol": "DGC"
+        },
+        {
+          "symbol": "BRR"
+        },
+        {
+          "symbol": "GER"
+        },
+        {
+          "symbol": "AVG"
+        },
+        {
+          "symbol": "NSG"
+        },
+        {
+          "symbol": "HMD"
+        },
+        {
+          "symbol": "RTB"
+        },
+        {
+          "symbol": "DAG"
+        },
+        {
+          "symbol": "NFC"
+        },
+        {
+          "symbol": "SFG"
+        },
+        {
+          "symbol": "TSC"
+        },
+        {
+          "symbol": "BFC"
+        },
+        {
+          "symbol": "HAI"
+        },
+        {
+          "symbol": "VTQ"
+        },
+        {
+          "symbol": "VAF"
+        },
+        {
+          "symbol": "VNY"
+        },
+        {
+          "symbol": "V68"
+        },
+        {
+          "symbol": "LAS"
+        },
+        {
+          "symbol": "PSE"
+        },
+        {
+          "symbol": "HVT"
+        },
+        {
+          "symbol": "DPR"
+        },
+        {
+          "symbol": "TNC"
+        },
+        {
+          "symbol": "VPS"
+        },
+        {
+          "symbol": "TPC"
+        },
+        {
+          "symbol": "BRC"
+        },
+        {
+          "symbol": "HSI"
+        },
+        {
+          "symbol": "CICO"
+        },
+        {
+          "symbol": "BQP"
+        },
+        {
+          "symbol": "HPH"
+        },
+        {
+          "symbol": "DDV"
+        },
+        {
+          "symbol": "PCH"
+        },
+        {
+          "symbol": "PSW"
+        },
+        {
+          "symbol": "GVR"
+        },
+        {
+          "symbol": "AAA"
+        },
+        {
+          "symbol": "PHR"
+        },
+        {
+          "symbol": "DTT"
+        },
+        {
+          "symbol": "HRC"
+        },
+        {
+          "symbol": "RDP"
+        },
+        {
+          "symbol": "PCN"
+        },
+        {
+          "symbol": "VKP"
+        },
+        {
+          "symbol": "PHOTPHOVN"
+        },
+        {
+          "symbol": "SBR"
+        },
+        {
+          "symbol": "QBS"
+        },
+        {
+          "symbol": "VNP"
+        },
+        {
+          "symbol": "PVO"
+        },
+        {
+          "symbol": "HCD"
+        },
+        {
+          "symbol": "ABS"
+        },
+        {
+          "symbol": "ECO"
+        },
+        {
+          "symbol": "CSV"
+        },
+        {
+          "symbol": "DCM"
+        },
+        {
+          "symbol": "PLC"
+        },
+        {
+          "symbol": "PGN"
+        },
+        {
+          "symbol": "CPC"
+        },
+        {
+          "symbol": "HII"
+        },
+        {
+          "symbol": "TRC"
+        },
+        {
+          "symbol": "VET"
+        },
+        {
+          "symbol": "IRC"
+        },
+        {
+          "symbol": "DRG"
+        },
+        {
+          "symbol": "APP"
+        },
+        {
+          "symbol": "PLP"
+        },
+        {
+          "symbol": "VFG"
+        },
+        {
+          "symbol": "NNG"
+        },
+        {
+          "symbol": "DPD"
+        },
+        {
+          "symbol": "VXP"
+        },
+        {
+          "symbol": "HNP"
+        },
+        {
+          "symbol": "DHB"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "215.84"
+    },
+    {
+      "industryName": {
+        "vi": "Tài nguyên Cơ bản",
+        "vn": "Tài nguyên Cơ bản",
+        "en": "Basic Resources"
+      },
+      "industryCode": "1700",
+      "listCompany": [
+        {
+          "symbol": "TD6"
+        },
+        {
+          "symbol": "SSM"
+        },
+        {
+          "symbol": "SHN"
+        },
+        {
+          "symbol": "CST"
+        },
+        {
+          "symbol": "KMT"
+        },
+        {
+          "symbol": "GTA"
+        },
+        {
+          "symbol": "YBM"
+        },
+        {
+          "symbol": "PTB"
+        },
+        {
+          "symbol": "KSA"
+        },
+        {
+          "symbol": "TDN"
+        },
+        {
+          "symbol": "MDF"
+        },
+        {
+          "symbol": "TVN"
+        },
+        {
+          "symbol": "TNB"
+        },
+        {
+          "symbol": "HMG"
+        },
+        {
+          "symbol": "TTS"
+        },
+        {
+          "symbol": "VIM"
+        },
+        {
+          "symbol": "TDS"
+        },
+        {
+          "symbol": "VGL"
+        },
+        {
+          "symbol": "NBC"
+        },
+        {
+          "symbol": "MIC"
+        },
+        {
+          "symbol": "MEL"
+        },
+        {
+          "symbol": "SMC"
+        },
+        {
+          "symbol": "TTF"
+        },
+        {
+          "symbol": "VPG"
+        },
+        {
+          "symbol": "DNS"
+        },
+        {
+          "symbol": "HUMEXCO"
+        },
+        {
+          "symbol": "MGC"
+        },
+        {
+          "symbol": "VDT"
+        },
+        {
+          "symbol": "VLS"
+        },
+        {
+          "symbol": "PAS"
+        },
+        {
+          "symbol": "POM"
+        },
+        {
+          "symbol": "KHD"
+        },
+        {
+          "symbol": "KTL"
+        },
+        {
+          "symbol": "MTA"
+        },
+        {
+          "symbol": "LTQ"
+        },
+        {
+          "symbol": "KNA"
+        },
+        {
+          "symbol": "VIF"
+        },
+        {
+          "symbol": "KKC"
+        },
+        {
+          "symbol": "HGM"
+        },
+        {
+          "symbol": "HLC"
+        },
+        {
+          "symbol": "TTH"
+        },
+        {
+          "symbol": "TLH"
+        },
+        {
+          "symbol": "TNI"
+        },
+        {
+          "symbol": "VCA"
+        },
+        {
+          "symbol": "HSG"
+        },
+        {
+          "symbol": "SCA"
+        },
+        {
+          "symbol": "MC3"
+        },
+        {
+          "symbol": "GTM"
+        },
+        {
+          "symbol": "KTB"
+        },
+        {
+          "symbol": "HPM"
+        },
+        {
+          "symbol": "CBI"
+        },
+        {
+          "symbol": "KVC"
+        },
+        {
+          "symbol": "DFC"
+        },
+        {
+          "symbol": "TIS"
+        },
+        {
+          "symbol": "TCP"
+        },
+        {
+          "symbol": "TMB"
+        },
+        {
+          "symbol": "MDC"
+        },
+        {
+          "symbol": "NSH"
+        },
+        {
+          "symbol": "BKC"
+        },
+        {
+          "symbol": "ITQ"
+        },
+        {
+          "symbol": "SAV"
+        },
+        {
+          "symbol": "MZG"
+        },
+        {
+          "symbol": "FCBC"
+        },
+        {
+          "symbol": "SQC"
+        },
+        {
+          "symbol": "SANTO"
+        },
+        {
+          "symbol": "KLM"
+        },
+        {
+          "symbol": "MUAXUANAC"
+        },
+        {
+          "symbol": "TC6"
+        },
+        {
+          "symbol": "TCS"
+        },
+        {
+          "symbol": "TNS"
+        },
+        {
+          "symbol": "GVT"
+        },
+        {
+          "symbol": "GLC"
+        },
+        {
+          "symbol": "BCA"
+        },
+        {
+          "symbol": "VBG"
+        },
+        {
+          "symbol": "DTL"
+        },
+        {
+          "symbol": "HAP"
+        },
+        {
+          "symbol": "HMC"
+        },
+        {
+          "symbol": "NKG"
+        },
+        {
+          "symbol": "RRC"
+        },
+        {
+          "symbol": "KHB"
+        },
+        {
+          "symbol": "KSMT"
+        },
+        {
+          "symbol": "KSS"
+        },
+        {
+          "symbol": "TMW"
+        },
+        {
+          "symbol": "MHL"
+        },
+        {
+          "symbol": "TNA"
+        },
+        {
+          "symbol": "BVG"
+        },
+        {
+          "symbol": "ATG"
+        },
+        {
+          "symbol": "CLI"
+        },
+        {
+          "symbol": "HSV"
+        },
+        {
+          "symbol": "TAH"
+        },
+        {
+          "symbol": "TMG"
+        },
+        {
+          "symbol": "TVD"
+        },
+        {
+          "symbol": "THT"
+        },
+        {
+          "symbol": "TKU"
+        },
+        {
+          "symbol": "KSV"
+        },
+        {
+          "symbol": "ACG"
+        },
+        {
+          "symbol": "SHI"
+        },
+        {
+          "symbol": "VID"
+        },
+        {
+          "symbol": "HPG"
+        },
+        {
+          "symbol": "DHC"
+        },
+        {
+          "symbol": "DHM"
+        },
+        {
+          "symbol": "GDA"
+        },
+        {
+          "symbol": "BMJ"
+        },
+        {
+          "symbol": "DNY"
+        },
+        {
+          "symbol": "MMC"
+        },
+        {
+          "symbol": "NHV"
+        },
+        {
+          "symbol": "BCB"
+        },
+        {
+          "symbol": "AAH"
+        },
+        {
+          "symbol": "PIS"
+        },
+        {
+          "symbol": "VDB"
+        },
+        {
+          "symbol": "VGS"
+        },
+        {
+          "symbol": "CAP"
+        },
+        {
+          "symbol": "AMC"
+        },
+        {
+          "symbol": "MIM"
+        },
+        {
+          "symbol": "PTK"
+        },
+        {
+          "symbol": "TQN"
+        },
+        {
+          "symbol": "D17"
+        },
+        {
+          "symbol": "TND"
+        },
+        {
+          "symbol": "KCB"
+        },
+        {
+          "symbol": "HLA"
+        },
+        {
+          "symbol": "MSR"
+        },
+        {
+          "symbol": "MVB"
+        },
+        {
+          "symbol": "CLM"
+        },
+        {
+          "symbol": "HHP"
+        },
+        {
+          "symbol": "SHA"
+        },
+        {
+          "symbol": "BMC"
+        },
+        {
+          "symbol": "DPS"
+        },
+        {
+          "symbol": "TKG"
+        },
+        {
+          "symbol": "BAM"
+        },
+        {
+          "symbol": "VIS"
+        },
+        {
+          "symbol": "LCM"
+        },
+        {
+          "symbol": "LMC"
+        },
+        {
+          "symbol": "FRC"
+        },
+        {
+          "symbol": "FRM"
+        },
+        {
+          "symbol": "ACM"
+        },
+        {
+          "symbol": "SJF"
+        },
+        {
+          "symbol": "SPI"
+        },
+        {
+          "symbol": "HTS"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "351.31"
+    },
+    {
+      "industryName": {
+        "vi": "Xây dựng và Vật liệu",
+        "vn": "Xây dựng và Vật liệu",
+        "en": "Construction & Materials"
+      },
+      "industryCode": "2300",
+      "listCompany": [
+        {
+          "symbol": "V12"
+        },
+        {
+          "symbol": "SDU"
+        },
+        {
+          "symbol": "PDB"
+        },
+        {
+          "symbol": "GMX"
+        },
+        {
+          "symbol": "ICG"
+        },
+        {
+          "symbol": "MCO"
+        },
+        {
+          "symbol": "CLH"
+        },
+        {
+          "symbol": "INC"
+        },
+        {
+          "symbol": "VCC"
+        },
+        {
+          "symbol": "CDC"
+        },
+        {
+          "symbol": "GMH"
+        },
+        {
+          "symbol": "PHC"
+        },
+        {
+          "symbol": "DXV"
+        },
+        {
+          "symbol": "CTD"
+        },
+        {
+          "symbol": "C47"
+        },
+        {
+          "symbol": "NNC"
+        },
+        {
+          "symbol": "NAV"
+        },
+        {
+          "symbol": "XDC"
+        },
+        {
+          "symbol": "CCIC"
+        },
+        {
+          "symbol": "DXD"
+        },
+        {
+          "symbol": "B82"
+        },
+        {
+          "symbol": "SDE"
+        },
+        {
+          "symbol": "TBX"
+        },
+        {
+          "symbol": "SHG"
+        },
+        {
+          "symbol": "KSK"
+        },
+        {
+          "symbol": "CEE"
+        },
+        {
+          "symbol": "MES"
+        },
+        {
+          "symbol": "LIC"
+        },
+        {
+          "symbol": "UDC"
+        },
+        {
+          "symbol": "TVH"
+        },
+        {
+          "symbol": "VMK"
+        },
+        {
+          "symbol": "SIG"
+        },
+        {
+          "symbol": "PVY"
+        },
+        {
+          "symbol": "VVN"
+        },
+        {
+          "symbol": "VW3"
+        },
+        {
+          "symbol": "X77"
+        },
+        {
+          "symbol": "SNZ"
+        },
+        {
+          "symbol": "DVW"
+        },
+        {
+          "symbol": "L12"
+        },
+        {
+          "symbol": "DGT"
+        },
+        {
+          "symbol": "CT3"
+        },
+        {
+          "symbol": "CT6"
+        },
+        {
+          "symbol": "CH5"
+        },
+        {
+          "symbol": "HAM"
+        },
+        {
+          "symbol": "HAN"
+        },
+        {
+          "symbol": "FIC"
+        },
+        {
+          "symbol": "GH3"
+        },
+        {
+          "symbol": "GTS"
+        },
+        {
+          "symbol": "CID"
+        },
+        {
+          "symbol": "PSB"
+        },
+        {
+          "symbol": "SD3"
+        },
+        {
+          "symbol": "VLB"
+        },
+        {
+          "symbol": "TL4"
+        },
+        {
+          "symbol": "RCC"
+        },
+        {
+          "symbol": "SDD"
+        },
+        {
+          "symbol": "DCT"
+        },
+        {
+          "symbol": "NAC"
+        },
+        {
+          "symbol": "PVH"
+        },
+        {
+          "symbol": "REN"
+        },
+        {
+          "symbol": "FVN"
+        },
+        {
+          "symbol": "VE1"
+        },
+        {
+          "symbol": "FID"
+        },
+        {
+          "symbol": "VTV"
+        },
+        {
+          "symbol": "LCD"
+        },
+        {
+          "symbol": "NTP"
+        },
+        {
+          "symbol": "HCC"
+        },
+        {
+          "symbol": "SD5"
+        },
+        {
+          "symbol": "TTC"
+        },
+        {
+          "symbol": "VE4"
+        },
+        {
+          "symbol": "PTC"
+        },
+        {
+          "symbol": "BCE"
+        },
+        {
+          "symbol": "C32"
+        },
+        {
+          "symbol": "GEL"
+        },
+        {
+          "symbol": "VC5"
+        },
+        {
+          "symbol": "TKC"
+        },
+        {
+          "symbol": "PXK"
+        },
+        {
+          "symbol": "SDB"
+        },
+        {
+          "symbol": "BCO"
+        },
+        {
+          "symbol": "CEC"
+        },
+        {
+          "symbol": "XDT"
+        },
+        {
+          "symbol": "DX2"
+        },
+        {
+          "symbol": "TEL"
+        },
+        {
+          "symbol": "STV"
+        },
+        {
+          "symbol": "MCI"
+        },
+        {
+          "symbol": "RLC"
+        },
+        {
+          "symbol": "S96"
+        },
+        {
+          "symbol": "LAI"
+        },
+        {
+          "symbol": "TVG"
+        },
+        {
+          "symbol": "CDO"
+        },
+        {
+          "symbol": "E12"
+        },
+        {
+          "symbol": "KSQ"
+        },
+        {
+          "symbol": "L45"
+        },
+        {
+          "symbol": "BTD"
+        },
+        {
+          "symbol": "BTN"
+        },
+        {
+          "symbol": "DID"
+        },
+        {
+          "symbol": "H11"
+        },
+        {
+          "symbol": "EIC"
+        },
+        {
+          "symbol": "SD4"
+        },
+        {
+          "symbol": "VCX"
+        },
+        {
+          "symbol": "XMC"
+        },
+        {
+          "symbol": "TDF"
+        },
+        {
+          "symbol": "PLA"
+        },
+        {
+          "symbol": "HT9"
+        },
+        {
+          "symbol": "TXM"
+        },
+        {
+          "symbol": "BAX"
+        },
+        {
+          "symbol": "VHL"
+        },
+        {
+          "symbol": "TMX"
+        },
+        {
+          "symbol": "VC1"
+        },
+        {
+          "symbol": "VC2"
+        },
+        {
+          "symbol": "VIT"
+        },
+        {
+          "symbol": "SJE"
+        },
+        {
+          "symbol": "QTC"
+        },
+        {
+          "symbol": "MCC"
+        },
+        {
+          "symbol": "SDN"
+        },
+        {
+          "symbol": "SCI"
+        },
+        {
+          "symbol": "CIG"
+        },
+        {
+          "symbol": "DSH"
+        },
+        {
+          "symbol": "THG"
+        },
+        {
+          "symbol": "TNT"
+        },
+        {
+          "symbol": "EVG"
+        },
+        {
+          "symbol": "LCG"
+        },
+        {
+          "symbol": "BMP"
+        },
+        {
+          "symbol": "CEG"
+        },
+        {
+          "symbol": "BM9"
+        },
+        {
+          "symbol": "C12"
+        },
+        {
+          "symbol": "DSS"
+        },
+        {
+          "symbol": "PX1"
+        },
+        {
+          "symbol": "I10"
+        },
+        {
+          "symbol": "CDV"
+        },
+        {
+          "symbol": "XDBD"
+        },
+        {
+          "symbol": "SDX"
+        },
+        {
+          "symbol": "RCD"
+        },
+        {
+          "symbol": "SIV"
+        },
+        {
+          "symbol": "DTC"
+        },
+        {
+          "symbol": "HBC"
+        },
+        {
+          "symbol": "HFB"
+        },
+        {
+          "symbol": "VHH"
+        },
+        {
+          "symbol": "VTA"
+        },
+        {
+          "symbol": "TTB"
+        },
+        {
+          "symbol": "TRT"
+        },
+        {
+          "symbol": "CNN"
+        },
+        {
+          "symbol": "HWI"
+        },
+        {
+          "symbol": "BCC"
+        },
+        {
+          "symbol": "S99"
+        },
+        {
+          "symbol": "S55"
+        },
+        {
+          "symbol": "GKM"
+        },
+        {
+          "symbol": "L14"
+        },
+        {
+          "symbol": "HMR"
+        },
+        {
+          "symbol": "HDA"
+        },
+        {
+          "symbol": "TTL"
+        },
+        {
+          "symbol": "VE3"
+        },
+        {
+          "symbol": "VC6"
+        },
+        {
+          "symbol": "CII"
+        },
+        {
+          "symbol": "ACC"
+        },
+        {
+          "symbol": "LBM"
+        },
+        {
+          "symbol": "SC5"
+        },
+        {
+          "symbol": "VGC"
+        },
+        {
+          "symbol": "TCR"
+        },
+        {
+          "symbol": "CVT"
+        },
+        {
+          "symbol": "HT1"
+        },
+        {
+          "symbol": "HU1"
+        },
+        {
+          "symbol": "V15"
+        },
+        {
+          "symbol": "KCE"
+        },
+        {
+          "symbol": "CC4"
+        },
+        {
+          "symbol": "DLA"
+        },
+        {
+          "symbol": "ATB"
+        },
+        {
+          "symbol": "PVA"
+        },
+        {
+          "symbol": "BTC"
+        },
+        {
+          "symbol": "SDJ"
+        },
+        {
+          "symbol": "XD4"
+        },
+        {
+          "symbol": "SD1"
+        },
+        {
+          "symbol": "TBT"
+        },
+        {
+          "symbol": "JSC"
+        },
+        {
+          "symbol": "TEC"
+        },
+        {
+          "symbol": "PCX18"
+        },
+        {
+          "symbol": "LDU"
+        },
+        {
+          "symbol": "CANTHOTC"
+        },
+        {
+          "symbol": "ICI"
+        },
+        {
+          "symbol": "UDJ"
+        },
+        {
+          "symbol": "CC1"
+        },
+        {
+          "symbol": "TCD"
+        },
+        {
+          "symbol": "KPF"
+        },
+        {
+          "symbol": "HC1"
+        },
+        {
+          "symbol": "CTX"
+        },
+        {
+          "symbol": "QCC"
+        },
+        {
+          "symbol": "SD2"
+        },
+        {
+          "symbol": "SCC"
+        },
+        {
+          "symbol": "SCJ"
+        },
+        {
+          "symbol": "HLY"
+        },
+        {
+          "symbol": "TVA"
+        },
+        {
+          "symbol": "VNE"
+        },
+        {
+          "symbol": "TED"
+        },
+        {
+          "symbol": "S72"
+        },
+        {
+          "symbol": "LQN"
+        },
+        {
+          "symbol": "MT9"
+        },
+        {
+          "symbol": "L40"
+        },
+        {
+          "symbol": "SVN"
+        },
+        {
+          "symbol": "PTD"
+        },
+        {
+          "symbol": "PEN"
+        },
+        {
+          "symbol": "BTS"
+        },
+        {
+          "symbol": "C69"
+        },
+        {
+          "symbol": "VC9"
+        },
+        {
+          "symbol": "CRC"
+        },
+        {
+          "symbol": "TLD"
+        },
+        {
+          "symbol": "KSB"
+        },
+        {
+          "symbol": "CTR"
+        },
+        {
+          "symbol": "HUB"
+        },
+        {
+          "symbol": "MDG"
+        },
+        {
+          "symbol": "NHA"
+        },
+        {
+          "symbol": "CPWC"
+        },
+        {
+          "symbol": "DTJ"
+        },
+        {
+          "symbol": "SJC"
+        },
+        {
+          "symbol": "TLT"
+        },
+        {
+          "symbol": "BHT"
+        },
+        {
+          "symbol": "S27"
+        },
+        {
+          "symbol": "C36"
+        },
+        {
+          "symbol": "C145"
+        },
+        {
+          "symbol": "C71"
+        },
+        {
+          "symbol": "BHV"
+        },
+        {
+          "symbol": "VIH"
+        },
+        {
+          "symbol": "CTN"
+        },
+        {
+          "symbol": "ESO"
+        },
+        {
+          "symbol": "NMK"
+        },
+        {
+          "symbol": "CTA"
+        },
+        {
+          "symbol": "MVC"
+        },
+        {
+          "symbol": "VE9"
+        },
+        {
+          "symbol": "CCV"
+        },
+        {
+          "symbol": "BDT"
+        },
+        {
+          "symbol": "PXI"
+        },
+        {
+          "symbol": "PCC"
+        },
+        {
+          "symbol": "PVX"
+        },
+        {
+          "symbol": "ILA"
+        },
+        {
+          "symbol": "G36"
+        },
+        {
+          "symbol": "GDH"
+        },
+        {
+          "symbol": "HMS"
+        },
+        {
+          "symbol": "DLR"
+        },
+        {
+          "symbol": "CHC"
+        },
+        {
+          "symbol": "HEJ"
+        },
+        {
+          "symbol": "GND"
+        },
+        {
+          "symbol": "BMK"
+        },
+        {
+          "symbol": "BOT"
+        },
+        {
+          "symbol": "DCF"
+        },
+        {
+          "symbol": "C92"
+        },
+        {
+          "symbol": "CMI"
+        },
+        {
+          "symbol": "PID"
+        },
+        {
+          "symbol": "PHH"
+        },
+        {
+          "symbol": "PFL"
+        },
+        {
+          "symbol": "QNT"
+        },
+        {
+          "symbol": "YBC"
+        },
+        {
+          "symbol": "TGG"
+        },
+        {
+          "symbol": "SD7"
+        },
+        {
+          "symbol": "PVV"
+        },
+        {
+          "symbol": "SDP"
+        },
+        {
+          "symbol": "LUT"
+        },
+        {
+          "symbol": "NXT"
+        },
+        {
+          "symbol": "HNC"
+        },
+        {
+          "symbol": "G30"
+        },
+        {
+          "symbol": "LHC"
+        },
+        {
+          "symbol": "MST"
+        },
+        {
+          "symbol": "SCG"
+        },
+        {
+          "symbol": "HOM"
+        },
+        {
+          "symbol": "NDX"
+        },
+        {
+          "symbol": "VMC"
+        },
+        {
+          "symbol": "SD9"
+        },
+        {
+          "symbol": "VC7"
+        },
+        {
+          "symbol": "VSI"
+        },
+        {
+          "symbol": "HID"
+        },
+        {
+          "symbol": "FCM"
+        },
+        {
+          "symbol": "FCN"
+        },
+        {
+          "symbol": "PC1"
+        },
+        {
+          "symbol": "RYG"
+        },
+        {
+          "symbol": "CTI"
+        },
+        {
+          "symbol": "DHA"
+        },
+        {
+          "symbol": "CCC"
+        },
+        {
+          "symbol": "DLG"
+        },
+        {
+          "symbol": "CYC"
+        },
+        {
+          "symbol": "VE2"
+        },
+        {
+          "symbol": "GTH"
+        },
+        {
+          "symbol": "LCS"
+        },
+        {
+          "symbol": "BRM"
+        },
+        {
+          "symbol": "ICN"
+        },
+        {
+          "symbol": "LG9"
+        },
+        {
+          "symbol": "CDG"
+        },
+        {
+          "symbol": "PXM"
+        },
+        {
+          "symbol": "VXB"
+        },
+        {
+          "symbol": "PCM"
+        },
+        {
+          "symbol": "PNT"
+        },
+        {
+          "symbol": "TCK"
+        },
+        {
+          "symbol": "DVG"
+        },
+        {
+          "symbol": "CGV"
+        },
+        {
+          "symbol": "DSG"
+        },
+        {
+          "symbol": "DFF"
+        },
+        {
+          "symbol": "C4G"
+        },
+        {
+          "symbol": "DAC"
+        },
+        {
+          "symbol": "PTO"
+        },
+        {
+          "symbol": "SJG"
+        },
+        {
+          "symbol": "QNC"
+        },
+        {
+          "symbol": "HU3"
+        },
+        {
+          "symbol": "HU4"
+        },
+        {
+          "symbol": "XLV"
+        },
+        {
+          "symbol": "TS3"
+        },
+        {
+          "symbol": "UMC"
+        },
+        {
+          "symbol": "VW1"
+        },
+        {
+          "symbol": "CCD"
+        },
+        {
+          "symbol": "V45"
+        },
+        {
+          "symbol": "VE8"
+        },
+        {
+          "symbol": "CX8"
+        },
+        {
+          "symbol": "DC2"
+        },
+        {
+          "symbol": "L18"
+        },
+        {
+          "symbol": "NHC"
+        },
+        {
+          "symbol": "CMS"
+        },
+        {
+          "symbol": "HAS"
+        },
+        {
+          "symbol": "HHV"
+        },
+        {
+          "symbol": "LGC"
+        },
+        {
+          "symbol": "LM8"
+        },
+        {
+          "symbol": "VCG"
+        },
+        {
+          "symbol": "TSA"
+        },
+        {
+          "symbol": "DC4"
+        },
+        {
+          "symbol": "HVH"
+        },
+        {
+          "symbol": "AMY"
+        },
+        {
+          "symbol": "VTS"
+        },
+        {
+          "symbol": "BGT"
+        },
+        {
+          "symbol": "ROS"
+        },
+        {
+          "symbol": "ING"
+        },
+        {
+          "symbol": "DBV"
+        },
+        {
+          "symbol": "BMN"
+        },
+        {
+          "symbol": "ICS"
+        },
+        {
+          "symbol": "BCR"
+        },
+        {
+          "symbol": "SDH"
+        },
+        {
+          "symbol": "KHL"
+        },
+        {
+          "symbol": "HLE"
+        },
+        {
+          "symbol": "ASD"
+        },
+        {
+          "symbol": "PSG"
+        },
+        {
+          "symbol": "DAL"
+        },
+        {
+          "symbol": "L43"
+        },
+        {
+          "symbol": "MEC"
+        },
+        {
+          "symbol": "ACS"
+        },
+        {
+          "symbol": "BHC"
+        },
+        {
+          "symbol": "PXS"
+        },
+        {
+          "symbol": "LM3"
+        },
+        {
+          "symbol": "DND"
+        },
+        {
+          "symbol": "KTT"
+        },
+        {
+          "symbol": "L61"
+        },
+        {
+          "symbol": "HVX"
+        },
+        {
+          "symbol": "CDR"
+        },
+        {
+          "symbol": "CI5"
+        },
+        {
+          "symbol": "ACE"
+        },
+        {
+          "symbol": "CIP"
+        },
+        {
+          "symbol": "SCL"
+        },
+        {
+          "symbol": "PTE"
+        },
+        {
+          "symbol": "TA6"
+        },
+        {
+          "symbol": "XMD"
+        },
+        {
+          "symbol": "SD8"
+        },
+        {
+          "symbol": "SD6"
+        },
+        {
+          "symbol": "SDT"
+        },
+        {
+          "symbol": "MCG"
+        },
+        {
+          "symbol": "PLE"
+        },
+        {
+          "symbol": "SGV"
+        },
+        {
+          "symbol": "THO"
+        },
+        {
+          "symbol": "VCS"
+        },
+        {
+          "symbol": "TA9"
+        },
+        {
+          "symbol": "DNP"
+        },
+        {
+          "symbol": "LIG"
+        },
+        {
+          "symbol": "MBG"
+        },
+        {
+          "symbol": "CSC"
+        },
+        {
+          "symbol": "KDM"
+        },
+        {
+          "symbol": "ADP"
+        },
+        {
+          "symbol": "DPG"
+        },
+        {
+          "symbol": "HTI"
+        },
+        {
+          "symbol": "QHKTHG"
+        },
+        {
+          "symbol": "TA3"
+        },
+        {
+          "symbol": "C3195"
+        },
+        {
+          "symbol": "TDI"
+        },
+        {
+          "symbol": "QLD"
+        },
+        {
+          "symbol": "MCT"
+        },
+        {
+          "symbol": "LCC"
+        },
+        {
+          "symbol": "TNM"
+        },
+        {
+          "symbol": "GABJSC"
+        },
+        {
+          "symbol": "ACC224"
+        },
+        {
+          "symbol": "BUD"
+        },
+        {
+          "symbol": "VMI"
+        },
+        {
+          "symbol": "ICC"
+        },
+        {
+          "symbol": "CCM"
+        },
+        {
+          "symbol": "PXT"
+        },
+        {
+          "symbol": "VPC"
+        },
+        {
+          "symbol": "E29"
+        },
+        {
+          "symbol": "HPP"
+        },
+        {
+          "symbol": "HC3"
+        },
+        {
+          "symbol": "HCI"
+        },
+        {
+          "symbol": "DKG"
+        },
+        {
+          "symbol": "CQT"
+        },
+        {
+          "symbol": "DIC"
+        },
+        {
+          "symbol": "BT6"
+        },
+        {
+          "symbol": "ALV"
+        },
+        {
+          "symbol": "CMD"
+        },
+        {
+          "symbol": "DCR"
+        },
+        {
+          "symbol": "DC1"
+        },
+        {
+          "symbol": "SJM"
+        },
+        {
+          "symbol": "HSP"
+        },
+        {
+          "symbol": "TTZ"
+        },
+        {
+          "symbol": "VCE"
+        },
+        {
+          "symbol": "VIW"
+        },
+        {
+          "symbol": "SDY"
+        },
+        {
+          "symbol": "S74"
+        },
+        {
+          "symbol": "USC"
+        },
+        {
+          "symbol": "S12"
+        },
+        {
+          "symbol": "DDB"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "258.2"
+    },
+    {
+      "industryName": {
+        "vi": "Hàng & Dịch vụ Công nghiệp",
+        "vn": "Hàng & Dịch vụ Công nghiệp",
+        "en": "Industrial Goods & Services"
+      },
+      "industryCode": "2700",
+      "listCompany": [
+        {
+          "symbol": "CIA"
+        },
+        {
+          "symbol": "WCS"
+        },
+        {
+          "symbol": "DL1"
+        },
+        {
+          "symbol": "PTS"
+        },
+        {
+          "symbol": "PHN"
+        },
+        {
+          "symbol": "VNC"
+        },
+        {
+          "symbol": "VTH"
+        },
+        {
+          "symbol": "GSP"
+        },
+        {
+          "symbol": "SRF"
+        },
+        {
+          "symbol": "PAC"
+        },
+        {
+          "symbol": "DVP"
+        },
+        {
+          "symbol": "TCL"
+        },
+        {
+          "symbol": "VTP"
+        },
+        {
+          "symbol": "NCT"
+        },
+        {
+          "symbol": "YRC"
+        },
+        {
+          "symbol": "SPA"
+        },
+        {
+          "symbol": "AGE"
+        },
+        {
+          "symbol": "VEEC"
+        },
+        {
+          "symbol": "CVP"
+        },
+        {
+          "symbol": "TTV"
+        },
+        {
+          "symbol": "HDO"
+        },
+        {
+          "symbol": "CKH"
+        },
+        {
+          "symbol": "HGREGIS"
+        },
+        {
+          "symbol": "EMC"
+        },
+        {
+          "symbol": "EMMC"
+        },
+        {
+          "symbol": "MTV"
+        },
+        {
+          "symbol": "L63"
+        },
+        {
+          "symbol": "ACV"
+        },
+        {
+          "symbol": "CMP"
+        },
+        {
+          "symbol": "SHC"
+        },
+        {
+          "symbol": "SAC"
+        },
+        {
+          "symbol": "SAL"
+        },
+        {
+          "symbol": "HPO"
+        },
+        {
+          "symbol": "DPC"
+        },
+        {
+          "symbol": "BBH"
+        },
+        {
+          "symbol": "PSP"
+        },
+        {
+          "symbol": "VHG"
+        },
+        {
+          "symbol": "VIN"
+        },
+        {
+          "symbol": "TR1"
+        },
+        {
+          "symbol": "TRV"
+        },
+        {
+          "symbol": "USD"
+        },
+        {
+          "symbol": "MTH"
+        },
+        {
+          "symbol": "NAU"
+        },
+        {
+          "symbol": "TKD"
+        },
+        {
+          "symbol": "NAP"
+        },
+        {
+          "symbol": "PCT"
+        },
+        {
+          "symbol": "GIC"
+        },
+        {
+          "symbol": "ABR"
+        },
+        {
+          "symbol": "VTB"
+        },
+        {
+          "symbol": "TDP"
+        },
+        {
+          "symbol": "PVT"
+        },
+        {
+          "symbol": "MTX"
+        },
+        {
+          "symbol": "TVU"
+        },
+        {
+          "symbol": "PEC"
+        },
+        {
+          "symbol": "HHR"
+        },
+        {
+          "symbol": "TTP"
+        },
+        {
+          "symbol": "QBR"
+        },
+        {
+          "symbol": "MCD"
+        },
+        {
+          "symbol": "NHP"
+        },
+        {
+          "symbol": "CER"
+        },
+        {
+          "symbol": "RHN"
+        },
+        {
+          "symbol": "L62"
+        },
+        {
+          "symbol": "VEA"
+        },
+        {
+          "symbol": "ALC"
+        },
+        {
+          "symbol": "SZE"
+        },
+        {
+          "symbol": "TCW"
+        },
+        {
+          "symbol": "TBD"
+        },
+        {
+          "symbol": "HEP"
+        },
+        {
+          "symbol": "AMS"
+        },
+        {
+          "symbol": "CKD"
+        },
+        {
+          "symbol": "NOS"
+        },
+        {
+          "symbol": "QSP"
+        },
+        {
+          "symbol": "TRS"
+        },
+        {
+          "symbol": "UTT"
+        },
+        {
+          "symbol": "PTT"
+        },
+        {
+          "symbol": "PBP"
+        },
+        {
+          "symbol": "PPS"
+        },
+        {
+          "symbol": "DS3"
+        },
+        {
+          "symbol": "PSC"
+        },
+        {
+          "symbol": "TPP"
+        },
+        {
+          "symbol": "MDD"
+        },
+        {
+          "symbol": "ILB"
+        },
+        {
+          "symbol": "TMS"
+        },
+        {
+          "symbol": "PDV"
+        },
+        {
+          "symbol": "L10"
+        },
+        {
+          "symbol": "SGN"
+        },
+        {
+          "symbol": "TV2"
+        },
+        {
+          "symbol": "STG"
+        },
+        {
+          "symbol": "HTV"
+        },
+        {
+          "symbol": "QLT"
+        },
+        {
+          "symbol": "CNH"
+        },
+        {
+          "symbol": "CDH"
+        },
+        {
+          "symbol": "HCS"
+        },
+        {
+          "symbol": "ABA"
+        },
+        {
+          "symbol": "DVT"
+        },
+        {
+          "symbol": "TTU"
+        },
+        {
+          "symbol": "UCT"
+        },
+        {
+          "symbol": "UDL"
+        },
+        {
+          "symbol": "CCP"
+        },
+        {
+          "symbol": "CMK"
+        },
+        {
+          "symbol": "KIP"
+        },
+        {
+          "symbol": "ILS"
+        },
+        {
+          "symbol": "CPI"
+        },
+        {
+          "symbol": "HLO"
+        },
+        {
+          "symbol": "CKA"
+        },
+        {
+          "symbol": "DDM"
+        },
+        {
+          "symbol": "PSN"
+        },
+        {
+          "symbol": "QNU"
+        },
+        {
+          "symbol": "HSA"
+        },
+        {
+          "symbol": "THU"
+        },
+        {
+          "symbol": "VFR"
+        },
+        {
+          "symbol": "MTB"
+        },
+        {
+          "symbol": "MQN"
+        },
+        {
+          "symbol": "SBC"
+        },
+        {
+          "symbol": "CDN"
+        },
+        {
+          "symbol": "ARM"
+        },
+        {
+          "symbol": "TJC"
+        },
+        {
+          "symbol": "QHD"
+        },
+        {
+          "symbol": "CMC"
+        },
+        {
+          "symbol": "BPC"
+        },
+        {
+          "symbol": "VNT"
+        },
+        {
+          "symbol": "HAH"
+        },
+        {
+          "symbol": "VTO"
+        },
+        {
+          "symbol": "VNL"
+        },
+        {
+          "symbol": "VOS"
+        },
+        {
+          "symbol": "SFI"
+        },
+        {
+          "symbol": "NO1"
+        },
+        {
+          "symbol": "HKP"
+        },
+        {
+          "symbol": "SVL"
+        },
+        {
+          "symbol": "SON"
+        },
+        {
+          "symbol": "SCY"
+        },
+        {
+          "symbol": "NBRAIL"
+        },
+        {
+          "symbol": "MDT"
+        },
+        {
+          "symbol": "DTPY"
+        },
+        {
+          "symbol": "L44"
+        },
+        {
+          "symbol": "MHP"
+        },
+        {
+          "symbol": "THI"
+        },
+        {
+          "symbol": "HTH"
+        },
+        {
+          "symbol": "BLU"
+        },
+        {
+          "symbol": "HGCERWASS"
+        },
+        {
+          "symbol": "MVN"
+        },
+        {
+          "symbol": "VLG"
+        },
+        {
+          "symbol": "SWC"
+        },
+        {
+          "symbol": "SGP"
+        },
+        {
+          "symbol": "MIE"
+        },
+        {
+          "symbol": "PAP"
+        },
+        {
+          "symbol": "TNP"
+        },
+        {
+          "symbol": "HNB"
+        },
+        {
+          "symbol": "BTG"
+        },
+        {
+          "symbol": "FSO"
+        },
+        {
+          "symbol": "BMD"
+        },
+        {
+          "symbol": "PHP"
+        },
+        {
+          "symbol": "SCO"
+        },
+        {
+          "symbol": "TAB"
+        },
+        {
+          "symbol": "TIE"
+        },
+        {
+          "symbol": "ULG"
+        },
+        {
+          "symbol": "SDK"
+        },
+        {
+          "symbol": "SDV"
+        },
+        {
+          "symbol": "MBN"
+        },
+        {
+          "symbol": "MDA"
+        },
+        {
+          "symbol": "MPY"
+        },
+        {
+          "symbol": "MTL"
+        },
+        {
+          "symbol": "NUE"
+        },
+        {
+          "symbol": "PVM"
+        },
+        {
+          "symbol": "SMV"
+        },
+        {
+          "symbol": "TV4"
+        },
+        {
+          "symbol": "DHP"
+        },
+        {
+          "symbol": "PPE"
+        },
+        {
+          "symbol": "MAC"
+        },
+        {
+          "symbol": "CAG"
+        },
+        {
+          "symbol": "DXP"
+        },
+        {
+          "symbol": "GMD"
+        },
+        {
+          "symbol": "SBG"
+        },
+        {
+          "symbol": "VSC"
+        },
+        {
+          "symbol": "GEE"
+        },
+        {
+          "symbol": "HTK"
+        },
+        {
+          "symbol": "ALP"
+        },
+        {
+          "symbol": "HYUREPCO"
+        },
+        {
+          "symbol": "CMURBAN"
+        },
+        {
+          "symbol": "CAV"
+        },
+        {
+          "symbol": "KTU"
+        },
+        {
+          "symbol": "HEM"
+        },
+        {
+          "symbol": "CE1"
+        },
+        {
+          "symbol": "SSU"
+        },
+        {
+          "symbol": "REC"
+        },
+        {
+          "symbol": "DT4"
+        },
+        {
+          "symbol": "TAP"
+        },
+        {
+          "symbol": "SVI"
+        },
+        {
+          "symbol": "VPK"
+        },
+        {
+          "symbol": "VTX"
+        },
+        {
+          "symbol": "VTK"
+        },
+        {
+          "symbol": "VMT"
+        },
+        {
+          "symbol": "WTC"
+        },
+        {
+          "symbol": "LM7"
+        },
+        {
+          "symbol": "LO5"
+        },
+        {
+          "symbol": "PQN"
+        },
+        {
+          "symbol": "PBT"
+        },
+        {
+          "symbol": "DNE"
+        },
+        {
+          "symbol": "HEC"
+        },
+        {
+          "symbol": "CFM"
+        },
+        {
+          "symbol": "HBD"
+        },
+        {
+          "symbol": "EMS"
+        },
+        {
+          "symbol": "FBC"
+        },
+        {
+          "symbol": "EMG"
+        },
+        {
+          "symbol": "GTX"
+        },
+        {
+          "symbol": "HTE"
+        },
+        {
+          "symbol": "VSG"
+        },
+        {
+          "symbol": "VST"
+        },
+        {
+          "symbol": "TGP"
+        },
+        {
+          "symbol": "SSG"
+        },
+        {
+          "symbol": "VGR"
+        },
+        {
+          "symbol": "MQB"
+        },
+        {
+          "symbol": "SFN"
+        },
+        {
+          "symbol": "CCR"
+        },
+        {
+          "symbol": "VBC"
+        },
+        {
+          "symbol": "PMS"
+        },
+        {
+          "symbol": "CTT"
+        },
+        {
+          "symbol": "INN"
+        },
+        {
+          "symbol": "HCT"
+        },
+        {
+          "symbol": "VMS"
+        },
+        {
+          "symbol": "VNF"
+        },
+        {
+          "symbol": "SDG"
+        },
+        {
+          "symbol": "HMH"
+        },
+        {
+          "symbol": "PJT"
+        },
+        {
+          "symbol": "MHC"
+        },
+        {
+          "symbol": "THAR"
+        },
+        {
+          "symbol": "VSTC"
+        },
+        {
+          "symbol": "DTB"
+        },
+        {
+          "symbol": "VT8"
+        },
+        {
+          "symbol": "HTU"
+        },
+        {
+          "symbol": "BBLC"
+        },
+        {
+          "symbol": "TBH"
+        },
+        {
+          "symbol": "HGENVI"
+        },
+        {
+          "symbol": "HGSTATION"
+        },
+        {
+          "symbol": "L35"
+        },
+        {
+          "symbol": "VLP"
+        },
+        {
+          "symbol": "BRS"
+        },
+        {
+          "symbol": "CCT"
+        },
+        {
+          "symbol": "LLM"
+        },
+        {
+          "symbol": "IST"
+        },
+        {
+          "symbol": "HPB"
+        },
+        {
+          "symbol": "DUS"
+        },
+        {
+          "symbol": "FT1"
+        },
+        {
+          "symbol": "HHN"
+        },
+        {
+          "symbol": "EGL"
+        },
+        {
+          "symbol": "DOP"
+        },
+        {
+          "symbol": "TUG"
+        },
+        {
+          "symbol": "VQC"
+        },
+        {
+          "symbol": "ESL"
+        },
+        {
+          "symbol": "BBS"
+        },
+        {
+          "symbol": "NAG"
+        },
+        {
+          "symbol": "CTB"
+        },
+        {
+          "symbol": "TOT"
+        },
+        {
+          "symbol": "VSA"
+        },
+        {
+          "symbol": "APH"
+        },
+        {
+          "symbol": "CLL"
+        },
+        {
+          "symbol": "VIP"
+        },
+        {
+          "symbol": "PDN"
+        },
+        {
+          "symbol": "PVP"
+        },
+        {
+          "symbol": "TYA"
+        },
+        {
+          "symbol": "DAP"
+        },
+        {
+          "symbol": "DSV"
+        },
+        {
+          "symbol": "VSP"
+        },
+        {
+          "symbol": "HTR"
+        },
+        {
+          "symbol": "TB8"
+        },
+        {
+          "symbol": "DZM"
+        },
+        {
+          "symbol": "PKRAIL"
+        },
+        {
+          "symbol": "UEM"
+        },
+        {
+          "symbol": "TVM"
+        },
+        {
+          "symbol": "SVG"
+        },
+        {
+          "symbol": "VPA"
+        },
+        {
+          "symbol": "MND"
+        },
+        {
+          "symbol": "MLC"
+        },
+        {
+          "symbol": "PNP"
+        },
+        {
+          "symbol": "ITS"
+        },
+        {
+          "symbol": "DNL"
+        },
+        {
+          "symbol": "ISG"
+        },
+        {
+          "symbol": "IME"
+        },
+        {
+          "symbol": "ILC"
+        },
+        {
+          "symbol": "CQN"
+        },
+        {
+          "symbol": "BAL"
+        },
+        {
+          "symbol": "HLS"
+        },
+        {
+          "symbol": "TV1"
+        },
+        {
+          "symbol": "VCT"
+        },
+        {
+          "symbol": "VSE"
+        },
+        {
+          "symbol": "VBH"
+        },
+        {
+          "symbol": "TSG"
+        },
+        {
+          "symbol": "RAT"
+        },
+        {
+          "symbol": "DDH"
+        },
+        {
+          "symbol": "TV3"
+        },
+        {
+          "symbol": "CAR"
+        },
+        {
+          "symbol": "STP"
+        },
+        {
+          "symbol": "PMP"
+        },
+        {
+          "symbol": "PRC"
+        },
+        {
+          "symbol": "CJC"
+        },
+        {
+          "symbol": "BXH"
+        },
+        {
+          "symbol": "IPA"
+        },
+        {
+          "symbol": "AME"
+        },
+        {
+          "symbol": "SDC"
+        },
+        {
+          "symbol": "VCM"
+        },
+        {
+          "symbol": "TSB"
+        },
+        {
+          "symbol": "VGP"
+        },
+        {
+          "symbol": "VSM"
+        },
+        {
+          "symbol": "QNP"
+        },
+        {
+          "symbol": "ASG"
+        },
+        {
+          "symbol": "MCP"
+        },
+        {
+          "symbol": "GEX"
+        },
+        {
+          "symbol": "NTR"
+        },
+        {
+          "symbol": "SULECO"
+        },
+        {
+          "symbol": "THRAIL"
+        },
+        {
+          "symbol": "IMI"
+        },
+        {
+          "symbol": "NEM"
+        },
+        {
+          "symbol": "RTS"
+        },
+        {
+          "symbol": "HLR"
+        },
+        {
+          "symbol": "CKM"
+        },
+        {
+          "symbol": "BTR"
+        },
+        {
+          "symbol": "MVY"
+        },
+        {
+          "symbol": "DNR"
+        },
+        {
+          "symbol": "SPP"
+        },
+        {
+          "symbol": "STU"
+        },
+        {
+          "symbol": "MTS"
+        },
+        {
+          "symbol": "VFC"
+        },
+        {
+          "symbol": "VNA"
+        },
+        {
+          "symbol": "SGS"
+        },
+        {
+          "symbol": "STS"
+        },
+        {
+          "symbol": "VXT"
+        },
+        {
+          "symbol": "LPT"
+        },
+        {
+          "symbol": "LMI"
+        },
+        {
+          "symbol": "BTU"
+        },
+        {
+          "symbol": "EME"
+        },
+        {
+          "symbol": "APL"
+        },
+        {
+          "symbol": "VBT"
+        },
+        {
+          "symbol": "TKA"
+        },
+        {
+          "symbol": "SDA"
+        },
+        {
+          "symbol": "NAS"
+        },
+        {
+          "symbol": "PLO"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "339.1"
+    },
+    {
+      "industryName": {
+        "vi": "Ô tô và phụ tùng",
+        "vn": "Ô tô và phụ tùng",
+        "en": "Automobiles & Parts"
+      },
+      "industryCode": "3300",
+      "listCompany": [
+        {
+          "symbol": "HAX"
+        },
+        {
+          "symbol": "HHS"
+        },
+        {
+          "symbol": "VVS"
+        },
+        {
+          "symbol": "CSM"
+        },
+        {
+          "symbol": "DRC"
+        },
+        {
+          "symbol": "TMT"
+        },
+        {
+          "symbol": "SVC"
+        },
+        {
+          "symbol": "CTF"
+        },
+        {
+          "symbol": "HTL"
+        },
+        {
+          "symbol": "GGG"
+        },
+        {
+          "symbol": "DAS"
+        },
+        {
+          "symbol": "VMA"
+        },
+        {
+          "symbol": "FTI"
+        },
+        {
+          "symbol": "VKC"
+        },
+        {
+          "symbol": "GMA"
+        },
+        {
+          "symbol": "HUT"
+        },
+        {
+          "symbol": "SRC"
+        },
+        {
+          "symbol": "PTM"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "691.57"
+    },
+    {
+      "industryName": {
+        "vi": "Thực phẩm và đồ uống",
+        "vn": "Thực phẩm và đồ uống",
+        "en": "Food & Beverage"
+      },
+      "industryCode": "3500",
+      "listCompany": [
+        {
+          "symbol": "KTS"
+        },
+        {
+          "symbol": "CTP"
+        },
+        {
+          "symbol": "HAG"
+        },
+        {
+          "symbol": "AAN"
+        },
+        {
+          "symbol": "MCH"
+        },
+        {
+          "symbol": "KSH"
+        },
+        {
+          "symbol": "KHASPEXCO"
+        },
+        {
+          "symbol": "AVF"
+        },
+        {
+          "symbol": "BSP"
+        },
+        {
+          "symbol": "BSH"
+        },
+        {
+          "symbol": "SB1"
+        },
+        {
+          "symbol": "MPC"
+        },
+        {
+          "symbol": "PRO"
+        },
+        {
+          "symbol": "SKN"
+        },
+        {
+          "symbol": "HHB"
+        },
+        {
+          "symbol": "CFV"
+        },
+        {
+          "symbol": "HGI"
+        },
+        {
+          "symbol": "APF"
+        },
+        {
+          "symbol": "BHH"
+        },
+        {
+          "symbol": "BLT"
+        },
+        {
+          "symbol": "ATA"
+        },
+        {
+          "symbol": "C22"
+        },
+        {
+          "symbol": "CAT"
+        },
+        {
+          "symbol": "VNH"
+        },
+        {
+          "symbol": "SST"
+        },
+        {
+          "symbol": "BNA"
+        },
+        {
+          "symbol": "ACL"
+        },
+        {
+          "symbol": "LAF"
+        },
+        {
+          "symbol": "SBT"
+        },
+        {
+          "symbol": "SAB"
+        },
+        {
+          "symbol": "DAT"
+        },
+        {
+          "symbol": "VKD"
+        },
+        {
+          "symbol": "CBC"
+        },
+        {
+          "symbol": "SGO"
+        },
+        {
+          "symbol": "FDG"
+        },
+        {
+          "symbol": "NGC"
+        },
+        {
+          "symbol": "HGSEED"
+        },
+        {
+          "symbol": "NDF"
+        },
+        {
+          "symbol": "LTG"
+        },
+        {
+          "symbol": "BAS"
+        },
+        {
+          "symbol": "ICF"
+        },
+        {
+          "symbol": "SBB"
+        },
+        {
+          "symbol": "SKV"
+        },
+        {
+          "symbol": "BHP"
+        },
+        {
+          "symbol": "CLX"
+        },
+        {
+          "symbol": "NSS"
+        },
+        {
+          "symbol": "PSL"
+        },
+        {
+          "symbol": "STD"
+        },
+        {
+          "symbol": "SLS"
+        },
+        {
+          "symbol": "SJ1"
+        },
+        {
+          "symbol": "HAT"
+        },
+        {
+          "symbol": "OCH"
+        },
+        {
+          "symbol": "ANT"
+        },
+        {
+          "symbol": "CMX"
+        },
+        {
+          "symbol": "VCF"
+        },
+        {
+          "symbol": "VHC"
+        },
+        {
+          "symbol": "FMC"
+        },
+        {
+          "symbol": "MSN"
+        },
+        {
+          "symbol": "ATP"
+        },
+        {
+          "symbol": "VHI"
+        },
+        {
+          "symbol": "GQN"
+        },
+        {
+          "symbol": "TAN"
+        },
+        {
+          "symbol": "KAT"
+        },
+        {
+          "symbol": "HDS"
+        },
+        {
+          "symbol": "HVG"
+        },
+        {
+          "symbol": "LYF"
+        },
+        {
+          "symbol": "GTN"
+        },
+        {
+          "symbol": "VUG"
+        },
+        {
+          "symbol": "BSD"
+        },
+        {
+          "symbol": "WSB"
+        },
+        {
+          "symbol": "NCS"
+        },
+        {
+          "symbol": "SNC"
+        },
+        {
+          "symbol": "HNF"
+        },
+        {
+          "symbol": "FCS"
+        },
+        {
+          "symbol": "VLC"
+        },
+        {
+          "symbol": "SPH"
+        },
+        {
+          "symbol": "SAF"
+        },
+        {
+          "symbol": "MCF"
+        },
+        {
+          "symbol": "IDI"
+        },
+        {
+          "symbol": "SMB"
+        },
+        {
+          "symbol": "HPA"
+        },
+        {
+          "symbol": "SSC"
+        },
+        {
+          "symbol": "BHN"
+        },
+        {
+          "symbol": "ASM"
+        },
+        {
+          "symbol": "NAF"
+        },
+        {
+          "symbol": "AUM"
+        },
+        {
+          "symbol": "SSN"
+        },
+        {
+          "symbol": "TS4"
+        },
+        {
+          "symbol": "HLBC"
+        },
+        {
+          "symbol": "NNQ"
+        },
+        {
+          "symbol": "EPC"
+        },
+        {
+          "symbol": "AGC"
+        },
+        {
+          "symbol": "TVO"
+        },
+        {
+          "symbol": "SBL"
+        },
+        {
+          "symbol": "TCJ"
+        },
+        {
+          "symbol": "GCF"
+        },
+        {
+          "symbol": "HNM"
+        },
+        {
+          "symbol": "BTB"
+        },
+        {
+          "symbol": "CPA"
+        },
+        {
+          "symbol": "HKB"
+        },
+        {
+          "symbol": "BLF"
+        },
+        {
+          "symbol": "APT"
+        },
+        {
+          "symbol": "BIG"
+        },
+        {
+          "symbol": "BQB"
+        },
+        {
+          "symbol": "VSF"
+        },
+        {
+          "symbol": "TT6"
+        },
+        {
+          "symbol": "SEA"
+        },
+        {
+          "symbol": "SGC"
+        },
+        {
+          "symbol": "HAD"
+        },
+        {
+          "symbol": "CAN"
+        },
+        {
+          "symbol": "KDC"
+        },
+        {
+          "symbol": "INFOOD"
+        },
+        {
+          "symbol": "S33"
+        },
+        {
+          "symbol": "SCV"
+        },
+        {
+          "symbol": "DONA"
+        },
+        {
+          "symbol": "STN"
+        },
+        {
+          "symbol": "CBS"
+        },
+        {
+          "symbol": "BSL"
+        },
+        {
+          "symbol": "IFS"
+        },
+        {
+          "symbol": "BHG"
+        },
+        {
+          "symbol": "CAD"
+        },
+        {
+          "symbol": "QNS"
+        },
+        {
+          "symbol": "SPV"
+        },
+        {
+          "symbol": "VHF"
+        },
+        {
+          "symbol": "HHC"
+        },
+        {
+          "symbol": "KHS"
+        },
+        {
+          "symbol": "VNM"
+        },
+        {
+          "symbol": "NSC"
+        },
+        {
+          "symbol": "BAF"
+        },
+        {
+          "symbol": "MCM"
+        },
+        {
+          "symbol": "LSS"
+        },
+        {
+          "symbol": "VTL"
+        },
+        {
+          "symbol": "TAC"
+        },
+        {
+          "symbol": "BRV"
+        },
+        {
+          "symbol": "BBC"
+        },
+        {
+          "symbol": "KDF"
+        },
+        {
+          "symbol": "AIG"
+        },
+        {
+          "symbol": "SKH"
+        },
+        {
+          "symbol": "BHK"
+        },
+        {
+          "symbol": "CMF"
+        },
+        {
+          "symbol": "VSN"
+        },
+        {
+          "symbol": "THP"
+        },
+        {
+          "symbol": "HCO"
+        },
+        {
+          "symbol": "TFC"
+        },
+        {
+          "symbol": "BCF"
+        },
+        {
+          "symbol": "ANV"
+        },
+        {
+          "symbol": "ABT"
+        },
+        {
+          "symbol": "PAN"
+        },
+        {
+          "symbol": "DBC"
+        },
+        {
+          "symbol": "BKH"
+        },
+        {
+          "symbol": "CFC"
+        },
+        {
+          "symbol": "HLG"
+        },
+        {
+          "symbol": "VEG"
+        },
+        {
+          "symbol": "DNIEAP"
+        },
+        {
+          "symbol": "IDP"
+        },
+        {
+          "symbol": "BSQ"
+        },
+        {
+          "symbol": "CCA"
+        },
+        {
+          "symbol": "AGF"
+        },
+        {
+          "symbol": "AGM"
+        },
+        {
+          "symbol": "CMM"
+        },
+        {
+          "symbol": "CMN"
+        },
+        {
+          "symbol": "NCG"
+        },
+        {
+          "symbol": "MLS"
+        },
+        {
+          "symbol": "TAR"
+        },
+        {
+          "symbol": "JOS"
+        },
+        {
+          "symbol": "DMN"
+        },
+        {
+          "symbol": "HNG"
+        },
+        {
+          "symbol": "FGL"
+        },
+        {
+          "symbol": "HAF"
+        },
+        {
+          "symbol": "BBM"
+        },
+        {
+          "symbol": "QHW"
+        },
+        {
+          "symbol": "SCD"
+        },
+        {
+          "symbol": "UXC"
+        },
+        {
+          "symbol": "SPD"
+        },
+        {
+          "symbol": "CNA"
+        },
+        {
+          "symbol": "CAF"
+        },
+        {
+          "symbol": "VDL"
+        },
+        {
+          "symbol": "THB"
+        },
+        {
+          "symbol": "AAM"
+        },
+        {
+          "symbol": "TCO"
+        },
+        {
+          "symbol": "HSL"
+        },
+        {
+          "symbol": "VOC"
+        },
+        {
+          "symbol": "GTC"
+        },
+        {
+          "symbol": "VLF"
+        },
+        {
+          "symbol": "SEP"
+        },
+        {
+          "symbol": "MML"
+        },
+        {
+          "symbol": "KTC"
+        },
+        {
+          "symbol": "HNR"
+        },
+        {
+          "symbol": "HLB"
+        },
+        {
+          "symbol": "HBH"
+        },
+        {
+          "symbol": "HAV"
+        },
+        {
+          "symbol": "BMV"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "738.05"
+    },
+    {
+      "industryName": {
+        "vi": "Hàng cá nhân & Gia dụng",
+        "vn": "Hàng cá nhân & Gia dụng",
+        "en": "Personal & Household Goods"
+      },
+      "industryCode": "3700",
+      "listCompany": [
+        {
+          "symbol": "TNG"
+        },
+        {
+          "symbol": "OPTIC"
+        },
+        {
+          "symbol": "VDM"
+        },
+        {
+          "symbol": "FBA"
+        },
+        {
+          "symbol": "VDN"
+        },
+        {
+          "symbol": "MPT"
+        },
+        {
+          "symbol": "NDT"
+        },
+        {
+          "symbol": "G20"
+        },
+        {
+          "symbol": "HUG"
+        },
+        {
+          "symbol": "SPB"
+        },
+        {
+          "symbol": "CET"
+        },
+        {
+          "symbol": "PNJ"
+        },
+        {
+          "symbol": "TVT"
+        },
+        {
+          "symbol": "STK"
+        },
+        {
+          "symbol": "HTG"
+        },
+        {
+          "symbol": "KMR"
+        },
+        {
+          "symbol": "HNE"
+        },
+        {
+          "symbol": "GCD"
+        },
+        {
+          "symbol": "AG1"
+        },
+        {
+          "symbol": "X26"
+        },
+        {
+          "symbol": "HNI"
+        },
+        {
+          "symbol": "THM"
+        },
+        {
+          "symbol": "DCS"
+        },
+        {
+          "symbol": "NST"
+        },
+        {
+          "symbol": "ADS"
+        },
+        {
+          "symbol": "DTN"
+        },
+        {
+          "symbol": "MASECO"
+        },
+        {
+          "symbol": "VNW"
+        },
+        {
+          "symbol": "HAFASCO"
+        },
+        {
+          "symbol": "DKHN"
+        },
+        {
+          "symbol": "BBT"
+        },
+        {
+          "symbol": "BMG"
+        },
+        {
+          "symbol": "HSM"
+        },
+        {
+          "symbol": "VGG"
+        },
+        {
+          "symbol": "X20"
+        },
+        {
+          "symbol": "SHE"
+        },
+        {
+          "symbol": "KSD"
+        },
+        {
+          "symbol": "AAT"
+        },
+        {
+          "symbol": "EVE"
+        },
+        {
+          "symbol": "BKG"
+        },
+        {
+          "symbol": "TNV"
+        },
+        {
+          "symbol": "GDTEX"
+        },
+        {
+          "symbol": "LGM"
+        },
+        {
+          "symbol": "MEG"
+        },
+        {
+          "symbol": "MGG"
+        },
+        {
+          "symbol": "BEL"
+        },
+        {
+          "symbol": "MNB"
+        },
+        {
+          "symbol": "DM7"
+        },
+        {
+          "symbol": "BVN"
+        },
+        {
+          "symbol": "HLT"
+        },
+        {
+          "symbol": "TTG"
+        },
+        {
+          "symbol": "GLT"
+        },
+        {
+          "symbol": "VTJ"
+        },
+        {
+          "symbol": "GIL"
+        },
+        {
+          "symbol": "DQC"
+        },
+        {
+          "symbol": "LIX"
+        },
+        {
+          "symbol": "RAL"
+        },
+        {
+          "symbol": "MSH"
+        },
+        {
+          "symbol": "NHT"
+        },
+        {
+          "symbol": "AQN"
+        },
+        {
+          "symbol": "SSF"
+        },
+        {
+          "symbol": "HPU"
+        },
+        {
+          "symbol": "VDG"
+        },
+        {
+          "symbol": "FTM"
+        },
+        {
+          "symbol": "XHC"
+        },
+        {
+          "symbol": "LBE"
+        },
+        {
+          "symbol": "TCM"
+        },
+        {
+          "symbol": "TLL"
+        },
+        {
+          "symbol": "NPS"
+        },
+        {
+          "symbol": "ATD"
+        },
+        {
+          "symbol": "BDSFC"
+        },
+        {
+          "symbol": "BDG"
+        },
+        {
+          "symbol": "HDM"
+        },
+        {
+          "symbol": "DCG"
+        },
+        {
+          "symbol": "PTG"
+        },
+        {
+          "symbol": "M10"
+        },
+        {
+          "symbol": "NTT"
+        },
+        {
+          "symbol": "NET"
+        },
+        {
+          "symbol": "CLC"
+        },
+        {
+          "symbol": "TLG"
+        },
+        {
+          "symbol": "HCB"
+        },
+        {
+          "symbol": "KANGAROO"
+        },
+        {
+          "symbol": "MDN"
+        },
+        {
+          "symbol": "MVT"
+        },
+        {
+          "symbol": "ASA"
+        },
+        {
+          "symbol": "TKSHOES"
+        },
+        {
+          "symbol": "GTD"
+        },
+        {
+          "symbol": "GMC"
+        },
+        {
+          "symbol": "A32"
+        },
+        {
+          "symbol": "TDT"
+        },
+        {
+          "symbol": "SVD"
+        },
+        {
+          "symbol": "GDT"
+        },
+        {
+          "symbol": "TLI"
+        },
+        {
+          "symbol": "AGB"
+        },
+        {
+          "symbol": "VTI"
+        },
+        {
+          "symbol": "SGI"
+        },
+        {
+          "symbol": "PPH"
+        },
+        {
+          "symbol": "HJC"
+        },
+        {
+          "symbol": "NJC"
+        },
+        {
+          "symbol": "XPH"
+        },
+        {
+          "symbol": "VGT"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "124.84"
+    },
+    {
+      "industryName": {
+        "vi": "Y tế",
+        "vn": "Y tế",
+        "en": "Health Care"
+      },
+      "industryCode": "4500",
+      "listCompany": [
+        {
+          "symbol": "PMC"
+        },
+        {
+          "symbol": "DHG"
+        },
+        {
+          "symbol": "NHD"
+        },
+        {
+          "symbol": "CDP"
+        },
+        {
+          "symbol": "DPH"
+        },
+        {
+          "symbol": "AMP"
+        },
+        {
+          "symbol": "APC"
+        },
+        {
+          "symbol": "BIO"
+        },
+        {
+          "symbol": "DDN"
+        },
+        {
+          "symbol": "DBM"
+        },
+        {
+          "symbol": "TTD"
+        },
+        {
+          "symbol": "MRF"
+        },
+        {
+          "symbol": "MKV"
+        },
+        {
+          "symbol": "DTG"
+        },
+        {
+          "symbol": "DVM"
+        },
+        {
+          "symbol": "TNH"
+        },
+        {
+          "symbol": "VMD"
+        },
+        {
+          "symbol": "FIT"
+        },
+        {
+          "symbol": "DKP"
+        },
+        {
+          "symbol": "DHN"
+        },
+        {
+          "symbol": "UPH"
+        },
+        {
+          "symbol": "VHE"
+        },
+        {
+          "symbol": "SRA"
+        },
+        {
+          "symbol": "LDP"
+        },
+        {
+          "symbol": "TRA"
+        },
+        {
+          "symbol": "DBD"
+        },
+        {
+          "symbol": "DBT"
+        },
+        {
+          "symbol": "DCL"
+        },
+        {
+          "symbol": "DMC"
+        },
+        {
+          "symbol": "DAN"
+        },
+        {
+          "symbol": "HDP"
+        },
+        {
+          "symbol": "GPC"
+        },
+        {
+          "symbol": "NTF"
+        },
+        {
+          "symbol": "PHY"
+        },
+        {
+          "symbol": "MED"
+        },
+        {
+          "symbol": "IMP"
+        },
+        {
+          "symbol": "NDC"
+        },
+        {
+          "symbol": "DTH"
+        },
+        {
+          "symbol": "DP2"
+        },
+        {
+          "symbol": "CNC"
+        },
+        {
+          "symbol": "CBV"
+        },
+        {
+          "symbol": "DHT"
+        },
+        {
+          "symbol": "DP3"
+        },
+        {
+          "symbol": "BCH"
+        },
+        {
+          "symbol": "TRH"
+        },
+        {
+          "symbol": "TW3"
+        },
+        {
+          "symbol": "MKP"
+        },
+        {
+          "symbol": "MTP"
+        },
+        {
+          "symbol": "DMH"
+        },
+        {
+          "symbol": "AMV"
+        },
+        {
+          "symbol": "SPM"
+        },
+        {
+          "symbol": "TVP"
+        },
+        {
+          "symbol": "MEF"
+        },
+        {
+          "symbol": "AGP"
+        },
+        {
+          "symbol": "NDP"
+        },
+        {
+          "symbol": "DTP"
+        },
+        {
+          "symbol": "PPP"
+        },
+        {
+          "symbol": "OPC"
+        },
+        {
+          "symbol": "HDV"
+        },
+        {
+          "symbol": "DNM"
+        },
+        {
+          "symbol": "DVN"
+        },
+        {
+          "symbol": "DHD"
+        },
+        {
+          "symbol": "DPP"
+        },
+        {
+          "symbol": "DP1"
+        },
+        {
+          "symbol": "CVN"
+        },
+        {
+          "symbol": "VDP"
+        },
+        {
+          "symbol": "JVC"
+        },
+        {
+          "symbol": "PMPLABS"
+        },
+        {
+          "symbol": "BCP"
+        },
+        {
+          "symbol": "PBC"
+        },
+        {
+          "symbol": "YTC"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "724.29"
+    },
+    {
+      "industryName": {
+        "vi": "Bán lẻ",
+        "vn": "Bán lẻ",
+        "en": "Retail"
+      },
+      "industryCode": "5300",
+      "listCompany": [
+        {
+          "symbol": "PSD"
+        },
+        {
+          "symbol": "AFX"
+        },
+        {
+          "symbol": "GEM"
+        },
+        {
+          "symbol": "LBC"
+        },
+        {
+          "symbol": "TOP"
+        },
+        {
+          "symbol": "CPH"
+        },
+        {
+          "symbol": "HTM"
+        },
+        {
+          "symbol": "PET"
+        },
+        {
+          "symbol": "SAS"
+        },
+        {
+          "symbol": "KGM"
+        },
+        {
+          "symbol": "ICL"
+        },
+        {
+          "symbol": "COM"
+        },
+        {
+          "symbol": "CMV"
+        },
+        {
+          "symbol": "SBV"
+        },
+        {
+          "symbol": "AST"
+        },
+        {
+          "symbol": "MWG"
+        },
+        {
+          "symbol": "SAD"
+        },
+        {
+          "symbol": "DKC"
+        },
+        {
+          "symbol": "HTT"
+        },
+        {
+          "symbol": "THS"
+        },
+        {
+          "symbol": "DMX"
+        },
+        {
+          "symbol": "PIT"
+        },
+        {
+          "symbol": "FRT"
+        },
+        {
+          "symbol": "CEN"
+        },
+        {
+          "symbol": "FHN"
+        },
+        {
+          "symbol": "TH1"
+        },
+        {
+          "symbol": "SVT"
+        },
+        {
+          "symbol": "DGW"
+        },
+        {
+          "symbol": "AGX"
+        },
+        {
+          "symbol": "BTT"
+        },
+        {
+          "symbol": "CGL"
+        },
+        {
+          "symbol": "HFX"
+        },
+        {
+          "symbol": "TLS"
+        },
+        {
+          "symbol": "UNM"
+        },
+        {
+          "symbol": "T12"
+        },
+        {
+          "symbol": "VT1"
+        },
+        {
+          "symbol": "IED"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "1294.88"
+    },
+    {
+      "industryName": {
+        "vi": "Truyền thông",
+        "vn": "Truyền thông",
+        "en": "Media"
+      },
+      "industryCode": "5500",
+      "listCompany": [
+        {
+          "symbol": "HEV"
+        },
+        {
+          "symbol": "ADG"
+        },
+        {
+          "symbol": "DVV"
+        },
+        {
+          "symbol": "BDB"
+        },
+        {
+          "symbol": "HAB"
+        },
+        {
+          "symbol": "FOC"
+        },
+        {
+          "symbol": "HHI"
+        },
+        {
+          "symbol": "SMN"
+        },
+        {
+          "symbol": "STC"
+        },
+        {
+          "symbol": "PNC"
+        },
+        {
+          "symbol": "MTN"
+        },
+        {
+          "symbol": "DNB"
+        },
+        {
+          "symbol": "SUM"
+        },
+        {
+          "symbol": "HBE"
+        },
+        {
+          "symbol": "VPR"
+        },
+        {
+          "symbol": "FHS"
+        },
+        {
+          "symbol": "ECI"
+        },
+        {
+          "symbol": "QST"
+        },
+        {
+          "symbol": "ALT"
+        },
+        {
+          "symbol": "INTK"
+        },
+        {
+          "symbol": "IKH"
+        },
+        {
+          "symbol": "EPH"
+        },
+        {
+          "symbol": "HST"
+        },
+        {
+          "symbol": "DAD"
+        },
+        {
+          "symbol": "ADC"
+        },
+        {
+          "symbol": "HTP"
+        },
+        {
+          "symbol": "IN4"
+        },
+        {
+          "symbol": "VNX"
+        },
+        {
+          "symbol": "EBS"
+        },
+        {
+          "symbol": "CAB"
+        },
+        {
+          "symbol": "KHX"
+        },
+        {
+          "symbol": "NBE"
+        },
+        {
+          "symbol": "ODE"
+        },
+        {
+          "symbol": "SGD"
+        },
+        {
+          "symbol": "BED"
+        },
+        {
+          "symbol": "DST"
+        },
+        {
+          "symbol": "INC7"
+        },
+        {
+          "symbol": "IHK"
+        },
+        {
+          "symbol": "IBN"
+        },
+        {
+          "symbol": "VNB"
+        },
+        {
+          "symbol": "STH"
+        },
+        {
+          "symbol": "SED"
+        },
+        {
+          "symbol": "EID"
+        },
+        {
+          "symbol": "DAE"
+        },
+        {
+          "symbol": "YEG"
+        },
+        {
+          "symbol": "TPH"
+        },
+        {
+          "symbol": "SAP"
+        },
+        {
+          "symbol": "KBE"
+        },
+        {
+          "symbol": "BST"
+        },
+        {
+          "symbol": "RGC"
+        },
+        {
+          "symbol": "IBD"
+        },
+        {
+          "symbol": "VNZ"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "481.87"
+    },
+    {
+      "industryName": {
+        "vi": "Du lịch và Giải trí",
+        "vn": "Du lịch và Giải trí",
+        "en": "Travel & Leisure"
+      },
+      "industryCode": "5700",
+      "listCompany": [
+        {
+          "symbol": "SKG"
+        },
+        {
+          "symbol": "VNG"
+        },
+        {
+          "symbol": "FDT"
+        },
+        {
+          "symbol": "MLN"
+        },
+        {
+          "symbol": "TPS"
+        },
+        {
+          "symbol": "HHG"
+        },
+        {
+          "symbol": "BTV"
+        },
+        {
+          "symbol": "DTI"
+        },
+        {
+          "symbol": "VTD"
+        },
+        {
+          "symbol": "NWT"
+        },
+        {
+          "symbol": "VJC"
+        },
+        {
+          "symbol": "DAH"
+        },
+        {
+          "symbol": "MTC"
+        },
+        {
+          "symbol": "ORIENTALSEA"
+        },
+        {
+          "symbol": "NTG"
+        },
+        {
+          "symbol": "DLD"
+        },
+        {
+          "symbol": "GTT"
+        },
+        {
+          "symbol": "VIR"
+        },
+        {
+          "symbol": "TSD"
+        },
+        {
+          "symbol": "SHX"
+        },
+        {
+          "symbol": "DLT"
+        },
+        {
+          "symbol": "DNT"
+        },
+        {
+          "symbol": "HES"
+        },
+        {
+          "symbol": "ATS"
+        },
+        {
+          "symbol": "THUYTA"
+        },
+        {
+          "symbol": "DBH"
+        },
+        {
+          "symbol": "ROXYVN"
+        },
+        {
+          "symbol": "CXH"
+        },
+        {
+          "symbol": "HNT"
+        },
+        {
+          "symbol": "SRT"
+        },
+        {
+          "symbol": "VTG"
+        },
+        {
+          "symbol": "BCV"
+        },
+        {
+          "symbol": "BSG"
+        },
+        {
+          "symbol": "DXL"
+        },
+        {
+          "symbol": "EIN"
+        },
+        {
+          "symbol": "PDC"
+        },
+        {
+          "symbol": "DHQ"
+        },
+        {
+          "symbol": "SCS"
+        },
+        {
+          "symbol": "DAR"
+        },
+        {
+          "symbol": "KLC"
+        },
+        {
+          "symbol": "POST"
+        },
+        {
+          "symbol": "HRT"
+        },
+        {
+          "symbol": "HOT"
+        },
+        {
+          "symbol": "HGT"
+        },
+        {
+          "symbol": "DSP"
+        },
+        {
+          "symbol": "BLN"
+        },
+        {
+          "symbol": "TSJ"
+        },
+        {
+          "symbol": "ONW"
+        },
+        {
+          "symbol": "VNS"
+        },
+        {
+          "symbol": "MT7"
+        },
+        {
+          "symbol": "KLF"
+        },
+        {
+          "symbol": "PNG"
+        },
+        {
+          "symbol": "DSD"
+        },
+        {
+          "symbol": "CTC"
+        },
+        {
+          "symbol": "TCT"
+        },
+        {
+          "symbol": "VPL"
+        },
+        {
+          "symbol": "SPSC"
+        },
+        {
+          "symbol": "DLH"
+        },
+        {
+          "symbol": "VTR"
+        },
+        {
+          "symbol": "VTM"
+        },
+        {
+          "symbol": "RIC"
+        },
+        {
+          "symbol": "TTT"
+        },
+        {
+          "symbol": "SGH"
+        },
+        {
+          "symbol": "PGT"
+        },
+        {
+          "symbol": "MAS"
+        },
+        {
+          "symbol": "DSN"
+        },
+        {
+          "symbol": "HVN"
+        },
+        {
+          "symbol": "DCD"
+        },
+        {
+          "symbol": "STT"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "26.95"
+    },
+    {
+      "industryName": {
+        "vi": "Viễn thông",
+        "vn": "Viễn thông",
+        "en": "Telecommunications"
+      },
+      "industryCode": "6500",
+      "listCompany": [
+        {
+          "symbol": "PIA"
+        },
+        {
+          "symbol": "PTP"
+        },
+        {
+          "symbol": "ABC"
+        },
+        {
+          "symbol": "VGI"
+        },
+        {
+          "symbol": "PAI"
+        },
+        {
+          "symbol": "MFS"
+        },
+        {
+          "symbol": "FOX"
+        },
+        {
+          "symbol": "TTN"
+        },
+        {
+          "symbol": "VTT"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "1071"
+    },
+    {
+      "industryName": {
+        "vi": "Điện, nước & xăng dầu khí đốt",
+        "vn": "Điện, nước & xăng dầu khí đốt",
+        "en": "Utilities"
+      },
+      "industryCode": "7500",
+      "listCompany": [
+        {
+          "symbol": "PGS"
+        },
+        {
+          "symbol": "DRL"
+        },
+        {
+          "symbol": "HNA"
+        },
+        {
+          "symbol": "DMS"
+        },
+        {
+          "symbol": "TVW"
+        },
+        {
+          "symbol": "CGC"
+        },
+        {
+          "symbol": "PDT"
+        },
+        {
+          "symbol": "TQW"
+        },
+        {
+          "symbol": "BDW"
+        },
+        {
+          "symbol": "BGW"
+        },
+        {
+          "symbol": "SBH"
+        },
+        {
+          "symbol": "NED"
+        },
+        {
+          "symbol": "POV"
+        },
+        {
+          "symbol": "POB"
+        },
+        {
+          "symbol": "TAW"
+        },
+        {
+          "symbol": "HPW"
+        },
+        {
+          "symbol": "KHW"
+        },
+        {
+          "symbol": "CHS"
+        },
+        {
+          "symbol": "PEG"
+        },
+        {
+          "symbol": "THW"
+        },
+        {
+          "symbol": "XMP"
+        },
+        {
+          "symbol": "PIC"
+        },
+        {
+          "symbol": "BTW"
+        },
+        {
+          "symbol": "PTX"
+        },
+        {
+          "symbol": "CLW"
+        },
+        {
+          "symbol": "PGV"
+        },
+        {
+          "symbol": "PPC"
+        },
+        {
+          "symbol": "SBA"
+        },
+        {
+          "symbol": "REE"
+        },
+        {
+          "symbol": "TTE"
+        },
+        {
+          "symbol": "TBC"
+        },
+        {
+          "symbol": "VPD"
+        },
+        {
+          "symbol": "PBK"
+        },
+        {
+          "symbol": "PSH"
+        },
+        {
+          "symbol": "EAD"
+        },
+        {
+          "symbol": "CVH"
+        },
+        {
+          "symbol": "NS2"
+        },
+        {
+          "symbol": "BLW"
+        },
+        {
+          "symbol": "NQT"
+        },
+        {
+          "symbol": "TOW"
+        },
+        {
+          "symbol": "BGE"
+        },
+        {
+          "symbol": "DNH"
+        },
+        {
+          "symbol": "DNN"
+        },
+        {
+          "symbol": "ANI"
+        },
+        {
+          "symbol": "BWA"
+        },
+        {
+          "symbol": "NAW"
+        },
+        {
+          "symbol": "TMC"
+        },
+        {
+          "symbol": "PPT"
+        },
+        {
+          "symbol": "DNC"
+        },
+        {
+          "symbol": "CHP"
+        },
+        {
+          "symbol": "PMG"
+        },
+        {
+          "symbol": "POW"
+        },
+        {
+          "symbol": "VSH"
+        },
+        {
+          "symbol": "HIO"
+        },
+        {
+          "symbol": "ASP"
+        },
+        {
+          "symbol": "BWE"
+        },
+        {
+          "symbol": "CCI"
+        },
+        {
+          "symbol": "GEG"
+        },
+        {
+          "symbol": "KTW"
+        },
+        {
+          "symbol": "DBW"
+        },
+        {
+          "symbol": "NS3"
+        },
+        {
+          "symbol": "DTE"
+        },
+        {
+          "symbol": "NCP"
+        },
+        {
+          "symbol": "DWC"
+        },
+        {
+          "symbol": "HPD"
+        },
+        {
+          "symbol": "GSM"
+        },
+        {
+          "symbol": "GLW"
+        },
+        {
+          "symbol": "QNW"
+        },
+        {
+          "symbol": "VCP"
+        },
+        {
+          "symbol": "PND"
+        },
+        {
+          "symbol": "DTK"
+        },
+        {
+          "symbol": "SMA"
+        },
+        {
+          "symbol": "TDW"
+        },
+        {
+          "symbol": "GHC"
+        },
+        {
+          "symbol": "KWA"
+        },
+        {
+          "symbol": "LCW"
+        },
+        {
+          "symbol": "HGW"
+        },
+        {
+          "symbol": "HWS"
+        },
+        {
+          "symbol": "PWS"
+        },
+        {
+          "symbol": "PCF"
+        },
+        {
+          "symbol": "PCG"
+        },
+        {
+          "symbol": "DVC"
+        },
+        {
+          "symbol": "AVC"
+        },
+        {
+          "symbol": "NLS"
+        },
+        {
+          "symbol": "NQN"
+        },
+        {
+          "symbol": "NBP"
+        },
+        {
+          "symbol": "HTC"
+        },
+        {
+          "symbol": "PGD"
+        },
+        {
+          "symbol": "SHP"
+        },
+        {
+          "symbol": "HDG"
+        },
+        {
+          "symbol": "GAS"
+        },
+        {
+          "symbol": "DLM"
+        },
+        {
+          "symbol": "LDW"
+        },
+        {
+          "symbol": "SII"
+        },
+        {
+          "symbol": "GCB"
+        },
+        {
+          "symbol": "HND"
+        },
+        {
+          "symbol": "HFC"
+        },
+        {
+          "symbol": "NNT"
+        },
+        {
+          "symbol": "QPH"
+        },
+        {
+          "symbol": "TLP"
+        },
+        {
+          "symbol": "NTW"
+        },
+        {
+          "symbol": "GE2"
+        },
+        {
+          "symbol": "GDW"
+        },
+        {
+          "symbol": "PVG"
+        },
+        {
+          "symbol": "SEB"
+        },
+        {
+          "symbol": "PPY"
+        },
+        {
+          "symbol": "NBW"
+        },
+        {
+          "symbol": "CNG"
+        },
+        {
+          "symbol": "PGC"
+        },
+        {
+          "symbol": "TDG"
+        },
+        {
+          "symbol": "S4A"
+        },
+        {
+          "symbol": "VCW"
+        },
+        {
+          "symbol": "LWS"
+        },
+        {
+          "symbol": "NNB"
+        },
+        {
+          "symbol": "HTW"
+        },
+        {
+          "symbol": "LAW"
+        },
+        {
+          "symbol": "VLW"
+        },
+        {
+          "symbol": "BSA"
+        },
+        {
+          "symbol": "STW"
+        },
+        {
+          "symbol": "VWS"
+        },
+        {
+          "symbol": "SP2"
+        },
+        {
+          "symbol": "TNW"
+        },
+        {
+          "symbol": "DWS"
+        },
+        {
+          "symbol": "HDW"
+        },
+        {
+          "symbol": "CTW"
+        },
+        {
+          "symbol": "BNW"
+        },
+        {
+          "symbol": "NQB"
+        },
+        {
+          "symbol": "VAV"
+        },
+        {
+          "symbol": "THN"
+        },
+        {
+          "symbol": "UPC"
+        },
+        {
+          "symbol": "DDG"
+        },
+        {
+          "symbol": "NBT"
+        },
+        {
+          "symbol": "HJS"
+        },
+        {
+          "symbol": "NTH"
+        },
+        {
+          "symbol": "SJD"
+        },
+        {
+          "symbol": "SFC"
+        },
+        {
+          "symbol": "TDM"
+        },
+        {
+          "symbol": "TTA"
+        },
+        {
+          "symbol": "NT2"
+        },
+        {
+          "symbol": "BTP"
+        },
+        {
+          "symbol": "KHP"
+        },
+        {
+          "symbol": "BPT"
+        },
+        {
+          "symbol": "HBWATER"
+        },
+        {
+          "symbol": "BPWACO"
+        },
+        {
+          "symbol": "TANIWACO"
+        },
+        {
+          "symbol": "EBA"
+        },
+        {
+          "symbol": "WTB"
+        },
+        {
+          "symbol": "VMG"
+        },
+        {
+          "symbol": "BHA"
+        },
+        {
+          "symbol": "VPW"
+        },
+        {
+          "symbol": "LKW"
+        },
+        {
+          "symbol": "NDW"
+        },
+        {
+          "symbol": "DNA"
+        },
+        {
+          "symbol": "ISH"
+        },
+        {
+          "symbol": "BMF"
+        },
+        {
+          "symbol": "BWS"
+        },
+        {
+          "symbol": "NSL"
+        },
+        {
+          "symbol": "QTP"
+        },
+        {
+          "symbol": "TDB"
+        },
+        {
+          "symbol": "MTG"
+        },
+        {
+          "symbol": "PJS"
+        },
+        {
+          "symbol": "PMW"
+        },
+        {
+          "symbol": "NVP"
+        },
+        {
+          "symbol": "PJC"
+        },
+        {
+          "symbol": "TMP"
+        },
+        {
+          "symbol": "UIC"
+        },
+        {
+          "symbol": "DTV"
+        },
+        {
+          "symbol": "DKW"
+        },
+        {
+          "symbol": "SVH"
+        },
+        {
+          "symbol": "SBM"
+        },
+        {
+          "symbol": "ND2"
+        },
+        {
+          "symbol": "TBW"
+        },
+        {
+          "symbol": "DNW"
+        },
+        {
+          "symbol": "PTH"
+        },
+        {
+          "symbol": "CMW"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "4768.71"
+    },
+    {
+      "industryName": {
+        "vi": "Ngân hàng",
+        "vn": "Ngân hàng",
+        "en": "Banks"
+      },
+      "industryCode": "8300",
+      "listCompany": [
+        {
+          "symbol": "LPB"
+        },
+        {
+          "symbol": "TCB"
+        },
+        {
+          "symbol": "CTG"
+        },
+        {
+          "symbol": "BVB"
+        },
+        {
+          "symbol": "PGB"
+        },
+        {
+          "symbol": "ACB"
+        },
+        {
+          "symbol": "SSB"
+        },
+        {
+          "symbol": "VBB"
+        },
+        {
+          "symbol": "VPB"
+        },
+        {
+          "symbol": "HDB"
+        },
+        {
+          "symbol": "OCB"
+        },
+        {
+          "symbol": "STB"
+        },
+        {
+          "symbol": "MSB"
+        },
+        {
+          "symbol": "NAB"
+        },
+        {
+          "symbol": "ABB"
+        },
+        {
+          "symbol": "BAB"
+        },
+        {
+          "symbol": "EIB"
+        },
+        {
+          "symbol": "BID"
+        },
+        {
+          "symbol": "KLB"
+        },
+        {
+          "symbol": "NVB"
+        },
+        {
+          "symbol": "VCB"
+        },
+        {
+          "symbol": "SHB"
+        },
+        {
+          "symbol": "VIB"
+        },
+        {
+          "symbol": "MBB"
+        },
+        {
+          "symbol": "SGB"
+        },
+        {
+          "symbol": "VAB"
+        },
+        {
+          "symbol": "TPB"
+        },
+        {
+          "symbol": "PCB"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "641.9"
+    },
+    {
+      "industryName": {
+        "vi": "Bảo hiểm",
+        "vn": "Bảo hiểm",
+        "en": "Insurance"
+      },
+      "industryCode": "8500",
+      "listCompany": [
+        {
+          "symbol": "PTI"
+        },
+        {
+          "symbol": "MIG"
+        },
+        {
+          "symbol": "ABI"
+        },
+        {
+          "symbol": "BIC"
+        },
+        {
+          "symbol": "BHI"
+        },
+        {
+          "symbol": "PGI"
+        },
+        {
+          "symbol": "BHVA"
+        },
+        {
+          "symbol": "VNR"
+        },
+        {
+          "symbol": "AIC"
+        },
+        {
+          "symbol": "PVI"
+        },
+        {
+          "symbol": "PRE"
+        },
+        {
+          "symbol": "BMI"
+        },
+        {
+          "symbol": "BVH"
+        },
+        {
+          "symbol": "IFA"
+        },
+        {
+          "symbol": "BLI"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "364.94"
+    },
+    {
+      "industryName": {
+        "vi": "Bất động sản",
+        "vn": "Bất động sản",
+        "en": "Real Estate"
+      },
+      "industryCode": "8600",
+      "listCompany": [
+        {
+          "symbol": "CEO"
+        },
+        {
+          "symbol": "TIG"
+        },
+        {
+          "symbol": "NRC"
+        },
+        {
+          "symbol": "TIX"
+        },
+        {
+          "symbol": "KOS"
+        },
+        {
+          "symbol": "SGR"
+        },
+        {
+          "symbol": "TDC"
+        },
+        {
+          "symbol": "VRE"
+        },
+        {
+          "symbol": "SZC"
+        },
+        {
+          "symbol": "MEY"
+        },
+        {
+          "symbol": "PXA"
+        },
+        {
+          "symbol": "TBR"
+        },
+        {
+          "symbol": "HU6"
+        },
+        {
+          "symbol": "HD6"
+        },
+        {
+          "symbol": "DTR"
+        },
+        {
+          "symbol": "FCC"
+        },
+        {
+          "symbol": "DCH"
+        },
+        {
+          "symbol": "SZG"
+        },
+        {
+          "symbol": "VRG"
+        },
+        {
+          "symbol": "LSG"
+        },
+        {
+          "symbol": "HDC"
+        },
+        {
+          "symbol": "TEG"
+        },
+        {
+          "symbol": "VRC"
+        },
+        {
+          "symbol": "PTL"
+        },
+        {
+          "symbol": "CRE"
+        },
+        {
+          "symbol": "BCM"
+        },
+        {
+          "symbol": "CCL"
+        },
+        {
+          "symbol": "KDH"
+        },
+        {
+          "symbol": "VNN"
+        },
+        {
+          "symbol": "PXC"
+        },
+        {
+          "symbol": "HD2"
+        },
+        {
+          "symbol": "VHD"
+        },
+        {
+          "symbol": "NDN"
+        },
+        {
+          "symbol": "IJC"
+        },
+        {
+          "symbol": "ITC"
+        },
+        {
+          "symbol": "SJS"
+        },
+        {
+          "symbol": "TN1"
+        },
+        {
+          "symbol": "VHM"
+        },
+        {
+          "symbol": "NTC"
+        },
+        {
+          "symbol": "TCH"
+        },
+        {
+          "symbol": "SZL"
+        },
+        {
+          "symbol": "CRV"
+        },
+        {
+          "symbol": "HTN"
+        },
+        {
+          "symbol": "KHG"
+        },
+        {
+          "symbol": "SDI"
+        },
+        {
+          "symbol": "BSC"
+        },
+        {
+          "symbol": "EFI"
+        },
+        {
+          "symbol": "CK8"
+        },
+        {
+          "symbol": "TID"
+        },
+        {
+          "symbol": "TV6"
+        },
+        {
+          "symbol": "HKT"
+        },
+        {
+          "symbol": "KSF"
+        },
+        {
+          "symbol": "DTA"
+        },
+        {
+          "symbol": "CKG"
+        },
+        {
+          "symbol": "TIP"
+        },
+        {
+          "symbol": "VIC"
+        },
+        {
+          "symbol": "LGL"
+        },
+        {
+          "symbol": "OGC"
+        },
+        {
+          "symbol": "LDG"
+        },
+        {
+          "symbol": "HPX"
+        },
+        {
+          "symbol": "SCR"
+        },
+        {
+          "symbol": "TDH"
+        },
+        {
+          "symbol": "TAL"
+        },
+        {
+          "symbol": "TAG"
+        },
+        {
+          "symbol": "NTB"
+        },
+        {
+          "symbol": "V11"
+        },
+        {
+          "symbol": "AMD"
+        },
+        {
+          "symbol": "LMH"
+        },
+        {
+          "symbol": "PRT"
+        },
+        {
+          "symbol": "PVR"
+        },
+        {
+          "symbol": "D11"
+        },
+        {
+          "symbol": "RCL"
+        },
+        {
+          "symbol": "PV2"
+        },
+        {
+          "symbol": "DRH"
+        },
+        {
+          "symbol": "NVT"
+        },
+        {
+          "symbol": "VPI"
+        },
+        {
+          "symbol": "FIR"
+        },
+        {
+          "symbol": "HQC"
+        },
+        {
+          "symbol": "VJTC"
+        },
+        {
+          "symbol": "KAC"
+        },
+        {
+          "symbol": "ABFG"
+        },
+        {
+          "symbol": "SSE"
+        },
+        {
+          "symbol": "MH3"
+        },
+        {
+          "symbol": "PXL"
+        },
+        {
+          "symbol": "ITA"
+        },
+        {
+          "symbol": "SSH"
+        },
+        {
+          "symbol": "PIV"
+        },
+        {
+          "symbol": "OFG"
+        },
+        {
+          "symbol": "DIH"
+        },
+        {
+          "symbol": "DTD"
+        },
+        {
+          "symbol": "IDC"
+        },
+        {
+          "symbol": "PDR"
+        },
+        {
+          "symbol": "NTL"
+        },
+        {
+          "symbol": "VPH"
+        },
+        {
+          "symbol": "D2D"
+        },
+        {
+          "symbol": "NBB"
+        },
+        {
+          "symbol": "C21"
+        },
+        {
+          "symbol": "PTN"
+        },
+        {
+          "symbol": "HD3"
+        },
+        {
+          "symbol": "BII"
+        },
+        {
+          "symbol": "VEF"
+        },
+        {
+          "symbol": "CCS"
+        },
+        {
+          "symbol": "HPI"
+        },
+        {
+          "symbol": "HD8"
+        },
+        {
+          "symbol": "XDH"
+        },
+        {
+          "symbol": "VGV"
+        },
+        {
+          "symbol": "FHH"
+        },
+        {
+          "symbol": "THD"
+        },
+        {
+          "symbol": "SZB"
+        },
+        {
+          "symbol": "TET"
+        },
+        {
+          "symbol": "API"
+        },
+        {
+          "symbol": "IDJ"
+        },
+        {
+          "symbol": "IDV"
+        },
+        {
+          "symbol": "HLD"
+        },
+        {
+          "symbol": "VC3"
+        },
+        {
+          "symbol": "AGG"
+        },
+        {
+          "symbol": "HAR"
+        },
+        {
+          "symbol": "SIP"
+        },
+        {
+          "symbol": "LHG"
+        },
+        {
+          "symbol": "NVL"
+        },
+        {
+          "symbol": "DXG"
+        },
+        {
+          "symbol": "QCG"
+        },
+        {
+          "symbol": "FDC"
+        },
+        {
+          "symbol": "SLD"
+        },
+        {
+          "symbol": "KHA"
+        },
+        {
+          "symbol": "HIZ"
+        },
+        {
+          "symbol": "MGR"
+        },
+        {
+          "symbol": "LEC"
+        },
+        {
+          "symbol": "VES"
+        },
+        {
+          "symbol": "PWA"
+        },
+        {
+          "symbol": "PPI"
+        },
+        {
+          "symbol": "HRB"
+        },
+        {
+          "symbol": "VCR"
+        },
+        {
+          "symbol": "RGG"
+        },
+        {
+          "symbol": "VNI"
+        },
+        {
+          "symbol": "CNT"
+        },
+        {
+          "symbol": "PVL"
+        },
+        {
+          "symbol": "DO3"
+        },
+        {
+          "symbol": "V21"
+        },
+        {
+          "symbol": "DXS"
+        },
+        {
+          "symbol": "DIG"
+        },
+        {
+          "symbol": "NLG"
+        },
+        {
+          "symbol": "KBC"
+        },
+        {
+          "symbol": "STL"
+        },
+        {
+          "symbol": "FLC"
+        },
+        {
+          "symbol": "APR"
+        },
+        {
+          "symbol": "CLG"
+        },
+        {
+          "symbol": "SID"
+        },
+        {
+          "symbol": "BTH"
+        },
+        {
+          "symbol": "AAV"
+        },
+        {
+          "symbol": "BVL"
+        },
+        {
+          "symbol": "MA1"
+        },
+        {
+          "symbol": "MBT"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "694.31"
+    },
+    {
+      "industryName": {
+        "vi": "Dịch vụ tài chính",
+        "vn": "Dịch vụ tài chính",
+        "en": "Financial Services"
+      },
+      "industryCode": "8700",
+      "listCompany": [
+        {
+          "symbol": "TVC"
+        },
+        {
+          "symbol": "EVS"
+        },
+        {
+          "symbol": "VIG"
+        },
+        {
+          "symbol": "PSI"
+        },
+        {
+          "symbol": "HBS"
+        },
+        {
+          "symbol": "SSI"
+        },
+        {
+          "symbol": "KAI"
+        },
+        {
+          "symbol": "CSI"
+        },
+        {
+          "symbol": "F88"
+        },
+        {
+          "symbol": "LPS"
+        },
+        {
+          "symbol": "VDS"
+        },
+        {
+          "symbol": "VPX"
+        },
+        {
+          "symbol": "TVB"
+        },
+        {
+          "symbol": "BCG"
+        },
+        {
+          "symbol": "VUA"
+        },
+        {
+          "symbol": "BVS"
+        },
+        {
+          "symbol": "IVS"
+        },
+        {
+          "symbol": "HCM"
+        },
+        {
+          "symbol": "APG"
+        },
+        {
+          "symbol": "VND"
+        },
+        {
+          "symbol": "ORS"
+        },
+        {
+          "symbol": "TCI"
+        },
+        {
+          "symbol": "CTS"
+        },
+        {
+          "symbol": "BSI"
+        },
+        {
+          "symbol": "FTS"
+        },
+        {
+          "symbol": "PHS"
+        },
+        {
+          "symbol": "EVF"
+        },
+        {
+          "symbol": "TCX"
+        },
+        {
+          "symbol": "TVS"
+        },
+        {
+          "symbol": "HFT"
+        },
+        {
+          "symbol": "HAC"
+        },
+        {
+          "symbol": "BMS"
+        },
+        {
+          "symbol": "WSS"
+        },
+        {
+          "symbol": "VIX"
+        },
+        {
+          "symbol": "VCI"
+        },
+        {
+          "symbol": "VCK"
+        },
+        {
+          "symbol": "IBC"
+        },
+        {
+          "symbol": "TIN"
+        },
+        {
+          "symbol": "MBS"
+        },
+        {
+          "symbol": "AGR"
+        },
+        {
+          "symbol": "ART"
+        },
+        {
+          "symbol": "AAS"
+        },
+        {
+          "symbol": "ABW"
+        },
+        {
+          "symbol": "SBS"
+        },
+        {
+          "symbol": "DCV"
+        },
+        {
+          "symbol": "APS"
+        },
+        {
+          "symbol": "VFS"
+        },
+        {
+          "symbol": "SHS"
+        },
+        {
+          "symbol": "DSC"
+        },
+        {
+          "symbol": "DSE"
+        },
+        {
+          "symbol": "UPS"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "731.02"
+    },
+    {
+      "industryName": {
+        "vi": "Công nghệ Thông tin",
+        "vn": "Công nghệ Thông tin",
+        "en": "Technology"
+      },
+      "industryCode": "9500",
+      "listCompany": [
+        {
+          "symbol": "ONE"
+        },
+        {
+          "symbol": "CMG"
+        },
+        {
+          "symbol": "VAT"
+        },
+        {
+          "symbol": "LTC"
+        },
+        {
+          "symbol": "ITD"
+        },
+        {
+          "symbol": "HIG"
+        },
+        {
+          "symbol": "VIE"
+        },
+        {
+          "symbol": "SRB"
+        },
+        {
+          "symbol": "PMT"
+        },
+        {
+          "symbol": "SMT"
+        },
+        {
+          "symbol": "VLA"
+        },
+        {
+          "symbol": "ELC"
+        },
+        {
+          "symbol": "SGT"
+        },
+        {
+          "symbol": "SAM"
+        },
+        {
+          "symbol": "FPT"
+        },
+        {
+          "symbol": "SBD"
+        },
+        {
+          "symbol": "HPT"
+        },
+        {
+          "symbol": "TST"
+        },
+        {
+          "symbol": "PMJ"
+        },
+        {
+          "symbol": "CMT"
+        },
+        {
+          "symbol": "CKV"
+        },
+        {
+          "symbol": "VEC"
+        },
+        {
+          "symbol": "VTC"
+        },
+        {
+          "symbol": "ST8"
+        },
+        {
+          "symbol": "CNX"
+        },
+        {
+          "symbol": "TPE"
+        },
+        {
+          "symbol": "UNI"
+        },
+        {
+          "symbol": "ATC"
+        },
+        {
+          "symbol": "HVA"
+        },
+        {
+          "symbol": "POT"
+        },
+        {
+          "symbol": "KST"
+        },
+        {
+          "symbol": "ICT"
+        },
+        {
+          "symbol": "VTE"
+        }
+      ],
+      "industryLevel": "2",
+      "industryCloseIndex": "599.1"
+    }
+  ],
+  "status": "ok"
+}

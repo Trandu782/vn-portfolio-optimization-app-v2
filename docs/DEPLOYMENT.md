@@ -1,0 +1,261 @@
+# Deployment
+
+The app deploys as two Vercel projects from this folder with the **Vercel CLI**
+(no Git remote required). Both projects run in `sin1` (Singapore), the closest
+region to Vietnam.
+
+- **API** — Root Directory **the repository root**, FastAPI framework preset.
+  Vercel only auto-detects FastAPI at a supported root entrypoint (`app.py`,
+  `index.py`, `server.py`, `main.py`, `wsgi.py` or `asgi.py`, or the same names
+  inside `src/` or `app/`), so the repository root holds `asgi.py`: it puts
+  `apps/api`, `packages/core` and `packages/data` on `sys.path` and re-exports
+  the real `app` from `apps/api/app/main.py`. Deploying from the root is
+  required because the API imports those sibling packages.
+- **Web** — Root Directory `apps/web`, Next.js. Its `next.config.mjs` rewrite
+  proxies `/api/*` to `API_URL`. Keep `next` on the newest `15.5.x` security
+  release (currently `15.5.29`): Vercel refuses to deploy a Next.js version with
+  a known vulnerability, and `postcss` is pinned to `8.5.33` via `overrides` so
+  Next's nested copy is patched too — `npm audit` in `apps/web` must stay clean.
+
+The FastAPI preset serves the whole application from that one function with the
+original request paths, so `vercel.json` has no `rewrites`; `functions` is keyed
+by the resolved entrypoint (`asgi.py`) and only customises its bundle and
+`maxDuration`. Do not move the entrypoint under `apps/api`: file-based Python
+functions are only discovered in a root `api/` directory, and a catch-all
+rewrite to one function would rewrite the path FastAPI routes on.
+
+### Python dependencies
+
+The runtime dependencies live in the root `pyproject.toml`
+(`[project].dependencies`). There is no `requirements.txt` on purpose: Vercel
+resolves the manifest from the entrypoint directory upward and stops at the
+first `pyproject.toml` it finds, so a tooling-only `pyproject.toml` (or an
+`-r`/local-path `requirements.txt`) can leave the deployed function without
+packages and the import fails with `ModuleNotFoundError`. Keep the whole
+runtime set in that one list — `apps/api`, `packages/core` and `packages/data`
+all import from it — and let `asgi.py` provide the workspace source
+directories, which are not installed as distributions.
+
+### Postgres pooler (pgBouncer)
+
+Production points `DATABASE_URL` at Supabase's transaction-mode pooler (port
+6543). That pooler cannot keep server-side prepared statements between
+transactions, so `data/db/base.py` sets psycopg3's `prepare_threshold=None` for
+`postgresql+psycopg` URLs through the `connect_args_for` helper. Without it,
+repeated queries fail intermittently with
+`psycopg.errors.DuplicatePreparedStatement` and the API returns 500 on
+data-heavy routes (frontier, risk, P&L, rebalance, probe). Keep that setting if
+the connection string ever changes to another pooler.
+
+## Verified Vercel limits (August 2026 docs)
+
+Sources: `vercel.com/docs/functions/limitations` and
+`vercel.com/docs/functions/runtimes/python`.
+
+| Limit | Value |
+| --- | --- |
+| Function bundle, uncompressed | **250 MB**; **500 MB for the Python runtime**; up to 5 GB with Large Functions (beta) |
+| Maximum duration | Hobby **300 s** (default and max); Pro/Enterprise 300 s default, **800 s** max, 1800 s extended (beta) |
+| Maximum memory | Hobby **2 GB**; Pro/Enterprise **4 GB** |
+| Request body | 4.5 MB (`FUNCTION_PAYLOAD_TOO_LARGE` beyond) |
+| Response body | 4.5 MB unless streamed |
+| File descriptors | 1,024 shared across concurrent executions |
+| Python dependencies | Installed from `requirements.txt` / `pyproject.toml` at build time; no automatic tree-shaking |
+
+The API depends on `scipy`, so it relies on the **500 MB Python-specific**
+bundle limit (scipy alone is ~110 MB uncompressed). The root `vercel.json`
+excludes `apps/web`, `node_modules`, tests and caches from the function bundle.
+
+## Measured bundle size
+
+Measured from the project's virtualenv (Windows, uncompressed) as the sum of the
+runtime dependency directories declared in the root `pyproject.toml` plus the app
+source:
+
+| Component | Size |
+| --- | --- |
+| `scipy` | 109.7 MB |
+| `numpy` | 31.4 MB |
+| `sqlalchemy` | 19.5 MB |
+| `pydantic` + `pydantic_core` + settings | 10.5 MB |
+| `alembic` + `mako` + `markupsafe` | 2.9 MB |
+| `fastapi` + `starlette` | 2.4 MB |
+| `httpx` + `httpcore` + `h11` + `anyio` + `certifi` + `idna` | 4.2 MB |
+| other (click, colorama, annotated_types, greenlet-ish) | ~1.2 MB |
+| **Runtime dependencies** | **≈ 182 MB** |
+| App + workspace source (`apps/api`, `packages/core`, `packages/data`) | ≈ 0.5 MB |
+| **Projected function bundle** | **≈ 183 MB** uncompressed (plus optional `.pyc` bytecode) |
+
+That is comfortably inside the 500 MB Python limit and just under the 250 MB
+general limit that applies to other runtimes. The local measurement is a
+projection: run `vercel build` and check the deploy log for the exact figure.
+Keep the bundle lean by not adding pandas, scikit-learn, cvxpy or torch.
+
+## Deploy with the Vercel CLI (no Git)
+
+```sh
+npm i -g vercel
+vercel login
+```
+
+### 1. API project (from the repository root)
+
+```sh
+# stay in the repository root: this includes packages/core and packages/data
+vercel link                      # create a new project or link an existing one
+vercel env add DATABASE_URL production     # Postgres URL, e.g. from Neon/Supabase
+vercel env add PROVIDER_ORDER production   # kbs,vci,dnse,tcbs,ssi_iboard
+vercel env add REFRESH_TOKEN production    # long random secret
+vercel env add CRON_SECRET production      # same value as REFRESH_TOKEN
+vercel --prod
+```
+
+The root `pyproject.toml` declares both the runtime dependencies
+(`[project].dependencies`, installed by Vercel) and the developer tooling config
+(ruff/mypy/pytest). Select Python 3.12 in the project settings (matching
+`.python-version`).
+
+`DATABASE_URL` must point at a persistent database. A local SQLite file does not
+survive a serverless deploy; use Postgres and run the migration once from your
+machine against it:
+
+```sh
+DATABASE_URL=postgresql+psycopg://... python -m alembic -c packages/data/alembic.ini upgrade head
+```
+
+The cron schedule lives in the root `vercel.json`
+(`30 8 * * 1-5` = 15:30 Asia/Ho_Chi_Minh, after the 15:00 close, Monday–Friday).
+Vercel sends `Authorization: Bearer ${CRON_SECRET}`; the endpoint is idempotent
+and returns `cursor`/`remaining` so an external scheduler can loop it when a
+single batch is not enough.
+
+### 2. Web project
+
+```sh
+cd apps/web
+vercel link
+vercel env add API_URL production   # the API project's production URL
+vercel --prod
+```
+
+`API_URL` is read by `next.config.mjs` at build time; redeploy the web project
+after changing it.
+
+## Post-deploy verification
+
+```sh
+# Health
+curl https://<api>/api/v1/health
+
+# The hosted probe must list kbs (KBS) as a working provider
+curl -H "Authorization: Bearer $REFRESH_TOKEN" \
+  "https://<api>/api/v1/data/probe?tickers=VNM,FPT,ACB&index_code=VNINDEX&years=5"
+
+# Freshness badge data (latest stored price date + active provider)
+curl https://<api>/api/v1/data/freshness
+
+# Trigger the nightly sync by hand (same path the cron calls)
+curl -H "Authorization: Bearer $REFRESH_TOKEN" https://<api>/api/v1/data/refresh
+```
+
+Then open the deployed web app and complete the vertical slice: search tickers
+(Universe), build a selection (Portfolio), run Optimize, view Risk & Backtest,
+run a Simulation, and generate a Rebalance order list. Every page shows the
+inline disclaimer; the header badge shows the latest price date and the active
+provider (KBS by default).
+
+## Environment variables
+
+| Variable | Scope | Required | Notes |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | API | yes | SQLAlchemy URL; Postgres in production. |
+| `PROVIDER_ORDER` | API | recommended | `kbs,vci,dnse,tcbs,ssi_iboard` (KBS first). |
+| `REFRESH_TOKEN` | API | yes | Protects `/data/refresh` and `/data/probe`. |
+| `CRON_SECRET` | API | yes | Vercel Cron auth; equal to `REFRESH_TOKEN`. |
+| `API_URL` | Web | yes | Base URL for the `/api/*` rewrite. |
+| `VNOPT_ENVIRONMENT` | API | no | `production` on Vercel. |
+| `VNOPT_SYNC_BATCH_SIZE` | API | no | Symbols per sync batch (default 50). |
+| `VNOPT_SYNC_TIME_BUDGET_SECONDS` | API | no | Wall-clock budget per batch (default 45). |
+| `VNOPT_ON_DEMAND_HISTORY_DAYS` | API | no | History depth for first fetch (default 365). |
+| `VNOPT_FRONTIER_MAX_PORTFOLIOS` | API | no | Hard cap on the random-portfolio cloud (default 20000). |
+| `VNOPT_FRONTIER_TIME_BUDGET` | API | no | Wall-clock budget for a frontier run (default 30s). |
+
+No credential is needed for any data source: KBS, VCI, DNSE, TCBS and SSI
+iBoard are anonymous public endpoints. If one starts requiring a login the
+failover chain logs it and moves to the next provider.
+
+## V2 first deployment runbook (Supabase + GitHub Actions + Vercel)
+
+V2 reads precomputed `v2_*` tables that a GitHub Actions runner fills. The
+scheduled job needs a persistent Postgres (a runner's local SQLite is discarded
+after the job), so use the same Supabase database as the API.
+
+1. **Provision a persistent Postgres** (e.g. Supabase) and note its
+   transaction-pooler URL (port `6543`) and session-pooler URL (port `5432`).
+2. **Migrate** — run Alembic `0001`…`0005` against the database. From a shell
+   with `DATABASE_URL` set to the **session** URL (DML/DDL over a transaction
+   pooler is unreliable):
+   ```sh
+   cd packages/data && python -m alembic upgrade head
+   ```
+3. **Set the GitHub repository secrets** used by `precompute_v2.yml`:
+   - `DATABASE_URL` — the Supabase URL the runner will use (session URL).
+   Set the V2 tunables (optional) as repo variables:
+   `VNOPT_V2_BACKFILL_START_DATE`, `VNOPT_V2_*_ORDER`,
+   `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE`.
+4. **Confirm cloud-IP access** — run the `probe_v2.yml` workflow first; SSI sits
+   behind Cloudflare, so only promote `ssi_statistics` into the active V2 chains
+   after the probe passes on the runner.
+5. **Backfill in chunks** — dispatch `precompute_v2.yml` with `mode=full` and a
+   `limit` (e.g. `150`) repeatedly; each run resumes from `v2_progress`. Then let
+   the schedule (`30 9 * * 1-5`) run `--incremental` on trading days.
+6. **Deploy the API and web** as before (`vercel --prod` from the repo root and
+   `apps/web`). The API reads the same `DATABASE_URL` (transaction-pooler URL is
+   fine for its read path) and needs the `VNOPT_V2_*_ORDER` vars only if you
+   override the defaults.
+7. **Verify** — `GET /api/v1/v2/coverage` (sector coverage), `GET /api/v1/v2/sectors`
+   and `GET /api/v1/v2/analytics` should return populated payloads; the Sector
+   Analysis tab should render within a couple of seconds.
+
+### V2 environment variables
+
+| Variable | Where | Required | Notes |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | API + precompute job | yes | Postgres in production; migrations use the session-pooler URL. |
+| `VNOPT_V2_OHLCV_ORDER` | precompute job | no | V2 price failover chain, default `ssi_statistics,vci,kbs`. |
+| `VNOPT_V2_CONSTITUENTS_ORDER` | precompute job | no | Index membership chain, default `kbs`. |
+| `VNOPT_V2_SECTOR_MAP_ORDER` | precompute job | no | Sector map chain, default `ssi_statistics`. |
+| `VNOPT_V2_RATIOS_ORDER` | precompute job | no | Ratios chain, default `ssi_statistics`. |
+| `VNOPT_V2_BACKFILL_START_DATE` | precompute job | no | Backfill start (`2023-01-01`). |
+| `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE` | precompute job | no | Per-data-type request budget (defaults 10-20/min). |
+
+### Row-level security on Supabase (proposal)
+
+The V2 tables are reference data, not per-user rows, so ordinary RLS (a per-row
+`auth.uid()`) does not apply. If you want to prevent anonymous reads of the
+precompute tables through the Supabase PostgREST API, enable RLS **bypassing it
+for the API role only** — the FastAPI backend connects as a service role that must
+ignore RLS, while the public PostgREST role is denied. For example:
+
+```sql
+-- Run in the Supabase SQL editor after migrating.
+ALTER TABLE v2_ticker_master        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE v2_sector_map           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE v2_index_membership     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE v2_daily_prices         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE v2_liquidity            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE v2_market_cap           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE v2_corporate_actions    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE v2_progress             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE v2_adjustment_flags     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE v2_financial_ratios     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE v2_sector_statistics    ENABLE ROW LEVEL SECURITY;
+
+-- Let only the service/authenticator role read; deny the anonymous anon role.
+CREATE POLICY v2_service_only ON v2_ticker_master
+  FOR ALL TO authenticated USING (true);
+CREATE POLICY v2_service_only ON v2_sector_map
+  FOR ALL TO authenticated USING (true);
+-- ... repeat for each V2 table. The `anon` role has no policy, so PostgREST
+-- denies it. The API connects as `authenticated`/service, so it is unaffected.
+```

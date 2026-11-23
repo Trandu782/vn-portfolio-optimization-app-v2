@@ -1,0 +1,61 @@
+# Root workspace configuration.
+#
+# The `[project]` table below is the *deployment* manifest for the API Vercel
+# project: Vercel resolves Python dependencies only from the project root and
+# prefers `pyproject.toml` over `requirements.txt`, so this file must declare
+# every runtime dependency of `apps/api`, `packages/core` and `packages/data`
+# (see docs/DEPLOYMENT.md). Those source packages are not installed as
+# distributions; `asgi.py` puts their directories on `sys.path` at startup.
+#
+# The `[tool.*]` tables configure the developer tooling (ruff, mypy, pytest).
+
+[project]
+name = "vnopt-api-runtime"
+version = "0.1.0"
+description = "Runtime dependency set for the deployed VN Portfolio Optimizer API."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "httpx>=0.27",
+    "numpy>=2.0",
+    "scipy>=1.11",
+    "psycopg[binary]>=3.1",
+]
+
+[tool.uv]
+# Nothing is built or installed from this manifest; it only pins dependencies.
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["packages/core", "packages/data", "apps/api", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "data", "app"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = ["packages/core", "packages/data", "apps/api"]
+files = ["asgi.py", "packages/core/core", "packages/data/data", "apps/api/app"]
+warn_unused_configs = true
+warn_redundant_casts = true
+
+# scipy ships without inline type information; treat it as untyped rather than
+# failing the strict check on its import.
+[[tool.mypy.overrides]]
+module = ["scipy.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["packages/core/tests", "packages/data/tests", "apps/api/tests"]
+pythonpath = ["packages/core", "packages/data", "apps/api"]
+addopts = "-ra"

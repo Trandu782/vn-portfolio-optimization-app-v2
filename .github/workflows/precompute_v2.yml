@@ -1,0 +1,88 @@
+name: Precompute V2 datasets
+
+# Runs the resumable V2 precompute pipeline on a runner (not a serverless
+# function) after the Vietnamese market closes on trading days. The project is
+# local-only today; when it is pushed to GitHub:
+#
+#   1. run the "Probe V2 providers" workflow first to confirm cloud-IP access to
+#      SSI (Cloudflare fronts it) before trusting a scheduled backfill;
+#   2. set a repository secret DATABASE_URL pointing at a persistent Postgres (a
+#      runner's local SQLite file is discarded after the job), e.g. Supabase;
+#   3. enable this workflow. Heavy backfills are chunked: dispatch it with
+#      mode=full and a limit (e.g. 150) repeatedly; each run resumes where the
+#      previous one stopped because every ticker commits independently.
+#
+# `30 9 * * 1-5` is 09:30 UTC = 16:30 ICT, after the 15:00 ICT close.
+on:
+  schedule:
+    - cron: "30 9 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "incremental (only new dates) or full (re-fetch window)"
+        type: choice
+        options:
+          - incremental
+          - full
+        default: incremental
+      start:
+        description: "Backfill start date YYYY-MM-DD (blank uses the setting)"
+        required: false
+        default: ""
+      limit:
+        description: "Max tickers this run (blank = no cap); chunk a heavy backfill"
+        required: false
+        default: ""
+      profiles:
+        description: "Force a market-cap / corporate-action refresh"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: precompute-v2
+  cancel-in-progress: false
+
+jobs:
+  precompute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      MODE: ${{ github.event_name == 'schedule' && 'incremental' || inputs.mode }}
+      START: ${{ inputs.start }}
+      LIMIT: ${{ inputs.limit }}
+      PROFILES: ${{ inputs.profiles }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install packages
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e packages/core -e packages/data
+
+      - name: Run V2 precompute
+        shell: bash
+        run: |
+          set -o pipefail
+          args=("--${MODE}")
+          if [ -n "${START}" ]; then args+=(--start "${START}"); fi
+          if [ -n "${LIMIT}" ]; then args+=(--limit "${LIMIT}"); fi
+          if [ "${PROFILES}" = "true" ]; then args+=(--profiles); fi
+          python -m data.v2.jobs.precompute "${args[@]}" 2>&1 | tee precompute_report.txt
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: precompute-report
+          path: precompute_report.txt
+          if-no-files-found: warn

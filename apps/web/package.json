@@ -1,0 +1,36 @@
+{
+  "name": "vnopt-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --ext .ts,.tsx",
+    "typecheck": "tsc --noEmit",
+    "client": "openapi-typescript ../api/openapi.json -o lib/schema.d.ts",
+    "client:check": "openapi-typescript ../api/openapi.json -o lib/schema.check.d.ts",
+    "test": "node --test lib/app-store.test.ts lib/chart-theme.test.ts lib/fundamentals.test.ts lib/optimize-guardrails.test.ts lib/portfolio-csv.test.ts lib/portfolio-library.test.ts lib/rebalance-csv.test.ts lib/rebalance-targets.test.ts lib/sector-analysis.test.ts lib/sector-timeframe.test.ts lib/timeframe.test.ts"
+  },
+  "dependencies": {
+    "next": "15.5.29",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "recharts": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.5",
+    "@types/react": "19.0.7",
+    "@types/react-dom": "19.0.3",
+    "autoprefixer": "10.4.20",
+    "eslint": "8.57.1",
+    "eslint-config-next": "15.5.29",
+    "openapi-typescript": "7.13.0",
+    "postcss": "8.5.33",
+    "tailwindcss": "3.4.17",
+    "typescript": "5.7.3"
+  },
+  "overrides": {
+    "postcss": "8.5.33"
+  }
+}

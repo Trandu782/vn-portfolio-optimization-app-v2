@@ -1,0 +1,45 @@
+<!doctype html>
+<html translate="no" lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+
+  <title>Vietcap - Bảng giá chứng khoán trực tuyến</title>
+
+  <link rel="preconnect" href="https://www.googletagmanager.com" />
+  <link rel="preconnect" href="https://www.google-analytics.com" />
+  <link rel="preconnect" href="https://firebasestorage.googleapis.com" />
+  <link rel="icon" type="image/svg+xml" href="/images/logo.svg" />
+  <link rel="shortcut icon" type="image/svg+xml" href="/images/logo.svg" />
+
+  <!-- Preload critical bundles (chỉ production, hash khớp import map từ getImportMap) -->
+  
+  <!-- Shell + React runtime + micro app (remoteEntry, app có cờ `preload`). Danh sách: getImportMap trong src/utils.js -->
+  
+  <link rel="preload" as="script" href="/js/vietcap-core.js?v=8282c0fd6189" />
+  
+  <link rel="preload" as="script" href="/js/single-spa.min.js" />
+  
+  <link rel="preload" as="script" href="/main.js?v=2bb9d51e348fe1e3d51e5237823075d501b31caf" />
+  
+  <link rel="preload" as="script" href="/js/react.production.min.js" />
+  
+  <link rel="preload" as="script" href="/js/react-dom.production.min.js" />
+  
+  <link rel="preload" as="script" href="/js/react-router-dom.js" />
+  
+  <link rel="preload" as="script" href="/js/single-spa-react.min.js" />
+  
+  <link rel="preload" as="script" href="/common/remoteEntry.js?v=2c7f4949f20ea5ad5d0fbc25bba1d0601e7fefae" />
+  
+  <link rel="preload" as="script" href="/common/main.js?v=2c7f4949f20ea5ad5d0fbc25bba1d0601e7fefae" />
+  
+  
+
+  <link rel="stylesheet" href="/css/fonts.css" crossorigin="anonymous" />
+  <link rel="stylesheet" href="/css/normalize.css" crossorigin="anonymous" />
+  <link rel="stylesheet" href="/css/global.css?v=2bb9d51e348fe1e3d51e5237823075d501b31caf" crossorigin="anonymous" />
+
+  <link rel="preload" href="/css/awesome.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />

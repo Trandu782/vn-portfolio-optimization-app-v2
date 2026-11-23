@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vnopt-core"
+version = "0.1.0"
+description = "Pure domain logic for the VN Portfolio Optimizer."
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.0",
+    "scipy>=1.11",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+]
+
+[tool.setuptools]
+packages = ["core"]

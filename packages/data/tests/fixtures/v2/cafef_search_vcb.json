@@ -1,0 +1,69 @@
+{
+  "isSuccess": true,
+  "value": {
+    "documents": [
+      {
+        "document": {
+          "relatedSymbols": [],
+          "id": "",
+          "sourceId": "VCB",
+          "centerId": 1,
+          "symbol": "VCB",
+          "title": "Ngân hàng Thương mại cổ phần Ngoại thương Việt Nam",
+          "description": "Ngân hàng Thương mại cổ phần Ngoại thương Việt Nam",
+          "avatarUrl": "VCB.png",
+          "updateDate": "",
+          "redirectUrl": "/du-lieu/hose/vcb-ngan-hang-thuong-mai-co-phan-ngoai-thuong-viet-nam.chn"
+        },
+        "highlights": {
+          "symbol": "<em>VCB</em>",
+          "title": "",
+          "description": ""
+        }
+      },
+      {
+        "document": {
+          "relatedSymbols": [],
+          "id": "",
+          "sourceId": "VCBS",
+          "centerId": 8,
+          "symbol": "VCBS",
+          "title": "Công ty TNHH Chứng khoán Ngân hàng Thương mại Cổ phần Ngoại thương Việt Nam",
+          "description": "Công ty TNHH Chứng khoán Ngân hàng Thương mại Cổ phần Ngoại thương Việt Nam",
+          "avatarUrl": "VCBS_20251023164637.png",
+          "updateDate": "",
+          "redirectUrl": "/du-lieu/otc/vcbs-cong-ty-tnhh-chung-khoan-ngan-hang-thuong-mai-co-phan-ngoai-thuong-viet-nam.chn"
+        },
+        "highlights": {
+          "symbol": "<em>VCBS</em>",
+          "title": "",
+          "description": ""
+        }
+      },
+      {
+        "document": {
+          "relatedSymbols": [],
+          "id": "",
+          "sourceId": "VCBF",
+          "centerId": 8,
+          "symbol": "VCBF",
+          "title": "Công ty Liên doanh Quản lý quỹ đầu tư chứng khoán Vietcombank",
+          "description": "Công ty Liên doanh Quản lý quỹ đầu tư chứng khoán Vietcombank",
+          "avatarUrl": "",
+          "updateDate": "",
+          "redirectUrl": "/du-lieu/otc/vcbf-cong-ty-lien-doanh-quan-ly-quy-dau-tu-chung-khoan-vietcombank.chn"
+        },
+        "highlights": {
+          "symbol": "<em>VCBF</em>",
+          "title": "",
+          "description": ""
+        }
+      }
+    ],
+    "total": 3,
+    "pageNumber": 1,
+    "pageSize": 500,
+    "totalPages": 1
+  },
+  "errors": []
+}
