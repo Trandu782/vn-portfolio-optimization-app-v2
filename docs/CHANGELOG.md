@@ -6,6 +6,31 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Infrastructure / deployment
+
+- **Supabase Postgres provisioned, migrated, secured and seeded (V2 start).** Ran
+  Alembic `0001_initial`→`0005_v2_financial_ratios` against the Supabase
+  **session-pooler** (port 5432) database; all 17 V1/V2 application tables, their
+  indexes and `server_default` values applied cleanly. On Postgres the `0004` revision
+  id (`0004_v2_adjustment_flag_anomalies`, 33 chars) does not fit Alembic's default
+  `alembic_version.version_num VARCHAR(32)` (SQLite ignores the limit), so that column
+  is widened to `VARCHAR(255)` before upgrading — an operational bootstrap on Alembic's
+  own bookkeeping table, not an application schema change.
+- **Row-level security enabled on every public table** (18 tables incl.
+  `alembic_version`). No permissive policies are created and all residual privileges
+  are revoked from `anon` and `authenticated`, so both roles have zero read/write/
+  truncate access; `postgres` (owner, `BYPASSRLS`) and `service_role` (`BYPASSRLS`, with
+  full table + sequence grants) keep full access. Verified with `SET ROLE` probes.
+- **V2 universe synced across HOSE, HNX and UPCOM**: `v2_ticker_master` holds **1,519**
+  tradable stocks (HOSE 412, HNX 299, UPCOM 808), 1,516 with an ICB level-2 sector
+  (HAX, HPG, ITS are SSI coverage gaps), plus VN30 (30) / VN100 (100) membership and the
+  VNINDEX/VN30/VN100 benchmarks. The full per-ticker bar + ratio backfill is a
+  multi-hour **resumable** job (~1 ticker/min at the conservative client rate cap),
+  driven in `--limit` chunks with `python -m data.v2.jobs.precompute --full --limit N`
+  (or the `precompute_v2.yml` workflow). Six reference tickers (FPT, HPG, VHM, LPB, PVD,
+  DCM) were backfilled end-to-end (968 bars each + 305 ratio rows + liquidity + flags)
+  to validate the pipeline.
+
 ### Security
 
 - **Repository prepared for the first push to a private remote.** `.gitignore`

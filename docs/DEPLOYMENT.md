@@ -198,6 +198,13 @@ after the job), so use the same Supabase database as the API.
    ```sh
    cd packages/data && python -m alembic upgrade head
    ```
+   On Postgres, first widen Alembic's bookkeeping column: revision
+   `0004_v2_adjustment_flag_anomalies` (33 chars) exceeds the default
+   `alembic_version.version_num VARCHAR(32)` (SQLite ignores the limit; Postgres
+   raises `value too long for type character varying(32)`). Run
+   `ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255);` once
+   before `alembic upgrade head`.
+
 3. **Set the GitHub repository secrets** used by `precompute_v2.yml`:
    - `DATABASE_URL` — the Supabase URL the runner will use (session URL).
    Set the V2 tunables (optional) as repo variables:
@@ -229,33 +236,38 @@ after the job), so use the same Supabase database as the API.
 | `VNOPT_V2_BACKFILL_START_DATE` | precompute job | no | Backfill start (`2023-01-01`). |
 | `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE` | precompute job | no | Per-data-type request budget (defaults 10-20/min). |
 
-### Row-level security on Supabase (proposal)
+### Row-level security on Supabase
 
-The V2 tables are reference data, not per-user rows, so ordinary RLS (a per-row
-`auth.uid()`) does not apply. If you want to prevent anonymous reads of the
-precompute tables through the Supabase PostgREST API, enable RLS **bypassing it
-for the API role only** — the FastAPI backend connects as a service role that must
-ignore RLS, while the public PostgREST role is denied. For example:
+The V2 tables are reference data, not per-user rows, so per-row `auth.uid()` RLS
+does not apply. Instead the deployment **denies the public API roles entirely**:
+RLS is enabled on every table in `public` with **no permissive policies**, and all
+residual privileges are revoked from `anon` and `authenticated`, so both have zero
+read/write/truncate access. The FastAPI backend connects as `postgres` (the table
+owner, which bypasses RLS) and `service_role` has `BYPASSRLS` plus full table and
+sequence grants, so the service side keeps full access. Run once after migrating:
 
 ```sql
--- Run in the Supabase SQL editor after migrating.
-ALTER TABLE v2_ticker_master        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE v2_sector_map           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE v2_index_membership     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE v2_daily_prices         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE v2_liquidity            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE v2_market_cap           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE v2_corporate_actions    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE v2_progress             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE v2_adjustment_flags     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE v2_financial_ratios     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE v2_sector_statistics    ENABLE ROW LEVEL SECURITY;
+-- Enable RLS on every public table (default-deny: no policies are added).
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', r.tablename);
+  END LOOP;
+END $$;
 
--- Let only the service/authenticator role read; deny the anonymous anon role.
-CREATE POLICY v2_service_only ON v2_ticker_master
-  FOR ALL TO authenticated USING (true);
-CREATE POLICY v2_service_only ON v2_sector_map
-  FOR ALL TO authenticated USING (true);
--- ... repeat for each V2 table. The `anon` role has no policy, so PostgREST
--- denies it. The API connects as `authenticated`/service, so it is unaffected.
+-- Public API roles: remove every privilege (incl. TRUNCATE, which RLS does not filter).
+REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
+REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
+
+-- Service role keeps full access, now and for future migrations.
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO service_role;
+GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO service_role;
 ```
+
+Verify: `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public';`
+(all `true`) and `SELECT count(*) FROM pg_policies WHERE schemaname = 'public';`
+(zero). `anon`/`authenticated` then receive `permission denied` for reads, writes
+and truncates, while `postgres`/`service_role` read and write normally.
