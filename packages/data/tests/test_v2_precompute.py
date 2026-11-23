@@ -599,6 +599,48 @@ def test_ratios_and_sector_statistics_steps(factory: sessionmaker[Session]) -> N
         assert banks_roe.median == pytest.approx(15.0)
 
 
+def test_upsert_ratios_merges_duplicate_periods_in_one_batch(
+    factory: sessionmaker[Session],
+) -> None:
+    """SSI repeated ``(symbol, period, period_type)`` for ``AAH``; Postgres rejects it.
+
+    ``ON CONFLICT DO UPDATE`` cannot affect one row twice in a single statement
+    (``psycopg.errors.CardinalityViolation``), so the store must collapse the
+    duplicates before the upsert: one row survives and its ratio map keeps every
+    non-null value from both copies.
+    """
+    period = date(2025, 9, 30)
+    with session_scope(factory) as session:
+        written = V2Store(session).upsert_ratios(
+            [
+                RatioRecord(
+                    symbol="AAH",
+                    period=period,
+                    period_type="quarter",
+                    ratio_group="general",
+                    ratios={"roe": 8.0, "roa": 2.0},
+                    source="ssi_statistics",
+                    data_as_of=AS_OF,
+                ),
+                RatioRecord(
+                    # The same key: the store upper-cases the symbol.
+                    symbol="aah",
+                    period=period,
+                    period_type="quarter",
+                    ratio_group="general",
+                    ratios={"roe": 9.5, "pe": 12.0},
+                    source="ssi_statistics",
+                    data_as_of=AS_OF,
+                ),
+            ]
+        )
+    assert written == 1
+    with session_scope(factory) as session:
+        rows = V2Store(session).get_ratios("AAH")
+    assert len(rows) == 1
+    assert rows[0].ratios == {"roe": 9.5, "roa": 2.0, "pe": 12.0}
+
+
 def test_ratio_quality_logs_capped_warnings_and_skips_unpriced(
     factory: sessionmaker[Session], caplog: pytest.LogCaptureFixture
 ) -> None:

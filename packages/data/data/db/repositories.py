@@ -8,7 +8,7 @@ re-running the sync never duplicates a day.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Protocol
@@ -88,6 +88,35 @@ def _dialect(session: Session) -> str:
     return session.get_bind().dialect.name
 
 
+def _dedupe_rows(
+    rows: Sequence[dict[str, Any]], key_columns: Sequence[str]
+) -> list[dict[str, Any]]:
+    """Collapse rows that repeat a conflict key, keeping one row per key.
+
+    Postgres rejects an ``ON CONFLICT DO UPDATE`` statement whose input names the
+    same key twice (``psycopg.errors.CardinalityViolation``), and a provider can
+    repeat a key inside one batch — SSI's ``finance-indicator`` returned the same
+    ``(symbol, period, period_type)`` twice for ``AAH``. Duplicates are therefore
+    merged before the statement is built: the last value wins, a ``None`` never
+    blanks an already populated value, mapping values (a ratio or percentile map)
+    are merged key by key, and the first occurrence fixes the row order.
+    """
+    deduped: dict[tuple[Any, ...], dict[str, Any]] = {}
+    for row in rows:
+        key = tuple(row[column] for column in key_columns)
+        existing = deduped.get(key)
+        if existing is None:
+            deduped[key] = dict(row)
+            continue
+        for column, value in row.items():
+            current = existing.get(column)
+            if isinstance(current, Mapping) and isinstance(value, Mapping):
+                existing[column] = {**current, **value}
+            elif value is not None:
+                existing[column] = value
+    return list(deduped.values())
+
+
 def _bulk_upsert(
     session: Session,
     model: type[Any],
@@ -97,9 +126,14 @@ def _bulk_upsert(
     update_columns: Sequence[str],
     chunk: int = 500,
 ) -> int:
-    """Insert ``rows`` and update ``update_columns`` on conflict; return count."""
+    """Insert ``rows`` and update ``update_columns`` on conflict; return count.
+
+    ``rows`` that repeat a conflict key are merged first (:func:`_dedupe_rows`),
+    because one statement may not affect the same row twice on Postgres.
+    """
     if not rows:
         return 0
+    rows = _dedupe_rows(rows, key_columns)
     dialect = _dialect(session)
     written = 0
     for start in range(0, len(rows), chunk):

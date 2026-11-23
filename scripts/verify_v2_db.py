@@ -46,6 +46,15 @@ def _human_size(num_bytes: int) -> str:
     return f"{num_bytes} B"
 
 
+def _redacted_database_url(engine) -> str:
+    """Return the target database URL with any password masked as ``***``.
+
+    The report is printed to the console and uploaded as a CI artifact, so the
+    credentials inside ``DATABASE_URL`` must never reach ``verify_report.txt``.
+    """
+    return engine.url.render_as_string(hide_password=True)
+
+
 def _database_size(engine) -> tuple[str, int]:
     """Return the database file path and its size (0 for a non-file database)."""
     database = engine.url.database
@@ -128,7 +137,7 @@ def main() -> int:
 
         db_path, db_size = _database_size(engine)
 
-        print(f"database                  : {settings.database_url}")
+        print(f"database                  : {_redacted_database_url(engine)}")
         print(f"database file             : {db_path}")
         print(f"database file size        : {_human_size(db_size)} ({db_size} bytes)")
         print("row counts per table      :")

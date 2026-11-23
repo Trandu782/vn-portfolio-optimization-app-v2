@@ -85,6 +85,13 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **`scripts/verify_v2_db.py` masks the database password.** The `database` line
+  of the readiness report used to print `DATABASE_URL` verbatim, so
+  `verify_report.txt` (uploaded as the `precompute-report` artifact) would carry
+  a Supabase password whenever the workflow's `::add-mask::` step was skipped or
+  the script was run locally. The line now renders the SQLAlchemy URL with
+  `hide_password=True`, i.e. `***` in place of the password.
+
 - **Repository prepared for the first push to a private remote.** `.gitignore`
   now blocks `Deployment prerequisite.txt` (the local cheatsheet holding a
   plaintext `DATABASE_URL` with its password plus a `REFRESH_TOKEN`), local
@@ -108,6 +115,21 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **V2 ratio sync no longer aborts on a provider's duplicate period.** The
+  GitHub Actions run failed on `AAH` with
+  `psycopg.errors.CardinalityViolation: ON CONFLICT DO UPDATE command cannot
+  affect row a second time`, because SSI's `finance-indicator` response repeated
+  one `(symbol, period, period_type)` inside a single batch. `_bulk_upsert`
+  (`data/db/repositories.py`) now merges rows that share a conflict key through a
+  new `_dedupe_rows` helper before the statement is built — the last value wins,
+  a `None` never blanks a populated value, and mapping values (ratios,
+  percentile ranks) are merged — so `V2Store.upsert_ratios` stores one row per
+  key. The same guard covers every other upsert that receives provider-shaped
+  batches (`prices`, `sectors`, `ticker_master`, `adjustment_flags`,
+  `sector_statistics`, plus the V1 price/index repositories);
+  `V2PrecomputeService._sync_ratios` also collapses repeated periods before it
+  builds its records, so the checkpoint's row count is the stored count. Covered
+  by `test_upsert_ratios_merges_duplicate_periods_in_one_batch`.
 - **Portfolio values from the V2 spot close and flags trailing bars.** A holding
   could show a stale Friday close (e.g. FPT 45,000 and HPG 20,450 on 2026-11-20)
   while the header badge implied the latest session was current and `Notes` said

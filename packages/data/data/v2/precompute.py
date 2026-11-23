@@ -805,6 +805,13 @@ class V2PrecomputeService:
                 continue
             sector = sector_by_ticker.get(ticker)
             group = ratio_group_for(sector)
+            # SSI's ``finance-indicator`` response can repeat a period inside one
+            # batch (seen on ``AAH``). Keep the last copy so the stored row and the
+            # progress count match, and so Postgres never sees a duplicate conflict
+            # key in one ``ON CONFLICT DO UPDATE`` statement.
+            unique_periods = {
+                (period.period, period.period_type): period for period in periods
+            }
             ratio_rows = [
                 RatioRecord(
                     symbol=ticker,
@@ -815,7 +822,7 @@ class V2PrecomputeService:
                     source=period.provider,
                     data_as_of=target,
                 )
-                for period in periods
+                for period in unique_periods.values()
             ]
             with session_scope(self._session_factory) as session:
                 written += V2Store(session).upsert_ratios(ratio_rows)

@@ -657,7 +657,13 @@ class V2Store:
 
     # -- financial ratios (V2b) -------------------------------------------
     def upsert_ratios(self, records: Sequence[RatioRecord]) -> int:
-        """Upsert per-ticker, per-period trimmed ratios."""
+        """Upsert per-ticker, per-period trimmed ratios.
+
+        A provider can return the same ``(symbol, period, period_type)`` twice in
+        one batch (SSI did for ``AAH``). ``_bulk_upsert`` merges such duplicates
+        before building the ``ON CONFLICT DO UPDATE`` statement, because Postgres
+        raises ``CardinalityViolation`` when one statement names a row twice.
+        """
         rows = [
             {
                 "symbol_code": record.symbol.upper(),
