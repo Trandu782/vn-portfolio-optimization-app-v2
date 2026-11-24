@@ -316,7 +316,12 @@ Every row carries `data_as_of`, its provider and the adjustment/volume/market-ca
 basis. The pipeline is resumable (per-ticker commits + `v2_progress`), incremental
 (only new dates) and pre-screens the universe with KBS volume before the SSI
 calls; the call budget is in `docs/V2_DATA_GAPS.md` and the choices are in
-`docs/DECISIONS.md`. It runs from `python -m data.v2.jobs.precompute` locally and
+`docs/DECISIONS.md`. A limited run spends its slots on tracked tickers first, then
+unpriced `VN100`/`VN30` members, then the rest, and only on tickers that survive
+the pre-screen. Without an explicit `--as-of` the run retargets itself to the last
+published `VNINDEX` session when today's upstream EOD bars have not settled yet,
+so the quality gate keeps reporting real data defects. It runs from
+`python -m data.v2.jobs.precompute` locally and
 from `.github/workflows/precompute_v2.yml` on a GitHub runner (heavy backfill is
 never placed in a short serverless function). `data.v2.reader.V2Reader` and the
 `GET /api/v1/v2/ticker/{symbol}` route return a ticker's adjusted returns,

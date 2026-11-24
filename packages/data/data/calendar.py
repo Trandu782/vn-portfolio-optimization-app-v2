@@ -14,7 +14,29 @@ coverage rule.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta, timezone
+
+#: Vietnam's fixed offset from UTC. The country has observed UTC+7 all year with no
+#: daylight saving since 1975, so a fixed offset is exact and needs no tzdata package
+#: (which a Windows runner does not ship with :mod:`zoneinfo`).
+VIETNAM_UTC_OFFSET = timezone(timedelta(hours=7))
+
+#: Exchange time zone name, for log lines and docs.
+VIETNAM_TIME_ZONE = "Asia/Ho_Chi_Minh"
+
+
+def vietnam_today(now: datetime | None = None) -> date:
+    """Return the current calendar date in Vietnam (UTC+7).
+
+    The scheduled precompute job runs on a UTC runner, so ``date.today()`` there is
+    the UTC date: 19:13 UTC is already 02:13 ICT on the *next* Vietnam calendar day,
+    while a morning UTC run is still the same Vietnam date. Market sessions are
+    defined by the Vietnam calendar, so the pipeline resolves "today" here.
+    """
+    moment = now if now is not None else datetime.now(UTC)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    return moment.astimezone(VIETNAM_UTC_OFFSET).date()
 
 
 def is_trading_day(day: date, holidays: Iterable[date]) -> bool:

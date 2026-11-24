@@ -15,17 +15,20 @@ name: Precompute V2 datasets
 # Two schedules run the same job, so a missed or partial trading-day run is
 # repaired the same night:
 #
-#   1. `30 9 * * 1-5` -> 09:30 UTC = 16:30 ICT, weekdays, right after the
+#   1. `37 9 * * 1-5` -> 09:37 UTC = 16:37 ICT, weekdays, right after the
 #      15:00 ICT close (same-session data).
-#   2. `0 19 * * *`   -> 19:00 UTC = 02:00 ICT (UTC+7), nightly, which picks up
+#   2. `13 19 * * *`  -> 19:13 UTC = 02:13 ICT (UTC+7), nightly, which picks up
 #      late provider corrections plus any weekday run that failed. Because the
 #      scheduled mode is `incremental`, a second pass only fetches new dates.
+#
+# Both minutes are deliberately off :00/:30, where GitHub's scheduler queue is
+# busiest and a cron can be delayed by many minutes.
 on:
   schedule:
-    # Weekdays 09:30 UTC = 16:30 ICT, after the 15:00 ICT close.
-    - cron: "30 9 * * 1-5"
-    # Nightly 19:00 UTC = 02:00 AM Vietnam time (UTC+7).
-    - cron: "0 19 * * *"
+    # Weekdays 09:37 UTC = 16:37 ICT, after the 15:00 ICT close.
+    - cron: "37 9 * * 1-5"
+    # Nightly 19:13 UTC = 02:13 AM Vietnam time (UTC+7).
+    - cron: "13 19 * * *"
   workflow_dispatch:
     inputs:
       mode:
@@ -47,6 +50,10 @@ on:
         description: "Force a market-cap / corporate-action refresh"
         type: boolean
         default: false
+      as_of:
+        description: "Dataset as-of date YYYY-MM-DD (blank = auto, see below)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -70,11 +77,19 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       MODE: ${{ github.event_name == 'schedule' && 'incremental' || inputs.mode }}
       START: ${{ inputs.start }}
+      # Blank = automatic: the pipeline uses today's Vietnam date and, when the
+      # upstream VNINDEX bars for that session have not been published yet (a
+      # daytime manual run or a market holiday), falls back to the last published
+      # session with a warning instead of failing the quality gate. An explicit
+      # value keeps the strict stale-benchmark / stale-dataset errors.
+      AS_OF: ${{ inputs.as_of }}
       # A scheduled run processes the active tickers plus a bounded batch of new
       # ones (150) so the nightly/post-close cron cannot time out while it walks a
       # large universe; every ticker commits independently, so the next cron run
-      # resumes from there. A manual dispatch still accepts a blank (no cap) or
-      # custom limit.
+      # resumes from there. The batch is ordered tracked tickers first, then
+      # unpriced VN100/VN30 members, then the rest, and the cap is spent only on
+      # tickers that survive the pre-screen, so no slot goes to a rejected symbol.
+      # A manual dispatch still accepts a blank (no cap) or custom limit.
       LIMIT: ${{ github.event_name == 'schedule' && '150' || inputs.limit }}
       PROFILES: ${{ inputs.profiles }}
       # Optional tuning knobs, read from Settings -> Secrets and variables ->
@@ -122,6 +137,7 @@ jobs:
           args=("--${MODE}")
           if [ -n "${START}" ]; then args+=(--start "${START}"); fi
           if [ -n "${LIMIT}" ]; then args+=(--limit "${LIMIT}"); fi
+          if [ -n "${AS_OF}" ]; then args+=(--as-of "${AS_OF}"); fi
           if [ "${PROFILES}" = "true" ]; then args+=(--profiles); fi
           python -u -m data.v2.jobs.precompute "${args[@]}" 2>&1 | tee precompute_report.txt
 

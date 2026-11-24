@@ -6,7 +6,46 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### V2 precompute pipeline
+
+- **Backfill candidates are prioritized and `--limit` is spent after the
+  pre-screen.** `V2PrecomputeService._order_price_candidates` now returns three
+  tiers: already-tracked tickers (stored bars or a positive checkpoint count),
+  then unpriced `VN100`/`VN30` members from `v2_index_membership`, then the
+  remaining unpriced symbols alphabetically. The limit is applied by the new
+  `_select_candidates`/`_passes_pre_screen` pair (which also absorbs the old
+  `_pending_tickers` scan), so candidates are screened while the budget is being
+  spent and the loop stops as soon as enough survive: a rejected symbol costs no
+  slot. Previously `LIMIT=150` filled its first 104 slots with
+  tracked names and spent the rest on alphabetical unpriced symbols (`E`-`Z`)
+  that the 10k-share median-volume floor rejected, leaving 78 of 100 `VN100`
+  members without prices; now every run makes real backfill progress. The
+  per-ticker body moved to `_backfill_ticker` so the loop stays small, and the
+  ordering/screen rules are covered by new `test_v2_precompute.py` tests.
+- **Unsettled upstream EOD bars no longer fail the quality gate.** `run()` accepts
+  an optional `as_of`; without it the pipeline resolves today in Vietnam time
+  (`data.calendar.vietnam_today`, fixed UTC+7 — the runner clock is UTC) and, when
+  the stored `VNINDEX` series has no bar for that session yet (a daytime manual
+  run, a holiday, or a provider that publishes late), `_settle_target` retargets
+  the run to the last published session and logs `as-of fallback: VNINDEX has no
+  bar for ... yet`, so `quality: stale benchmark` / `quality: stale dataset`
+  (`quality_errors=2`) report a real defect instead. An explicit `--as-of`
+  keeps the strict errors. New `--as-of YYYY-MM-DD` CLI flag in
+  `data.v2.jobs.precompute` (and the job now passes `today_provider=vietnam_today`
+  so a 19:13 UTC run uses the Vietnam calendar date), wired as the `as_of`
+  `workflow_dispatch` input in `precompute_v2.yml`.
+- **Both per-ticker loops log live progress.** `_backfill_prices` and
+  `_sync_ratios` print `[prices] 37/150 FPT (+968 bars)` / `[ratios] 37/150 FPT
+  (+305 rows)` every `PROGRESS_LOG_EVERY` (10) tickers and for the final one, so
+  the Actions log shows progress instead of staying silent until `ratio_quality`.
+
 ### Infrastructure / deployment
+
+- **`precompute_v2.yml` schedules moved off the busiest GitHub minutes.** The
+  post-close cron is now `37 9 * * 1-5` (16:37 ICT) and the nightly cron
+  `13 19 * * *` (02:13 ICT), with the adjacent comments updated, so scheduled
+  runs avoid the `:00`/`:30` queue congestion that delays them by many minutes.
+  The dispatch inputs are unchanged apart from the new `as_of`.
 
 - **`precompute_v2.yml` bounds a scheduled run and streams its log live.** A cron
   trigger now caps the job at `LIMIT=150`

@@ -267,25 +267,40 @@ financial ratios.
   `done` with no stored bar, so a symbol that never trades is not polled daily; a
   `--full` run or `--profiles` re-checks them. `--full` re-fetches the configured
   window (`VNOPT_V2_BACKFILL_START_DATE`, default `2023-01-01`). Heavy backfills are
-  chunked with `--limit N`, and the tickers that already have prices are served
-  first, so a limited run updates the tracked stocks before it backfills a new
-  one. Each ticker commits its own session and the `v2_progress` checkpoint records
-  the last committed date and the cumulative bar count, so a run resumes where it
-  stopped; an incremental fetch that returns no new bar never blanks that count.
+  chunked with `--limit N`, and the candidates are ordered tracked tickers first,
+  then unpriced `VN100`/`VN30` members, then the remaining unpriced names, so the
+  index universe and the already-priced stocks are served before the long tail.
+  The cap is spent *after* the pre-screen, so a symbol the screen rejects costs no
+  slot and every limited run backfills real work. Each ticker commits its own
+  session and the `v2_progress` checkpoint records the last committed date and the
+  cumulative bar count, so a run resumes where it stopped; an incremental fetch
+  that returns no new bar never blanks that count.
+- **As-of date** — without `--as-of` the pipeline runs for today's *Vietnam* date
+  (`Asia/Ho_Chi_Minh`, UTC+7; the runner clock is UTC) and, when the upstream
+  `VNINDEX` bars for that session have not been published yet (a daytime manual
+  run or a market holiday), falls back to the last published session and logs
+  `as-of fallback: VNINDEX has no bar ...` instead of failing the quality gate with
+  `quality: stale benchmark` / `quality: stale dataset`. An explicit
+  `--as-of YYYY-MM-DD` (workflow input `as_of`) disables the fallback, so a
+  genuinely stale benchmark or dataset still fails loudly.
 - **Daily jobs** — the scheduled GitHub Actions workflow (`precompute_v2.yml`)
-  runs `--incremental` after the close (weekdays `30 9 * * 1-5` = 16:30 ICT) and
-  nightly (`0 19 * * *` = 02:00 ICT); overlapping triggers queue in the
-  `precompute-v2` concurrency group. A scheduled run passes `--limit 150`, so it
-  refreshes the tracked tickers plus a bounded batch of new ones well inside the
-  350-minute job timeout (the next cron continues the backfill); a manual dispatch
-  keeps the `limit` input, blank meaning no cap. The job keys the pip cache on
-  both `pyproject.toml` files and runs Python unbuffered (`python -u` with
-  `PYTHONUNBUFFERED=1`), so the report streams into the job log. The Vercel cron
+  runs `--incremental` after the close (weekdays `37 9 * * 1-5` = 16:37 ICT) and
+  nightly (`13 19 * * *` = 02:13 ICT); the off-`:00`/`:30` minutes avoid GitHub's
+  busiest scheduler slots. Overlapping triggers queue in the `precompute-v2`
+  concurrency group. A scheduled run passes `--limit 150`, so it refreshes the
+  tracked tickers plus a bounded batch of index members and other new ones well
+  inside the 350-minute job timeout (the next cron continues the backfill); a
+  manual dispatch keeps the `limit` input, blank meaning no cap. The job keys the
+  pip cache on both `pyproject.toml` files and runs Python unbuffered (`python -u`
+  with `PYTHONUNBUFFERED=1`), and both per-ticker loops print a
+  `[prices] 37/150 FPT (+968 bars)` / `[ratios] ...` line every 10 tickers, so the
+  report streams into the job log instead of appearing silent. The Vercel cron
   only refreshes the V1 tables. Manual commands:
 
   ```sh
   python -m data.v2.jobs.precompute --incremental
   python -m data.v2.jobs.precompute --full --start 2023-01-01 --limit 150
+  python -m data.v2.jobs.precompute --incremental --as-of 2025-12-31
   python -m data.v2.jobs.precompute --incremental --recompute-flags --members VN30
   ```
 

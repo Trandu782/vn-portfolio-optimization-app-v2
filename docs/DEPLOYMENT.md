@@ -358,11 +358,20 @@ after the job), so use the same Supabase database as the API.
    after the probe passes on the runner.
 5. **Backfill in chunks** — dispatch `precompute_v2.yml` with `mode=full` and a
    `limit` (e.g. `150`) repeatedly; each run resumes from `v2_progress`. Then let
-   the schedule run `--incremental`: weekdays at `30 9 * * 1-5`
-   (09:30 UTC = 16:30 ICT, after the close) and nightly at `0 19 * * *`
-   (19:00 UTC = 02:00 ICT), which repairs a failed weekday run. Both share the
+   the schedule run `--incremental`: weekdays at `37 9 * * 1-5`
+   (09:37 UTC = 16:37 ICT, after the close) and nightly at `13 19 * * *`
+   (19:13 UTC = 02:13 ICT), which repairs a failed weekday run. Both share the
    `precompute-v2` concurrency group with `cancel-in-progress: false`, so they
-   queue instead of overlapping.
+   queue instead of overlapping. The odd minutes keep the crons out of GitHub's
+   busiest scheduler slots, which otherwise delay a run by many minutes.
+6. **Read the progress lines** — each per-ticker loop prints a
+   `[prices] 37/150 FPT (+968 bars)` style line every 10 tickers, so the job log
+   shows live progress instead of staying silent, and `[ratios]` does the same
+   for the ratios step. A run dispatched while the upstream EOD bars of the
+   session are still unpublished logs `as-of fallback: VNINDEX has no bar ...`
+   and processes the last published session instead of failing
+   `quality: stale benchmark` / `quality: stale dataset`. Pass the `as_of`
+   input (or `--as-of`) to force a date and keep those errors strict.
 
    Budget: SSI `stock-info` pages 40 rows and the adapter walks 366-day windows,
    so a first history from `2023-01-01` costs roughly 25 requests per ticker

@@ -8,6 +8,7 @@ Usage:
     python -m data.v2.jobs.precompute --incremental
     python -m data.v2.jobs.precompute --full --start 2023-01-01 --limit 50
     python -m data.v2.jobs.precompute --incremental --create-schema
+    python -m data.v2.jobs.precompute --incremental --as-of 2025-12-31
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import sys
 from collections.abc import Sequence
 from datetime import date
 
+from data.calendar import vietnam_today
 from data.db.base import create_all, create_engine_for, create_session_factory
 from data.settings import get_settings
 from data.v2.context import V2DataContext
@@ -41,6 +43,18 @@ def _build_parser() -> argparse.ArgumentParser:
         "--full", action="store_true", help="Re-fetch the whole backfill window."
     )
     parser.add_argument("--start", default=None, metavar="YYYY-MM-DD", help="Backfill start.")
+    parser.add_argument(
+        "--as-of",
+        dest="as_of",
+        default=None,
+        metavar="YYYY-MM-DD",
+        help=(
+            "Dataset as-of date. Blank: today's Vietnam date, falling back to the last "
+            "published VNINDEX session when today's EOD bars have not settled yet "
+            "(a daytime or holiday run). Explicit: strict, so a stale benchmark or "
+            "dataset still fails the quality gate."
+        ),
+    )
     parser.add_argument(
         "--limit", type=int, default=None, help="Max tickers for the price/profile steps."
     )
@@ -107,6 +121,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         except ValueError:
             print(f"invalid --start date: {args.start!r} (expected YYYY-MM-DD)", file=sys.stderr)
             return 2
+    as_of: date | None = None
+    if args.as_of:
+        try:
+            as_of = date.fromisoformat(args.as_of)
+        except ValueError:
+            print(f"invalid --as-of date: {args.as_of!r} (expected YYYY-MM-DD)", file=sys.stderr)
+            return 2
 
     settings = get_settings()
     engine = create_engine_for(settings.database_url)
@@ -124,6 +145,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             service = V2PrecomputeService(
                 session_factory=session_factory,
                 sources=sources_from_context(context),
+                # The runner's clock is UTC; a market session is a Vietnam date.
+                today_provider=vietnam_today,
             )
             report = service.run(
                 mode="full" if args.full else "incremental",
@@ -131,6 +154,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 limit=args.limit,
                 profiles=True if args.profiles else None,
                 members=args.members,
+                as_of=as_of,
             )
     finally:
         engine.dispose()

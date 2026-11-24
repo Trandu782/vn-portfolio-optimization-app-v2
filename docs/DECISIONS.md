@@ -61,8 +61,8 @@ Only simple returns are used (CFA Level 1/2), matching the rest of the app.
 ## D-004 — Scheduler: GitHub Actions primary, manual CLI for local use
 
 **Decision.** Run the pipeline in `.github/workflows/precompute_v2.yml` (a runner,
-not a short serverless function), scheduled at `30 9 * * 1-5` UTC = 16:30 ICT on
-weekdays (after the 15:00 ICT close) and nightly at `0 19 * * *` UTC = 02:00 ICT,
+not a short serverless function), scheduled at `37 9 * * 1-5` UTC = 16:37 ICT on
+weekdays (after the 15:00 ICT close) and nightly at `13 19 * * *` UTC = 02:13 ICT,
 with `workflow_dispatch` for manual and heavy-backfill runs. Provide the manual
 equivalent `python -m data.v2.jobs.precompute`. The Vercel cron keeps the V1
 `/api/v1/data/refresh` only; heavy backfill must never run in the 120-second
@@ -73,6 +73,12 @@ app's 20 requests/minute), which fits neither a serverless timeout nor one runne
 job. The pipeline is resumable and chunked, so repeated `mode=full` runs with a
 `--limit` make progress and the daily `mode=incremental` run costs about one page
 per ticker. This satisfies "host heavy backfill on a runner".
+
+**Off-peak minutes.** GitHub's scheduler queue is busiest on `:00` and `:30`, where
+a cron can be delayed by many minutes, so both schedules use an odd minute
+(`:37`, `:13`); the market-relative timing (a few minutes earlier or later than
+the original 16:30/02:00 ICT) is irrelevant because a run processes whatever the
+providers have published when it starts.
 
 **Concurrency.** The job joins the `precompute-v2` concurrency group with
 `cancel-in-progress: false`, so the two crons and manual dispatches never overlap:
@@ -97,12 +103,28 @@ interrupted run resume instead of restarting.
 
 **Empty symbols and row counts.** `v2_progress.rows` holds the cumulative
 `v2_daily_prices` bar count and is never blanked by an incremental fetch that
-returns no new bar, while `state`, `last_date` and `updated_at` still advance. An
+returns no new bars, while `state`, `last_date` and `updated_at` still advance. An
 `incremental` run then drops the tickers whose checkpoint is `done` with `rows = 0`
 and no stored bar, so a symbol that never trades stops costing a daily request; a
-`--full` run or `--profiles` re-checks them. Candidates are ordered with the
-already-priced tickers first, so `--limit` updates tracked stocks before it
-backfills a new one.
+`--full` run or `--profiles` re-checks them.
+
+**Backfill priority and the `--limit` budget.** Candidates are ordered
+already-priced tickers first, then unpriced `VN100`/`VN30` members, then the
+remaining unpriced names alphabetically, so `--limit` updates tracked stocks
+before it backfills a new one and fills the index universes before the long tail.
+The limit is spent *after* the pre-screen: the screen runs while the budget is
+being spent and a rejected symbol consumes no slot. Before that, the first 150
+alphabetical candidates were screened first, so on a real run 46 of the 150 slots
+went to symbols the 10k-share volume floor rejected and the run left most `VN100`
+members unpriced.
+
+**As-of resolution.** The runner clock is UTC, so the automatic run resolves
+"today" in Vietnam time (`Asia/Ho_Chi_Minh`, a fixed UTC+7 with no DST). If the
+upstream `VNINDEX` series has no bar for that session — a daytime manual dispatch,
+a holiday, or a provider that has not published EOD bars yet — the run logs an
+`as-of fallback` warning and processes the last published session. The quality gate
+therefore keeps failing only on real defects; an explicit `--as-of` (workflow input
+`as_of`) disables the fallback so a stale benchmark or dataset still fails loudly.
 
 **Why.** The daily pass must spend its request budget on the stocks that have
 data, and a zeroed count made the checkpoint unable to tell "no bar ever" from

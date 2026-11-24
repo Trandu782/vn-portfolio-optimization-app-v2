@@ -18,6 +18,16 @@ Resumability: each ticker commits in its own session and its checkpoint
 the stored bars, and an incremental run fetches only ``latest + 1 .. today`` (about one
 page per ticker).
 
+Backfill order: already-tracked tickers first, then unpriced ``VN100``/``VN30`` members,
+then the remaining unpriced names. ``--limit`` caps the tickers that survive the
+pre-screen, so a symbol the screen rejects never consumes a slot and every chunked run
+makes real progress.
+
+As-of handling: without an explicit ``--as-of`` the pipeline retargets itself to the
+latest published ``VNINDEX`` session when today's upstream EOD bars have not settled
+yet (a daytime or holiday run), so the quality gate reports data defects instead of an
+upstream timing problem.
+
 The pipeline is pure orchestration over injected :class:`PrecomputeSources`, so tests
 run it against a temporary database and fake sources without touching the network.
 """
@@ -86,6 +96,10 @@ V2_BENCHMARKS: tuple[str, ...] = ("VNINDEX", "VN30", "VN100")
 #: Cap on the number of individual ratio findings the job logs per run; the rest
 #: are summarised in one line. ``scripts/verify_v2_ratios.py`` prints the full set.
 RATIO_WARNING_LOG_LIMIT = 30
+
+#: Print a progress line every this many tickers inside the per-ticker loops, so a
+#: GitHub Actions log shows live progress instead of staying silent for hours.
+PROGRESS_LOG_EVERY = 10
 
 
 @dataclass(frozen=True)
@@ -246,6 +260,7 @@ class V2PrecomputeService:
         limit: int | None = None,
         profiles: bool | None = None,
         members: str | None = None,
+        as_of: date | None = None,
     ) -> PrecomputeReport:
         """Run every step and return one report.
 
@@ -253,8 +268,10 @@ class V2PrecomputeService:
             mode: ``incremental`` (fetch only new dates) or ``full`` (re-fetch the
                 whole backfill window). Anything else raises ``ValueError``.
             start: Override the configured backfill start date.
-            limit: Optional cap on the number of tickers processed by the price and
-                profile steps (so a very large universe can be chunked across runs).
+            limit: Optional cap on the number of tickers the price step processes
+                (so a very large universe can be chunked across runs). It is
+                applied *after* the pre-screen, so a rejected symbol costs no
+                slot; the profile step reuses the same count.
             profiles: Force a profile/corporate-action refresh. Defaults to ``True``
                 for a full refresh without a limit and ``False`` otherwise, so a
                 chunked backfill fills missing profiles and skips finished ones. A
@@ -264,10 +281,16 @@ class V2PrecomputeService:
                 price, profile, liquidity, quality and adjustment-flag steps only
                 process that index's stored members; the master, membership and
                 benchmark steps still cover the full universe.
+            as_of: Explicit dataset as-of date. When omitted, the pipeline starts
+                from today's Vietnam date and falls back to the latest *published*
+                ``VNINDEX`` session if that date has no upstream bar yet (a daytime
+                or holiday run), logging a warning. An explicit date keeps the
+                strict staleness errors, so a genuinely stale dataset still fails.
         """
         if mode not in {"incremental", "full"}:
             raise ValueError("mode must be 'incremental' or 'full'")
-        target = last_trading_day(self._today(), self._rules.trading_holidays)
+        requested = as_of if as_of is not None else self._today()
+        target = last_trading_day(requested, self._rules.trading_holidays)
         fetch_start = start or self._backfill_start
         force_profiles = profiles if profiles is not None else (mode == "full" and limit is None)
         report = PrecomputeReport(mode=mode, as_of=target, started_at=utcnow())
@@ -282,6 +305,12 @@ class V2PrecomputeService:
             )
         report.steps.append(self._sync_membership(target))
         report.steps.append(self._sync_benchmarks(target, mode=mode, start=fetch_start))
+        if as_of is None:
+            # Upstream EOD bars settle after the close, so an automatic run whose
+            # target session is not published yet retargets itself to the last
+            # published benchmark session instead of failing the quality gate.
+            target = self._settle_target(target)
+            report.as_of = target
         universe = self._processing_universe(members)
         report.steps.append(
             self._backfill_prices(
@@ -334,6 +363,30 @@ class V2PrecomputeService:
             return list(universe)
         with session_scope(self._session_factory) as session:
             return V2Store(session).list_ticker_master()
+
+    def _settle_target(self, target: date) -> date:
+        """Return the last session the upstream benchmark has actually published.
+
+        The post-close and nightly crons run after the close, when the session's EOD
+        bars exist. A manual daytime dispatch or a market holiday leaves the stored
+        ``VNINDEX`` series at the previous session, and treating that as a defect
+        would fail the run with ``quality: stale benchmark`` / ``quality: stale
+        dataset`` for what is only an upstream timing problem. An automatic run
+        therefore retargets itself to the latest published benchmark session and
+        warns; an explicit ``--as-of`` never takes this path, so the strict errors
+        still catch a genuinely stale dataset.
+        """
+        with session_scope(self._session_factory) as session:
+            latest = SqlIndexRepository(session).latest_date("VNINDEX")
+        if latest is None or latest >= target:
+            return target
+        self._log.warning(
+            "as-of fallback: VNINDEX has no bar for %s yet; using the last published "
+            "session %s (pass --as-of to force a date)",
+            target.isoformat(),
+            latest.isoformat(),
+        )
+        return latest
 
     # -- step 1: ticker master / sectors ----------------------------------
     def _build_master(self, target: date) -> tuple[StepResult, UniverseBuild | None]:
@@ -453,110 +506,131 @@ class V2PrecomputeService:
         ``refresh_profiles`` mirrors the forced ``--profiles`` refresh: it keeps the
         known-empty tickers in the candidate set, so a periodic full refresh can
         re-check a symbol that stopped trading.
+
+        Candidates are ordered tracked-first, then unpriced index members, then the
+        remaining unpriced names, and ``limit`` is spent only on tickers that pass
+        the pre-screen, so a limited run always makes real backfill progress. A
+        progress line is printed every :data:`PROGRESS_LOG_EVERY` tickers (and for
+        the last one) because the Actions log would otherwise stay silent until
+        ``ratio_quality``.
         """
         master = self._master_or(universe)
         if not master:
             return StepResult(name="prices", ok=False, message="empty universe")
         exchange_by_ticker = {record.ticker: record.exchange for record in master}
         all_tickers = [record.ticker for record in master]
-        # Tracked names first, and (on an incremental run without --profiles) the
-        # known-empty names dropped; see the helper for both rules.
+        # Tracked names first, then unpriced index members, and (on an incremental
+        # run without --profiles) the known-empty names dropped; see the helper.
         ordered = self._order_price_candidates(
             all_tickers,
             skip_known_empty=mode == "incremental" and not refresh_profiles,
         )
-        if mode == "incremental" or limit is not None:
-            # Incremental: only the tickers with new dates. Chunked full: the next
-            # `limit` unfinished names. This also skips the cheap pre-screen when a
-            # same-day run has nothing to do.
-            effective_limit = limit if limit is not None else len(ordered)
-            candidates = self._pending_tickers(ordered, target, effective_limit)
-        else:
-            candidates = ordered
-        tickers = self._pre_screen(candidates)
+        # The pre-screen runs while the limit is spent, so a rejected symbol never
+        # consumes a slot; an incremental (or chunked full) run keeps only the
+        # tickers whose stored prices are not current.
+        tickers = self._select_candidates(ordered, target=target, mode=mode, limit=limit)
+        total = len(tickers)
         processed = 0
         fetched = 0
         failures = 0
-        for ticker in tickers:
-            with session_scope(self._session_factory) as session:
-                latest = V2Store(session).latest_price_date(ticker)
-            if mode == "incremental" and latest is not None and latest >= target:
-                self._record_progress(ticker, "prices", "up_to_date", last_date=latest)
-                continue
-            if mode == "full" or latest is None:
-                # Full backfill (or first fetch): store everything fetched.
-                fetch_start = start
-                overlap_end: date | None = None
-            else:
-                # Incremental: refetch a tail overlap together with the new dates so
-                # a retroactive re-base (SSI re-adjusts the whole series when a new
-                # ex-date lands) is detected and refreshed in place, in this run.
-                fetch_start = max(
-                    start,
-                    latest
-                    - timedelta(days=2 * self._settings.precompute_rebase_overlap_sessions),
-                )
-                overlap_end = latest
-            if fetch_start > self._today():
-                continue
-            try:
-                bars = self._sources.stock_bars(ticker, fetch_start, self._today())
-            except EmptyResultError:
-                self._record_progress(ticker, "prices", "done", last_date=latest)
-                continue
-            except DataError as exc:
+        for idx, ticker in enumerate(tickers, start=1):
+            added, failed = self._backfill_ticker(
+                ticker,
+                target=target,
+                mode=mode,
+                start=start,
+                exchange=exchange_by_ticker.get(ticker, "HOSE"),
+            )
+            if failed:
                 failures += 1
-                self._record_progress(
-                    ticker, "prices", "failed", last_date=latest, error=str(exc)[:1000]
-                )
-                self._log.warning("prices %s failed: %s", ticker, exc)
-                continue
-            if overlap_end is not None:
-                if self._needs_rebase(ticker, fetch_start, overlap_end, bars):
-                    # The stored tail disagrees with the fresh adjusted closes: SSI
-                    # re-based history, so replace the whole series in this run.
-                    try:
-                        bars = self._sources.stock_bars(ticker, start, self._today())
-                    except DataError as exc:
-                        failures += 1
-                        self._record_progress(
-                            ticker,
-                            "prices",
-                            "failed",
-                            last_date=latest,
-                            error=str(exc)[:1000],
-                        )
-                        self._log.warning("prices %s re-base refetch failed: %s", ticker, exc)
-                        continue
-                    self._log.info("prices %s re-based; full history refreshed", ticker)
-                else:
-                    # No re-base: only the genuinely new dates are stored; the
-                    # unchanged overlap rows are left untouched.
-                    bars = [bar for bar in bars if bar.date > overlap_end]
-            if not bars:
-                self._record_progress(ticker, "prices", "done", last_date=latest)
-                continue
-            prepared, basis = self._prepare_bars(exchange_by_ticker.get(ticker, "HOSE"), bars)
-            with session_scope(self._session_factory) as session:
-                store = V2Store(session)
-                store.upsert_prices(
-                    ticker, prepared, price_adjustment_basis=basis, data_as_of=target
-                )
-                store.set_progress(
-                    ProgressRecord(
-                        kind="prices",
-                        symbol=ticker,
-                        state="done",
-                        last_date=store.latest_price_date(ticker),
-                        # The cumulative stored bar count, so an incremental run that
-                        # adds a session or two keeps the historical count.
-                        rows=store.count_prices(ticker),
-                    )
-                )
-            processed += 1
-            fetched += len(prepared)
+            if added:
+                processed += 1
+                fetched += added
+            if idx % PROGRESS_LOG_EVERY == 0 or idx == total:
+                print(f"[prices] {idx}/{total} {ticker} (+{added} bars)", flush=True)
         message = f"{fetched} bars for {processed} tickers; {failures} failed"
         return StepResult(name="prices", ok=failures == 0, processed=processed, message=message)
+
+    def _backfill_ticker(
+        self, ticker: str, *, target: date, mode: str, start: date, exchange: str
+    ) -> tuple[int, bool]:
+        """Backfill one ticker and return ``(stored bars, failed)``.
+
+        An up-to-date or empty ticker returns ``(0, False)``; a provider failure is
+        recorded in ``v2_progress`` and reported as ``(0, True)`` so the caller can
+        fail the step without losing the other tickers.
+        """
+        with session_scope(self._session_factory) as session:
+            latest = V2Store(session).latest_price_date(ticker)
+        if mode == "incremental" and latest is not None and latest >= target:
+            self._record_progress(ticker, "prices", "up_to_date", last_date=latest)
+            return 0, False
+        if mode == "full" or latest is None:
+            # Full backfill (or first fetch): store everything fetched.
+            fetch_start = start
+            overlap_end: date | None = None
+        else:
+            # Incremental: refetch a tail overlap together with the new dates so a
+            # retroactive re-base (SSI re-adjusts the whole series when a new
+            # ex-date lands) is detected and refreshed in place, in this run.
+            fetch_start = max(
+                start,
+                latest - timedelta(days=2 * self._settings.precompute_rebase_overlap_sessions),
+            )
+            overlap_end = latest
+        if fetch_start > self._today():
+            return 0, False
+        try:
+            bars = self._sources.stock_bars(ticker, fetch_start, self._today())
+        except EmptyResultError:
+            self._record_progress(ticker, "prices", "done", last_date=latest)
+            return 0, False
+        except DataError as exc:
+            self._record_progress(
+                ticker, "prices", "failed", last_date=latest, error=str(exc)[:1000]
+            )
+            self._log.warning("prices %s failed: %s", ticker, exc)
+            return 0, True
+        if overlap_end is not None:
+            if self._needs_rebase(ticker, fetch_start, overlap_end, bars):
+                # The stored tail disagrees with the fresh adjusted closes: SSI
+                # re-based history, so replace the whole series in this run.
+                try:
+                    bars = self._sources.stock_bars(ticker, start, self._today())
+                except DataError as exc:
+                    self._record_progress(
+                        ticker,
+                        "prices",
+                        "failed",
+                        last_date=latest,
+                        error=str(exc)[:1000],
+                    )
+                    self._log.warning("prices %s re-base refetch failed: %s", ticker, exc)
+                    return 0, True
+                self._log.info("prices %s re-based; full history refreshed", ticker)
+            else:
+                # No re-base: only the genuinely new dates are stored; the unchanged
+                # overlap rows are left untouched.
+                bars = [bar for bar in bars if bar.date > overlap_end]
+        if not bars:
+            self._record_progress(ticker, "prices", "done", last_date=latest)
+            return 0, False
+        prepared, basis = self._prepare_bars(exchange, bars)
+        with session_scope(self._session_factory) as session:
+            store = V2Store(session)
+            store.upsert_prices(ticker, prepared, price_adjustment_basis=basis, data_as_of=target)
+            store.set_progress(
+                ProgressRecord(
+                    kind="prices",
+                    symbol=ticker,
+                    state="done",
+                    last_date=store.latest_price_date(ticker),
+                    # The cumulative stored bar count, so an incremental run that
+                    # adds a session or two keeps the historical count.
+                    rows=store.count_prices(ticker),
+                )
+            )
+        return len(prepared), False
 
     def _needs_rebase(
         self, ticker: str, overlap_start: date, overlap_end: date, bars: list[AdjustedOHLCV]
@@ -589,11 +663,15 @@ class V2PrecomputeService:
     def _order_price_candidates(
         self, tickers: Sequence[str], *, skip_known_empty: bool
     ) -> list[str]:
-        """Return the price candidates with the tracked tickers first.
+        """Return the price candidates in backfill priority order.
 
-        A ticker with stored bars (or a positive checkpoint count) precedes every
-        unpriced name, so a ``--limit`` run always refreshes the stocks that are
-        already tracked before it backfills a new one.
+        Priority (a chunked ``--limit`` run spends its slots in this order):
+
+        1. already-tracked tickers (stored bars or a positive checkpoint count), so
+           every scheduled run refreshes the stocks the app already shows;
+        2. unpriced members of a tracked index (``VN100``/``VN30``), so the index
+           universes the Optimize presets use fill in before the long tail;
+        3. every other unpriced symbol, in the master's (alphabetical) order.
 
         With ``skip_known_empty`` (an incremental run without a forced
         ``--profiles`` refresh) a ticker whose checkpoint is ``done`` with no
@@ -606,7 +684,10 @@ class V2PrecomputeService:
             store = V2Store(session)
             checkpoints = {record.symbol: record for record in store.list_progress("prices")}
             priced = set(store.history_starts())
+            index_members = set(store.get_membership("VN100"))
+            index_members.update(store.get_membership("VN30"))
         tracked: list[str] = []
+        indexed: list[str] = []
         rest: list[str] = []
         for ticker in tickers:
             code = ticker.upper()
@@ -615,60 +696,64 @@ class V2PrecomputeService:
                 tracked.append(ticker)
             elif skip_known_empty and checkpoint is not None and checkpoint.state == "done":
                 continue
+            elif code in index_members:
+                indexed.append(ticker)
             else:
                 rest.append(ticker)
-        return tracked + rest
+        return tracked + indexed + rest
 
-    def _pending_tickers(
-        self, tickers: list[str], target: date, limit: int
+    def _select_candidates(
+        self, ordered: Sequence[str], *, target: date, mode: str, limit: int | None
     ) -> list[str]:
-        """Return the next ``limit`` tickers whose prices are not yet current.
+        """Return the tickers to backfill, in priority order, capped at ``limit``.
 
-        Used for a chunked backfill: repeated ``--full --limit N`` runs each take
-        the next unfinished names, so the backfill makes progress instead of
-        re-processing the same first chunk.
+        An incremental run, and a chunked ``--full --limit`` run, keeps only the
+        tickers whose stored prices are not current, so repeated runs walk the
+        universe instead of re-processing the finished names (and a same-day run
+        has nothing to do). The pre-screen then runs while the budget is spent, so
+        a symbol it rejects costs no ``--limit`` slot and every limited run makes
+        real backfill progress.
         """
-        pending: list[str] = []
-        if limit <= 0:
-            return pending
-        for ticker in tickers:
-            with session_scope(self._session_factory) as session:
-                latest = V2Store(session).latest_price_date(ticker)
-            if latest is not None and latest >= target:
-                continue
-            pending.append(ticker)
-            if len(pending) >= limit:
+        selected: list[str] = []
+        if limit is not None and limit <= 0:
+            return selected
+        check_pending = mode == "incremental" or limit is not None
+        for ticker in ordered:
+            if limit is not None and len(selected) >= limit:
                 break
-        return pending
+            if check_pending:
+                with session_scope(self._session_factory) as session:
+                    latest = V2Store(session).latest_price_date(ticker)
+                if latest is not None and latest >= target:
+                    continue
+            if self._passes_pre_screen(ticker):
+                selected.append(ticker)
+        return selected
 
-    def _pre_screen(self, tickers: list[str]) -> list[str]:
-        """Drop effectively untraded names before the expensive SSI backfill.
+    def _passes_pre_screen(self, ticker: str) -> bool:
+        """Return ``False`` when ``ticker`` is too illiquid to be worth a backfill.
 
         This is a **backfill-cost floor, not a liquidity filter**: it removes a
         ticker only when its recent median volume is below the (low, 10k-share
         default) ``precompute_pre_screen_min_median_volume`` so the priced universe
         stays affordable. It is not a tradability/liquidity rule, and setting the
-        threshold to 0 disables it, so "All Stocks" is not silently filtered.
+        threshold to 0 disables it, so "All Stocks" is not silently filtered. A
+        transient screening failure keeps the ticker.
         """
         if not self._settings.precompute_pre_screen_enabled:
-            return list(tickers)
+            return True
         threshold = self._settings.precompute_pre_screen_min_median_volume
         if threshold <= 0:
-            return list(tickers)
+            return True
         start = self._today() - timedelta(days=self._settings.precompute_pre_screen_days)
-        kept: list[str] = []
-        for ticker in tickers:
-            try:
-                bars = self._sources.screen_bars(ticker, start, self._today())
-            except EmptyResultError:
-                continue  # no recent prints: illiquid, skip the SSI calls
-            except DataError:
-                kept.append(ticker)  # transient failure: keep rather than drop
-                continue
-            volumes = [bar.volume for bar in bars]
-            if volumes and median(volumes) >= threshold:
-                kept.append(ticker)
-        return kept
+        try:
+            bars = self._sources.screen_bars(ticker, start, self._today())
+        except EmptyResultError:
+            return False  # no recent prints: illiquid, skip the SSI calls
+        except DataError:
+            return True  # transient failure: keep rather than drop
+        volumes = [bar.volume for bar in bars]
+        return bool(volumes) and median(volumes) >= threshold
 
     def _prepare_bars(
         self, exchange: str, bars: list[AdjustedOHLCV]
@@ -817,7 +902,8 @@ class V2PrecomputeService:
         A full run pages every period; an incremental run fetches only the latest
         ``finance-indicator`` page (about one request per ticker, the section-8
         budget) and skips a ticker already refreshed on ``target``. Ratios are
-        trimmed to the ticker's group before they are stored.
+        trimmed to the ticker's group before they are stored. A progress line is
+        printed every :data:`PROGRESS_LOG_EVERY` tickers (and for the last one).
         """
         full_fetch = self._sources.ratios
         if full_fetch is None:
@@ -842,49 +928,56 @@ class V2PrecomputeService:
         candidates = [record.ticker for record in master if record.ticker in priced]
         if limit is not None:
             candidates = self._pending_ratio_tickers(candidates, limit)
+        total = len(candidates)
         processed = 0
         failures = 0
         written = 0
-        for ticker in candidates:
-            if incremental and self._ratio_refreshed_today(ticker, target):
-                continue
+        for idx, ticker in enumerate(candidates, start=1):
+            added = 0
             try:
-                periods = fetch(ticker)
-            except EmptyResultError:
-                self._record_progress(ticker, "ratios", "done", last_date=target)
-                continue
-            except DataError as exc:
-                failures += 1
-                self._record_progress(ticker, "ratios", "failed", error=str(exc)[:1000])
-                self._log.warning("ratios %s failed: %s", ticker, exc)
-                continue
-            sector = sector_by_ticker.get(ticker)
-            group = ratio_group_for(sector)
-            # SSI's ``finance-indicator`` response can repeat a period inside one
-            # batch (seen on ``AAH``). Keep the last copy so the stored row and the
-            # progress count match, and so Postgres never sees a duplicate conflict
-            # key in one ``ON CONFLICT DO UPDATE`` statement.
-            unique_periods = {
-                (period.period, period.period_type): period for period in periods
-            }
-            ratio_rows = [
-                RatioRecord(
-                    symbol=ticker,
-                    period=period.period,
-                    period_type=period.period_type,
-                    ratio_group=group,
-                    ratios=trim_ratios(period.ratios, sector),
-                    source=period.provider,
-                    data_as_of=target,
+                if incremental and self._ratio_refreshed_today(ticker, target):
+                    continue
+                try:
+                    periods = fetch(ticker)
+                except EmptyResultError:
+                    self._record_progress(ticker, "ratios", "done", last_date=target)
+                    continue
+                except DataError as exc:
+                    failures += 1
+                    self._record_progress(ticker, "ratios", "failed", error=str(exc)[:1000])
+                    self._log.warning("ratios %s failed: %s", ticker, exc)
+                    continue
+                sector = sector_by_ticker.get(ticker)
+                group = ratio_group_for(sector)
+                # SSI's ``finance-indicator`` response can repeat a period inside one
+                # batch (seen on ``AAH``). Keep the last copy so the stored row and
+                # the progress count match, and so Postgres never sees a duplicate
+                # conflict key in one ``ON CONFLICT DO UPDATE`` statement.
+                unique_periods = {
+                    (period.period, period.period_type): period for period in periods
+                }
+                ratio_rows = [
+                    RatioRecord(
+                        symbol=ticker,
+                        period=period.period,
+                        period_type=period.period_type,
+                        ratio_group=group,
+                        ratios=trim_ratios(period.ratios, sector),
+                        source=period.provider,
+                        data_as_of=target,
+                    )
+                    for period in unique_periods.values()
+                ]
+                with session_scope(self._session_factory) as session:
+                    added = V2Store(session).upsert_ratios(ratio_rows)
+                written += added
+                self._record_progress(
+                    ticker, "ratios", "done", last_date=target, rows=len(ratio_rows)
                 )
-                for period in unique_periods.values()
-            ]
-            with session_scope(self._session_factory) as session:
-                written += V2Store(session).upsert_ratios(ratio_rows)
-            self._record_progress(
-                ticker, "ratios", "done", last_date=target, rows=len(ratio_rows)
-            )
-            processed += 1
+                processed += 1
+            finally:
+                if idx % PROGRESS_LOG_EVERY == 0 or idx == total:
+                    print(f"[ratios] {idx}/{total} {ticker} (+{added} rows)", flush=True)
         message = f"{written} ratio rows for {processed} tickers; {failures} failed"
         return StepResult(name="ratios", ok=failures == 0, processed=processed, message=message)
 
@@ -1117,6 +1210,8 @@ class V2PrecomputeService:
 
 
 __all__ = [
+    "PROGRESS_LOG_EVERY",
+    "RATIO_WARNING_LOG_LIMIT",
     "V2_BENCHMARKS",
     "PrecomputeSources",
     "V2PrecomputeService",

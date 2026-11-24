@@ -68,6 +68,11 @@ def _bars(start: date, end: date, base: float = 100.0) -> list[AdjustedOHLCV]:
     return bars
 
 
+def _volume(bars: list[AdjustedOHLCV], volume: int) -> list[AdjustedOHLCV]:
+    """Return the series with every bar's volume replaced (pre-screen input)."""
+    return [bar.model_copy(update={"volume": volume}) for bar in bars]
+
+
 class _Clock:
     """A mutable today provider so a test can advance time."""
 
@@ -87,12 +92,18 @@ class FakeSources:
         bars_by_ticker: dict[str, list[AdjustedOHLCV]],
         vn30: list[str],
         vn100: list[str],
+        symbols: list[str] | None = None,
     ) -> None:
         self.bars_by_ticker = bars_by_ticker
         self.vn30 = vn30
         self.vn100 = vn100
+        self.symbols = symbols if symbols is not None else ["VCB", "FPT", "XYZ"]
         self.bar_calls: list[tuple[str, date, date]] = []
         self.index_calls: list[tuple[str, date, date]] = []
+        self.screen_calls: list[str] = []
+        #: When set, index bars stop at this date (an upstream feed that has not
+        #: published the newest session yet).
+        self.index_bars_end: date | None = None
         self.fail_on: set[str] = set()
         self.fail_actions_on: set[str] = set()
         self.actions_by_ticker: dict[str, list[CorporateAction]] = {}
@@ -102,17 +113,11 @@ class FakeSources:
     def ssi_symbol_master(self) -> list[SymbolMaster]:
         return [
             SymbolMaster(
-                ticker="VCB", exchange="HOSE", name="VCB", security_type="s",
+                ticker=ticker, exchange="HOSE", name=ticker, security_type="s",
                 source="ssi_statistics",
-            ),
-            SymbolMaster(
-                ticker="FPT", exchange="HOSE", name="FPT", security_type="s",
-                source="ssi_statistics",
-            ),
-            SymbolMaster(
-                ticker="XYZ", exchange="HOSE", name="XYZ", security_type="s",
-                source="ssi_statistics",
-            ),
+            )
+            for ticker in self.symbols
+        ] + [
             SymbolMaster(
                 ticker="ETF1", exchange="HOSE", name="ETF", security_type="f",
                 source="ssi_statistics",
@@ -122,7 +127,7 @@ class FakeSources:
     def kbs_symbol_master(self) -> list[SymbolMaster]:
         return [
             SymbolMaster(ticker=ticker, exchange="HOSE", security_type="stock", source="kbs")
-            for ticker in ("VCB", "FPT", "XYZ")
+            for ticker in self.symbols
         ]
 
     def sectors(self) -> list[SectorMap]:
@@ -143,7 +148,8 @@ class FakeSources:
 
     def index_bars(self, code: str, start: date, end: date) -> list[AdjustedOHLCV]:
         self.index_calls.append((code, start, end))
-        return _bars(start, end, base=1000.0)
+        end_date = min(end, self.index_bars_end) if self.index_bars_end is not None else end
+        return _bars(start, end_date, base=1000.0)
 
     def stock_bars(self, symbol: str, start: date, end: date) -> list[AdjustedOHLCV]:
         self.bar_calls.append((symbol, start, end))
@@ -152,6 +158,7 @@ class FakeSources:
         return [bar for bar in self.bars_by_ticker.get(symbol, []) if start <= bar.date <= end]
 
     def screen_bars(self, symbol: str, start: date, end: date) -> list[AdjustedOHLCV]:
+        self.screen_calls.append(symbol)
         return [bar for bar in self.bars_by_ticker.get(symbol, []) if start <= bar.date <= end]
 
     def company_profile(self, ticker: str) -> CompanyProfile:
@@ -725,6 +732,115 @@ def test_incremental_ratio_refresh_is_skipped_on_the_same_day(
     fake.ratio_calls.clear()
     assert service.run(mode="incremental", start=START).ok
     assert fake.ratio_calls == []  # already refreshed on the target date
+
+
+def test_limit_prioritizes_index_members_and_spends_it_after_the_prescreen(
+    factory: sessionmaker[Session],
+) -> None:
+    """A VN100 member beats an alphabetically earlier name, and a rejected symbol costs no slot."""
+    fake = FakeSources(
+        bars_by_ticker={
+            # AAA sorts first but never trades: the pre-screen drops it.
+            "AAA": _volume(_bars(START, AS_OF), 0),
+            "BBB": _bars(START, AS_OF),  # a VN100 member, still unpriced
+            "CCC": _bars(START, AS_OF),  # an ordinary unpriced stock
+        },
+        vn30=["BBB"],
+        vn100=["BBB"],
+        symbols=["AAA", "BBB", "CCC"],
+    )
+    service = V2PrecomputeService(
+        session_factory=factory,
+        sources=fake.to_sources(),
+        settings=V2DataSettings(
+            precompute_pre_screen_enabled=True,
+            precompute_pre_screen_min_median_volume=500,
+        ),
+        today_provider=_Clock(AS_OF),
+    )
+
+    first = service.run(mode="full", start=START, limit=1)
+    assert first.ok, first
+    # The index member wins over the alphabetically earlier AAA, and the budget is
+    # spent on it: nothing else is even screened.
+    assert [call[0] for call in fake.bar_calls] == ["BBB"]
+    assert fake.screen_calls == ["BBB"]
+
+    fake.bar_calls.clear()
+    fake.screen_calls.clear()
+    second = service.run(mode="full", start=START, limit=1)
+    assert second.ok, second
+    # AAA is screened and rejected without consuming the slot, so CCC takes it.
+    assert fake.screen_calls == ["AAA", "CCC"]
+    assert [call[0] for call in fake.bar_calls] == ["CCC"]
+    with session_scope(factory) as session:
+        store = V2Store(session)
+        assert store.latest_price_date("BBB") == AS_OF
+        assert store.latest_price_date("CCC") == AS_OF
+        assert store.latest_price_date("AAA") is None
+
+
+def test_unsettled_benchmark_falls_back_to_the_last_published_session(
+    factory: sessionmaker[Session], caplog: pytest.LogCaptureFixture
+) -> None:
+    """A daytime run retargets itself instead of failing stale benchmark/dataset."""
+    previous = AS_OF - timedelta(days=1)
+    fake = FakeSources(
+        bars_by_ticker={
+            ticker: _bars(START, previous) for ticker in ("VCB", "FPT", "XYZ")
+        },
+        vn30=["VCB"],
+        vn100=["VCB", "FPT"],
+    )
+    fake.index_bars_end = previous  # VNINDEX has not published AS_OF yet
+    service = _service(factory, fake.to_sources(), _Clock(AS_OF))
+
+    with caplog.at_level(logging.WARNING, logger="data.v2.precompute"):
+        report = service.run(mode="full", start=START)
+
+    assert report.ok, report
+    assert report.as_of == previous
+    assert report.quality_errors == 0
+    assert "as-of fallback" in caplog.text
+    assert "VNINDEX has no bar" in caplog.text
+
+
+def test_explicit_as_of_keeps_the_strict_quality_errors(
+    factory: sessionmaker[Session],
+) -> None:
+    """An explicit ``--as-of`` never falls back: a stale dataset still fails loudly."""
+    previous = AS_OF - timedelta(days=1)
+    fake = FakeSources(
+        bars_by_ticker={
+            ticker: _bars(START, previous) for ticker in ("VCB", "FPT", "XYZ")
+        },
+        vn30=["VCB"],
+        vn100=["VCB", "FPT"],
+    )
+    fake.index_bars_end = previous
+    service = _service(factory, fake.to_sources(), _Clock(AS_OF))
+
+    report = service.run(mode="full", start=START, as_of=AS_OF)
+
+    assert report.as_of == AS_OF
+    assert report.quality_errors == 2  # stale benchmark + stale dataset
+    assert not report.ok
+    quality = next(step for step in report.steps if step.name == "quality")
+    assert not quality.ok
+
+
+def test_backfill_prints_live_progress_lines(
+    factory: sessionmaker[Session], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Each per-ticker loop prints one line, so a long job is not silent."""
+    fake = _fake()
+    service = _service(factory, fake.to_sources(), _Clock(AS_OF))
+
+    assert service.run(mode="full", start=START).ok
+
+    out = capsys.readouterr().out
+    assert "[prices] 3/3" in out
+    assert "[ratios] 3/3" in out
 
 
 def test_set_progress_keeps_rows_and_refreshes_updated_at(
