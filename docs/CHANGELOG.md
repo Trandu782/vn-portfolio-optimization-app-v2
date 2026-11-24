@@ -8,6 +8,19 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Infrastructure / deployment
 
+- **`precompute_v2.yml` bounds a scheduled run and streams its log live.** A cron
+  trigger now caps the job at `LIMIT=150`
+  (`github.event_name == 'schedule' && '150' || inputs.limit`), so the post-close
+  and nightly passes refresh every tracked ticker plus a bounded batch of new ones
+  instead of walking the whole universe into the 350-minute job timeout; a manual
+  dispatch still accepts a blank (no cap) or custom limit. The
+  `actions/setup-python@v5` step now sets `cache: "pip"` keyed on
+  `packages/core/pyproject.toml` and `packages/data/pyproject.toml`, the
+  `VNOPT_V2_CLIENT_REQUESTS_PER_SECOND` fallback moved from `0.5` to `1.5`, and
+  `PYTHONUNBUFFERED: "1"` plus `python -u` make every progress line reach the
+  Actions log as it is written instead of at exit. `concurrency` (`group:
+  precompute-v2`, `cancel-in-progress: false`) and the four `workflow_dispatch`
+  inputs are unchanged. `docs/DATA.md` notes the scheduled limit.
 - **`precompute_v2.yml` now runs nightly as well as after the close, with the
   concurrency guard documented.** The workflow had only the post-close cron
   `30 9 * * 1-5` (09:30 UTC = 16:30 ICT); it now also runs `0 19 * * *`
@@ -129,6 +142,26 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Incremental V2 runs keep the historical `v2_progress` row count and stop
+  re-polling known-empty tickers.** `V2Store.set_progress` (`data/v2/store.py`)
+  keeps a ticker's stored `rows` when a checkpoint arrives with `0`: an
+  incremental fetch that brought no new bar for a ticker that already had stored
+  rows reported `0` and blanked the count (the success path also wrote only the
+  incremental delta instead of the cumulative count). The count is now the
+  `v2_daily_prices` bar total read with `count_prices`, while `state`,
+  `last_date`, `error` and `updated_at` still advance — the conflict update now
+  sets `updated_at` explicitly because `insert().on_conflict_do_update()` does not
+  apply the column's `onupdate`. `_backfill_prices` also filters and orders its
+  candidates through a new `_order_price_candidates` helper: tickers that already
+  have prices come first, so `--limit` updates the tracked stocks before it
+  backfills a new one, and an `incremental` run without `--profiles` drops the
+  tickers whose checkpoint is `done` with no stored bar, so a symbol that never
+  trades no longer costs a daily API call. A `--full` run or an explicit
+  `--profiles` keeps them, so the periodic refresh still re-checks them, and
+  emptiness is decided by `v2_daily_prices` so a legacy `0` cannot hide a priced
+  ticker. Covered by four new `test_v2_precompute.py` tests (row-count
+  preservation, `updated_at` refresh, known-empty skip/re-check and `--limit`
+  priority).
 - **V2 ratio sync no longer aborts on a provider's duplicate period.** The
   GitHub Actions run failed on `AAH` with
   `psycopg.errors.CardinalityViolation: ON CONFLICT DO UPDATE command cannot

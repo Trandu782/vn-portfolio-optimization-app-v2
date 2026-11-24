@@ -70,7 +70,12 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       MODE: ${{ github.event_name == 'schedule' && 'incremental' || inputs.mode }}
       START: ${{ inputs.start }}
-      LIMIT: ${{ inputs.limit }}
+      # A scheduled run processes the active tickers plus a bounded batch of new
+      # ones (150) so the nightly/post-close cron cannot time out while it walks a
+      # large universe; every ticker commits independently, so the next cron run
+      # resumes from there. A manual dispatch still accepts a blank (no cap) or
+      # custom limit.
+      LIMIT: ${{ github.event_name == 'schedule' && '150' || inputs.limit }}
       PROFILES: ${{ inputs.profiles }}
       # Optional tuning knobs, read from Settings -> Secrets and variables ->
       # Actions -> Variables. An unset variable falls back to the default below,
@@ -80,9 +85,12 @@ jobs:
       # data/v2/precompute.py (sources_from_context) and throttles through the
       # shared client, so those two families only configure the API's runner.
       VNOPT_V2_BACKFILL_START_DATE: ${{ vars.VNOPT_V2_BACKFILL_START_DATE || '2023-01-01' }}
-      VNOPT_V2_CLIENT_REQUESTS_PER_SECOND: ${{ vars.VNOPT_V2_CLIENT_REQUESTS_PER_SECOND || '0.5' }}
+      VNOPT_V2_CLIENT_REQUESTS_PER_SECOND: ${{ vars.VNOPT_V2_CLIENT_REQUESTS_PER_SECOND || '1.5' }}
       VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED: ${{ vars.VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED || 'true' }}
       VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME: ${{ vars.VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME || '10000' }}
+      # Unbuffered stdout so every progress line reaches the Actions log as it is
+      # written instead of being flushed on exit.
+      PYTHONUNBUFFERED: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -91,6 +99,13 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          # Reuse the pip download cache between runs; the editable install of
+          # both local packages re-resolves their third-party dependencies each
+          # time, so key the cache on the pyproject files that declare them.
+          cache: "pip"
+          cache-dependency-path: |
+            packages/core/pyproject.toml
+            packages/data/pyproject.toml
 
       - name: Install packages
         run: |
@@ -108,7 +123,7 @@ jobs:
           if [ -n "${START}" ]; then args+=(--start "${START}"); fi
           if [ -n "${LIMIT}" ]; then args+=(--limit "${LIMIT}"); fi
           if [ "${PROFILES}" = "true" ]; then args+=(--profiles); fi
-          python -m data.v2.jobs.precompute "${args[@]}" 2>&1 | tee precompute_report.txt
+          python -u -m data.v2.jobs.precompute "${args[@]}" 2>&1 | tee precompute_report.txt
 
       - name: Verify stored rows
         if: always()

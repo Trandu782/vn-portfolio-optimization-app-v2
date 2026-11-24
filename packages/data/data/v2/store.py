@@ -32,6 +32,7 @@ from data.db.models import (
     V2SectorMap,
     V2SectorStatistic,
     V2TickerMaster,
+    utcnow,
 )
 from data.db.repositories import SqlIndexRepository, _bulk_upsert
 from data.v2.precompute_schemas import (
@@ -540,22 +541,40 @@ class V2Store:
         return _progress_record(row) if row is not None else None
 
     def set_progress(self, record: ProgressRecord) -> int:
-        """Upsert one checkpoint (state, last committed date, row count, error)."""
+        """Upsert one checkpoint (state, last committed date, row count, error).
+
+        A zero row count never blanks a historical one. An incremental fetch that
+        brings no new bar for a ticker that already has stored rows reports zero,
+        so the stored count is kept while ``state``, ``last_date``, ``error`` and
+        ``updated_at`` still move forward. The stored count is read as a column
+        scalar so an already-loaded ORM copy cannot shadow the committed value.
+        """
+        symbol = record.symbol.upper()
+        rows = record.rows
+        if rows <= 0:
+            stored = self._session.scalar(
+                select(V2Progress.rows).where(
+                    V2Progress.kind == record.kind, V2Progress.symbol == symbol
+                )
+            )
+            if stored is not None and stored > 0:
+                rows = stored
         return _bulk_upsert(
             self._session,
             V2Progress,
             [
                 {
                     "kind": record.kind,
-                    "symbol": record.symbol.upper(),
+                    "symbol": symbol,
                     "state": record.state,
                     "last_date": record.last_date,
-                    "rows": record.rows,
+                    "rows": rows,
                     "error": record.error,
+                    "updated_at": utcnow(),
                 }
             ],
             key_columns=["kind", "symbol"],
-            update_columns=["state", "last_date", "rows", "error"],
+            update_columns=["state", "last_date", "rows", "error", "updated_at"],
         )
 
     def list_progress(self, kind: str) -> list[ProgressRecord]:

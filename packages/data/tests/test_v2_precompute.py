@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from data.db.base import create_all, create_engine_for, create_session_factory, session_scope
+from data.db.models import V2Progress
 from data.db.repositories import SqlIndexRepository
 from data.errors import NetworkError
 from data.v2.config import V2DataSettings
@@ -723,3 +725,119 @@ def test_incremental_ratio_refresh_is_skipped_on_the_same_day(
     fake.ratio_calls.clear()
     assert service.run(mode="incremental", start=START).ok
     assert fake.ratio_calls == []  # already refreshed on the target date
+
+
+def test_set_progress_keeps_rows_and_refreshes_updated_at(
+    factory: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A zero count never blanks history, but the checkpoint still moves forward."""
+    first = datetime(2026, 1, 5, 8, 0, tzinfo=UTC)
+    second = datetime(2026, 1, 6, 8, 0, tzinfo=UTC)
+    with session_scope(factory) as session:
+        store = V2Store(session)
+        monkeypatch.setattr("data.v2.store.utcnow", lambda: first)
+        store.set_progress(
+            ProgressRecord(
+                kind="prices", symbol="VCB", state="done", last_date=START, rows=240
+            )
+        )
+        # An incremental fetch with no new bar reports zero rows for the same ticker.
+        monkeypatch.setattr("data.v2.store.utcnow", lambda: second)
+        store.set_progress(
+            ProgressRecord(kind="prices", symbol="VCB", state="done", last_date=AS_OF)
+        )
+    with session_scope(factory) as session:
+        progress = V2Store(session).get_progress("prices", "VCB")
+        updated_at = session.scalar(
+            select(V2Progress.updated_at).where(
+                V2Progress.kind == "prices", V2Progress.symbol == "VCB"
+            )
+        )
+    assert progress is not None
+    assert progress.rows == 240  # the historical count survives
+    assert progress.state == "done"
+    assert progress.last_date == AS_OF  # the newer checkpoint still lands
+    assert updated_at is not None
+    assert updated_at.replace(tzinfo=None) == second.replace(tzinfo=None)
+
+
+def test_incremental_run_keeps_the_historical_row_count(
+    factory: sessionmaker[Session],
+) -> None:
+    """A ticker whose feed ends before the target keeps its stored count."""
+    fake = _fake()
+    clock = _Clock(AS_OF)
+    service = _service(factory, fake.to_sources(), clock)
+    assert service.run(mode="full", start=START).ok
+
+    with session_scope(factory) as session:
+        progress = V2Store(session).get_progress("prices", "VCB")
+    assert progress is not None and progress.rows > 0
+    stored_rows = progress.rows
+
+    # The clock moves on but VCB's feed still ends at AS_OF (a suspension): the
+    # incremental fetch returns only the already-stored overlap, so no new bar.
+    clock.today = AS_OF + timedelta(days=7)
+    fake.bar_calls.clear()
+    service.run(mode="incremental", start=START)
+    assert "VCB" in {call[0] for call in fake.bar_calls}  # still polled: it is priced
+
+    with session_scope(factory) as session:
+        after = V2Store(session).get_progress("prices", "VCB")
+    assert after is not None
+    assert after.rows == stored_rows
+    assert after.state == "done"
+
+
+def test_incremental_skips_known_empty_symbols(factory: sessionmaker[Session]) -> None:
+    """A symbol that never trades is re-checked by a full run, not every day."""
+    fake = _fake()
+    fake.bars_by_ticker.pop("XYZ")  # XYZ never prints: the price feed is empty
+    clock = _Clock(AS_OF)
+    service = _service(factory, fake.to_sources(), clock)
+    first = service.run(mode="full", start=START)
+    assert next(step for step in first.steps if step.name == "prices").ok
+    with session_scope(factory) as session:
+        progress = V2Store(session).get_progress("prices", "XYZ")
+    assert progress is not None
+    assert progress.state == "done" and progress.rows == 0
+
+    newer = date(2026, 1, 6)
+    _extend(fake, date(2026, 1, 1), newer)
+    clock.today = newer
+    fake.bar_calls.clear()
+    incremental = service.run(mode="incremental", start=START)
+    assert next(step for step in incremental.steps if step.name == "prices").ok
+    called = {call[0] for call in fake.bar_calls}
+    assert "XYZ" not in called  # no daily polling of a known-empty symbol
+    assert "VCB" in called  # the priced names keep updating
+
+    fake.bar_calls.clear()
+    service.run(mode="incremental", start=START, profiles=True)
+    assert "XYZ" in {call[0] for call in fake.bar_calls}  # --profiles re-checks it
+
+    fake.bar_calls.clear()
+    service.run(mode="full", start=START)
+    assert "XYZ" in {call[0] for call in fake.bar_calls}  # so does a full refresh
+
+
+def test_limit_updates_tracked_tickers_before_new_ones(
+    factory: sessionmaker[Session],
+) -> None:
+    """``--limit`` spends its slots on the stocks that already have prices."""
+    fake = _fake()
+    clock = _Clock(AS_OF)
+    service = _service(factory, fake.to_sources(), clock)
+    # Price only VCB (the sole VN30 member in the fixture); FPT and XYZ stay new.
+    assert service.run(mode="full", start=START, members="VN30").ok
+
+    newer = date(2026, 1, 6)
+    _extend(fake, date(2026, 1, 1), newer)
+    clock.today = newer
+    fake.bar_calls.clear()
+
+    report = service.run(mode="incremental", start=START, limit=1)
+    assert report.ok, report
+    # Alphabetical order would fetch FPT first; the already-tracked VCB wins.
+    assert {call[0] for call in fake.bar_calls} == {"VCB"}
+

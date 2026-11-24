@@ -47,7 +47,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--profiles",
         action="store_true",
-        help="Force a market-cap / corporate-action refresh.",
+        help=(
+            "Force a market-cap / corporate-action refresh and re-check the "
+            "known-empty symbols an incremental run skips."
+        ),
     )
     parser.add_argument(
         "--members",

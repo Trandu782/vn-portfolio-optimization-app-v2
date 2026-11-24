@@ -263,16 +263,25 @@ financial ratios.
   only providers verified from recorded fixtures; unverified providers stay out of
   the chain until the cloud-IP probe (`scripts/probe_v2.py`) confirms them.
 - **Incremental vs full/backfill** — `--incremental` fetches only new dates (about
-  one page per ticker per day); `--full` re-fetches the configured window
-  (`VNOPT_V2_BACKFILL_START_DATE`, default `2023-01-01`). Heavy backfills are
-  chunked with `--limit N`; each ticker commits its own session and the
-  `v2_progress` checkpoint records the last committed date, so a run resumes where
-  it stopped.
+  one page per ticker per day) and skips the tickers a previous run recorded as
+  `done` with no stored bar, so a symbol that never trades is not polled daily; a
+  `--full` run or `--profiles` re-checks them. `--full` re-fetches the configured
+  window (`VNOPT_V2_BACKFILL_START_DATE`, default `2023-01-01`). Heavy backfills are
+  chunked with `--limit N`, and the tickers that already have prices are served
+  first, so a limited run updates the tracked stocks before it backfills a new
+  one. Each ticker commits its own session and the `v2_progress` checkpoint records
+  the last committed date and the cumulative bar count, so a run resumes where it
+  stopped; an incremental fetch that returns no new bar never blanks that count.
 - **Daily jobs** — the scheduled GitHub Actions workflow (`precompute_v2.yml`)
   runs `--incremental` after the close (weekdays `30 9 * * 1-5` = 16:30 ICT) and
   nightly (`0 19 * * *` = 02:00 ICT); overlapping triggers queue in the
-  `precompute-v2` concurrency group. The Vercel cron only refreshes the V1
-  tables. Manual commands:
+  `precompute-v2` concurrency group. A scheduled run passes `--limit 150`, so it
+  refreshes the tracked tickers plus a bounded batch of new ones well inside the
+  350-minute job timeout (the next cron continues the backfill); a manual dispatch
+  keeps the `limit` input, blank meaning no cap. The job keys the pip cache on
+  both `pyproject.toml` files and runs Python unbuffered (`python -u` with
+  `PYTHONUNBUFFERED=1`), so the report streams into the job log. The Vercel cron
+  only refreshes the V1 tables. Manual commands:
 
   ```sh
   python -m data.v2.jobs.precompute --incremental

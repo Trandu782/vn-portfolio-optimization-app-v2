@@ -95,6 +95,19 @@ configured `backfill_start_date`.
 chunked, resumable backfill mandatory. Per-ticker commit is what makes an
 interrupted run resume instead of restarting.
 
+**Empty symbols and row counts.** `v2_progress.rows` holds the cumulative
+`v2_daily_prices` bar count and is never blanked by an incremental fetch that
+returns no new bar, while `state`, `last_date` and `updated_at` still advance. An
+`incremental` run then drops the tickers whose checkpoint is `done` with `rows = 0`
+and no stored bar, so a symbol that never trades stops costing a daily request; a
+`--full` run or `--profiles` re-checks them. Candidates are ordered with the
+already-priced tickers first, so `--limit` updates tracked stocks before it
+backfills a new one.
+
+**Why.** The daily pass must spend its request budget on the stocks that have
+data, and a zeroed count made the checkpoint unable to tell "no bar ever" from
+"no new bar today", so a suspended or newly listed name was polled forever.
+
 ## D-006 — Sector coverage gaps are reported, never guessed
 
 **Decision.** Keep a ticker with no ICB level-2 sector in the universe (so its

@@ -257,7 +257,9 @@ class V2PrecomputeService:
                 profile steps (so a very large universe can be chunked across runs).
             profiles: Force a profile/corporate-action refresh. Defaults to ``True``
                 for a full refresh without a limit and ``False`` otherwise, so a
-                chunked backfill fills missing profiles and skips finished ones.
+                chunked backfill fills missing profiles and skips finished ones. A
+                forced refresh also re-checks the known-empty tickers that an
+                incremental run skips.
             members: Optional index code (``VN30`` or ``VN100``). When set, the
                 price, profile, liquidity, quality and adjustment-flag steps only
                 process that index's stored members; the master, membership and
@@ -283,7 +285,12 @@ class V2PrecomputeService:
         universe = self._processing_universe(members)
         report.steps.append(
             self._backfill_prices(
-                target, mode=mode, start=fetch_start, limit=limit, universe=universe
+                target,
+                mode=mode,
+                start=fetch_start,
+                limit=limit,
+                universe=universe,
+                refresh_profiles=force_profiles,
             )
         )
         report.steps.append(
@@ -439,20 +446,33 @@ class V2PrecomputeService:
         start: date,
         limit: int | None,
         universe: Sequence[TickerRecord] | None = None,
+        refresh_profiles: bool = False,
     ) -> StepResult:
+        """Fetch and store adjusted daily bars, resumably and incrementally.
+
+        ``refresh_profiles`` mirrors the forced ``--profiles`` refresh: it keeps the
+        known-empty tickers in the candidate set, so a periodic full refresh can
+        re-check a symbol that stopped trading.
+        """
         master = self._master_or(universe)
         if not master:
             return StepResult(name="prices", ok=False, message="empty universe")
         exchange_by_ticker = {record.ticker: record.exchange for record in master}
         all_tickers = [record.ticker for record in master]
+        # Tracked names first, and (on an incremental run without --profiles) the
+        # known-empty names dropped; see the helper for both rules.
+        ordered = self._order_price_candidates(
+            all_tickers,
+            skip_known_empty=mode == "incremental" and not refresh_profiles,
+        )
         if mode == "incremental" or limit is not None:
             # Incremental: only the tickers with new dates. Chunked full: the next
             # `limit` unfinished names. This also skips the cheap pre-screen when a
             # same-day run has nothing to do.
-            effective_limit = limit if limit is not None else len(all_tickers)
-            candidates = self._pending_tickers(all_tickers, target, effective_limit)
+            effective_limit = limit if limit is not None else len(ordered)
+            candidates = self._pending_tickers(ordered, target, effective_limit)
         else:
-            candidates = all_tickers
+            candidates = ordered
         tickers = self._pre_screen(candidates)
         processed = 0
         fetched = 0
@@ -528,7 +548,9 @@ class V2PrecomputeService:
                         symbol=ticker,
                         state="done",
                         last_date=store.latest_price_date(ticker),
-                        rows=len(prepared),
+                        # The cumulative stored bar count, so an incremental run that
+                        # adds a session or two keeps the historical count.
+                        rows=store.count_prices(ticker),
                     )
                 )
             processed += 1
@@ -563,6 +585,39 @@ class V2PrecomputeService:
             if abs(bar.close - previous) > tolerance * max(abs(previous), 1.0):
                 return True
         return False
+
+    def _order_price_candidates(
+        self, tickers: Sequence[str], *, skip_known_empty: bool
+    ) -> list[str]:
+        """Return the price candidates with the tracked tickers first.
+
+        A ticker with stored bars (or a positive checkpoint count) precedes every
+        unpriced name, so a ``--limit`` run always refreshes the stocks that are
+        already tracked before it backfills a new one.
+
+        With ``skip_known_empty`` (an incremental run without a forced
+        ``--profiles`` refresh) a ticker whose checkpoint is ``done`` with no
+        stored bar is dropped, so a symbol that never trades stops costing a daily
+        API call; a full run or ``--profiles`` keeps it so the periodic refresh can
+        re-check it. Emptiness is decided by ``v2_daily_prices``, so a legacy zero
+        count on a priced ticker can never hide it from the daily run.
+        """
+        with session_scope(self._session_factory) as session:
+            store = V2Store(session)
+            checkpoints = {record.symbol: record for record in store.list_progress("prices")}
+            priced = set(store.history_starts())
+        tracked: list[str] = []
+        rest: list[str] = []
+        for ticker in tickers:
+            code = ticker.upper()
+            checkpoint = checkpoints.get(code)
+            if code in priced or (checkpoint is not None and checkpoint.rows > 0):
+                tracked.append(ticker)
+            elif skip_known_empty and checkpoint is not None and checkpoint.state == "done":
+                continue
+            else:
+                rest.append(ticker)
+        return tracked + rest
 
     def _pending_tickers(
         self, tickers: list[str], target: date, limit: int
