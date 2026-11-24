@@ -382,11 +382,11 @@ after the job), so use the same Supabase database as the API.
    a scheduled `--incremental` will keep working through the unpriced names
    instead of only fetching the new session; the `v2_progress` rows and the
    `verify_report.txt` `unfinished progress rows` count show how far it got.
-6. **Deploy the API and web** as before (`vercel --prod` from the repo root and
+7. **Deploy the API and web** as before (`vercel --prod` from the repo root and
    `apps/web`). The API reads the same `DATABASE_URL` (transaction-pooler URL is
    fine for its read path) and needs the `VNOPT_V2_*_ORDER` vars only if you
    override the defaults.
-7. **Verify** — `GET /api/v1/v2/coverage` (sector coverage), `GET /api/v1/v2/sectors`
+8. **Verify** — `GET /api/v1/v2/coverage` (sector coverage), `GET /api/v1/v2/sectors`
    and `GET /api/v1/v2/analytics` should return populated payloads; the Sector
    Analysis tab should render within a couple of seconds.
 
