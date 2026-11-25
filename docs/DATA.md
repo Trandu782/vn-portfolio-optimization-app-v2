@@ -271,18 +271,29 @@ financial ratios.
   then unpriced `VN100`/`VN30` members, then the remaining unpriced names, so the
   index universe and the already-priced stocks are served before the long tail.
   The cap is spent *after* the pre-screen, so a symbol the screen rejects costs no
-  slot and every limited run backfills real work. Each ticker commits its own
-  session and the `v2_progress` checkpoint records the last committed date and the
-  cumulative bar count, so a run resumes where it stopped; an incremental fetch
-  that returns no new bar never blanks that count.
-- **As-of date** — without `--as-of` the pipeline runs for today's *Vietnam* date
-  (`Asia/Ho_Chi_Minh`, UTC+7; the runner clock is UTC) and, when the upstream
-  `VNINDEX` bars for that session have not been published yet (a daytime manual
-  run or a market holiday), falls back to the last published session and logs
-  `as-of fallback: VNINDEX has no bar ...` instead of failing the quality gate with
-  `quality: stale benchmark` / `quality: stale dataset`. An explicit
-  `--as-of YYYY-MM-DD` (workflow input `as_of`) disables the fallback, so a
-  genuinely stale benchmark or dataset still fails loudly.
+  slot and every limited run backfills real work; the rejected names are logged once
+  per run (`prices: pre-screen rejected N candidate(s) ...`). To finish a large
+  backfill, use `--unpriced` (workflow input `unpriced`, with `mode=full`,
+  `limit=150`): it selects only tickers with **no stored bar** and never re-fetches a
+  priced ticker, so every slot makes progress (add `--profiles` to re-check the
+  known-empty symbols in the same pass). Each ticker commits its own session and the
+  `v2_progress` checkpoint records the last committed date and the cumulative bar
+  count, so a run resumes where it stopped; an incremental fetch that returns no new
+  bar never blanks that count.
+- **As-of date** — without `--as-of` the pipeline targets the last *completed*
+  Vietnam session: today only after the 15:00 ICT close (`MarketRules.session_close`),
+  otherwise the previous trading day, rolled back over weekends and holidays
+  (`data.calendar.last_completed_session`). Every fetch window ends at that target,
+  so a pre-close run cannot store today's provisional intraday `VNINDEX` bar. When
+  the stored `VNINDEX` series still has no bar for the target (a holiday the
+  built-in calendar does not know, or a provider that publishes late), `_settle_target`
+  falls back to the last published session and logs `as-of fallback: VNINDEX has no
+  bar ...` instead of failing the quality gate with `quality: stale benchmark` /
+  `quality: stale dataset`. An explicit `--as-of YYYY-MM-DD` (workflow input `as_of`)
+  disables the fallback, so a genuinely stale benchmark or dataset still fails loudly.
+  `VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS` (default `0`) is the only
+  tolerance: set it to `1` while an upstream feed is known to publish one session
+  late, and the lag is logged as a warning instead of failing the gate.
 - **Daily jobs** — the scheduled GitHub Actions workflow (`precompute_v2.yml`)
   runs `--incremental` after the close (weekdays `37 9 * * 1-5` = 16:37 ICT) and
   nightly (`13 19 * * *` = 02:13 ICT); the off-`:00`/`:30` minutes avoid GitHub's
@@ -290,16 +301,18 @@ financial ratios.
   concurrency group. A scheduled run passes `--limit 150`, so it refreshes the
   tracked tickers plus a bounded batch of index members and other new ones well
   inside the 350-minute job timeout (the next cron continues the backfill); a
-  manual dispatch keeps the `limit` input, blank meaning no cap. The job keys the
+  manual dispatch defaults to the same `150` (blank means no cap). The job keys the
   pip cache on both `pyproject.toml` files and runs Python unbuffered (`python -u`
-  with `PYTHONUNBUFFERED=1`), and both per-ticker loops print a
-  `[prices] 37/150 FPT (+968 bars)` / `[ratios] ...` line every 10 tickers, so the
-  report streams into the job log instead of appearing silent. The Vercel cron
-  only refreshes the V1 tables. Manual commands:
+  with `PYTHONUNBUFFERED=1`), both per-ticker loops print a
+  `[prices] 37/150 FPT (+968 bars)` / `[ratios] ...` line every 10 tickers, and a
+  `Report trigger` step prints the event, the cron expression that fired and the
+  UTC/ICT timestamps, so a run outside the expected window can be identified from
+  the log. The Vercel cron only refreshes the V1 tables. Manual commands:
 
   ```sh
   python -m data.v2.jobs.precompute --incremental
   python -m data.v2.jobs.precompute --full --start 2023-01-01 --limit 150
+  python -m data.v2.jobs.precompute --full --unpriced --limit 150
   python -m data.v2.jobs.precompute --incremental --as-of 2025-12-31
   python -m data.v2.jobs.precompute --incremental --recompute-flags --members VN30
   ```

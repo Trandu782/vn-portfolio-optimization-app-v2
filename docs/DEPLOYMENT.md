@@ -340,8 +340,9 @@ after the job), so use the same Supabase database as the API.
    that extra a Postgres URL fails at connect with `ModuleNotFoundError`).
 
    Optional repo **variables** are forwarded to the job explicitly:
-   `VNOPT_V2_BACKFILL_START_DATE`, `VNOPT_V2_CLIENT_REQUESTS_PER_SECOND` and
-   the pre-screen knobs `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED` /
+   `VNOPT_V2_BACKFILL_START_DATE`, `VNOPT_V2_CLIENT_REQUESTS_PER_SECOND`,
+   `VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS` and the pre-screen knobs
+   `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED` /
    `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME`. `VNOPT_V2_*_ORDER` and
    `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE` are **not** read by the precompute job —
    `data/v2/precompute.py::sources_from_context` wires one adapter per data
@@ -356,22 +357,33 @@ after the job), so use the same Supabase database as the API.
 4. **Confirm cloud-IP access** — run the `probe_v2.yml` workflow first; SSI sits
    behind Cloudflare, so only promote `ssi_statistics` into the active V2 chains
    after the probe passes on the runner.
-5. **Backfill in chunks** — dispatch `precompute_v2.yml` with `mode=full` and a
-   `limit` (e.g. `150`) repeatedly; each run resumes from `v2_progress`. Then let
-   the schedule run `--incremental`: weekdays at `37 9 * * 1-5`
-   (09:37 UTC = 16:37 ICT, after the close) and nightly at `13 19 * * *`
-   (19:13 UTC = 02:13 ICT), which repairs a failed weekday run. Both share the
-   `precompute-v2` concurrency group with `cancel-in-progress: false`, so they
-   queue instead of overlapping. The odd minutes keep the crons out of GitHub's
-   busiest scheduler slots, which otherwise delay a run by many minutes.
+5. **Backfill in chunks** — confirm the gap first with the read-only summary, then
+   dispatch `precompute_v2.yml` with `mode=full`, `limit=150` and `unpriced=true`
+   repeatedly until `tickers without prices` reaches 0; each run touches only the
+   tickers that still have no stored bar, so no chunk re-fetches the priced ones.
+   Set the repo variable `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME=0` for
+   those chunks if the remaining names are the illiquid tail the 10k-share floor
+   rejects (the job then logs `prices: pre-screen rejected N candidate(s) ...` when
+   names are dropped, and nothing when the floor is disabled). Then let the schedule
+   run `--incremental`: weekdays at `37 9 * * 1-5` (09:37 UTC = 16:37 ICT, after the
+   close) and nightly at `13 19 * * *` (19:13 UTC = 02:13 ICT), which repairs a
+   failed weekday run. Both share the `precompute-v2` concurrency group with
+   `cancel-in-progress: false`, so they queue instead of overlapping (a queued run
+   starts later than it was created, never earlier). The odd minutes keep the crons
+   out of GitHub's busiest scheduler slots, which otherwise delay a run by many
+   minutes.
 6. **Read the progress lines** — each per-ticker loop prints a
    `[prices] 37/150 FPT (+968 bars)` style line every 10 tickers, so the job log
    shows live progress instead of staying silent, and `[ratios]` does the same
-   for the ratios step. A run dispatched while the upstream EOD bars of the
-   session are still unpublished logs `as-of fallback: VNINDEX has no bar ...`
-   and processes the last published session instead of failing
-   `quality: stale benchmark` / `quality: stale dataset`. Pass the `as_of`
-   input (or `--as-of`) to force a date and keep those errors strict.
+   for the ratios step. The first step (`Report trigger`) prints the event, the cron
+   expression that fired and the UTC/ICT timestamps: `schedule` crons are evaluated
+   in UTC, so use that line (not the browser's local clock) to tell which trigger a
+   run came from. A run dispatched while the upstream EOD bars of the session are
+   still unpublished logs `as-of fallback: VNINDEX has no bar ...` and processes the
+   last published session instead of failing `quality: stale benchmark` /
+   `quality: stale dataset`; a run *before* the 15:00 ICT close or on a holiday
+   simply targets the previous completed session. Pass the `as_of` input (or
+   `--as-of`) to force a date and keep those errors strict.
 
    Budget: SSI `stock-info` pages 40 rows and the adapter walks 366-day windows,
    so a first history from `2023-01-01` costs roughly 25 requests per ticker
@@ -401,7 +413,8 @@ after the job), so use the same Supabase database as the API.
 | `VNOPT_V2_RATIOS_ORDER` | API | no | Ratios chain, default `ssi_statistics`. |
 | `VNOPT_V2_BACKFILL_START_DATE` | precompute job (repo variable) | no | Backfill start (`2023-01-01`); also `--start`. |
 | `VNOPT_V2_CLIENT_REQUESTS_PER_SECOND` | precompute job (repo variable) | no | Shared-client throttle, default `0.5` (30/min). |
-| `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED` / `..._MIN_MEDIAN_VOLUME` | precompute job (repo variables) | no | Backfill pre-screen, defaults `true` / `10000`. |
+| `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED` / `..._MIN_MEDIAN_VOLUME` | precompute job (repo variables) | no | Backfill pre-screen, defaults `true` / `10000`. Set the floor to `0` to backfill the illiquid tail. |
+| `VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS` | precompute job (repo variable) | no | Trading sessions the benchmark/dataset may lag the target before the quality gate fails, default `0` (strict); `1` logs a warning only. |
 | `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE` | API | no | Per-data-type request budget for the failover runner (defaults 10-20/min); the precompute job throttles through the shared client instead. |
 
 ### Row-level security on Supabase

@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
-from datetime import UTC, date, datetime, timedelta
+from dataclasses import replace
+from datetime import UTC, date, datetime, time, timedelta
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from core.market_rules import DEFAULT_MARKET_RULES
+from data.calendar import VIETNAM_UTC_OFFSET
 from data.db.base import create_all, create_engine_for, create_session_factory, session_scope
 from data.db.models import V2Progress
 from data.db.repositories import SqlIndexRepository
@@ -74,13 +77,16 @@ def _volume(bars: list[AdjustedOHLCV], volume: int) -> list[AdjustedOHLCV]:
 
 
 class _Clock:
-    """A mutable today provider so a test can advance time."""
+    """A mutable clock (default 18:00 ICT, i.e. after the close) so a test can move time."""
 
-    def __init__(self, today: date) -> None:
+    def __init__(self, today: date, hour_ict: int = 18) -> None:
         self.today = today
+        self.hour_ict = hour_ict
 
-    def __call__(self) -> date:
-        return self.today
+    def __call__(self) -> datetime:
+        return datetime.combine(
+            self.today, time(self.hour_ict, 0), tzinfo=VIETNAM_UTC_OFFSET
+        )
 
 
 class FakeSources:
@@ -215,7 +221,7 @@ def _service(
         session_factory=factory,
         sources=sources,
         settings=settings,
-        today_provider=clock,
+        now_provider=clock,
     )
 
 
@@ -735,7 +741,7 @@ def test_incremental_ratio_refresh_is_skipped_on_the_same_day(
 
 
 def test_limit_prioritizes_index_members_and_spends_it_after_the_prescreen(
-    factory: sessionmaker[Session],
+    factory: sessionmaker[Session], caplog: pytest.LogCaptureFixture
 ) -> None:
     """A VN100 member beats an alphabetically earlier name, and a rejected symbol costs no slot."""
     fake = FakeSources(
@@ -756,10 +762,11 @@ def test_limit_prioritizes_index_members_and_spends_it_after_the_prescreen(
             precompute_pre_screen_enabled=True,
             precompute_pre_screen_min_median_volume=500,
         ),
-        today_provider=_Clock(AS_OF),
+        now_provider=_Clock(AS_OF),
     )
 
-    first = service.run(mode="full", start=START, limit=1)
+    with caplog.at_level(logging.INFO, logger="data.v2.precompute"):
+        first = service.run(mode="full", start=START, limit=1)
     assert first.ok, first
     # The index member wins over the alphabetically earlier AAA, and the budget is
     # spent on it: nothing else is even screened.
@@ -768,11 +775,16 @@ def test_limit_prioritizes_index_members_and_spends_it_after_the_prescreen(
 
     fake.bar_calls.clear()
     fake.screen_calls.clear()
-    second = service.run(mode="full", start=START, limit=1)
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger="data.v2.precompute"):
+        second = service.run(mode="full", start=START, limit=1)
     assert second.ok, second
     # AAA is screened and rejected without consuming the slot, so CCC takes it.
     assert fake.screen_calls == ["AAA", "CCC"]
     assert [call[0] for call in fake.bar_calls] == ["CCC"]
+    # The rejection is reported, so an unpriced ticker can always be explained.
+    assert "pre-screen rejected" in caplog.text
+    assert "AAA" in caplog.text
     with session_scope(factory) as session:
         store = V2Store(session)
         assert store.latest_price_date("BBB") == AS_OF
@@ -956,4 +968,109 @@ def test_limit_updates_tracked_tickers_before_new_ones(
     assert report.ok, report
     # Alphabetical order would fetch FPT first; the already-tracked VCB wins.
     assert {call[0] for call in fake.bar_calls} == {"VCB"}
+
+
+def test_pre_close_run_targets_the_last_completed_session(
+    factory: sessionmaker[Session], caplog: pytest.LogCaptureFixture
+) -> None:
+    """A 10:02 ICT run after a market holiday does not chase today's session.
+
+    The observed failure: a 2026-11-25 dispatch before the close, with 2026-11-24 a
+    holiday, asked for the 2026-11-25 session and failed
+    ``quality: stale dataset, latest price bar 2026-11-23``.
+    """
+    holiday = date(2026, 11, 24)
+    last_session = date(2026, 11, 23)
+    first = date(2026, 8, 3)
+    fake = FakeSources(
+        bars_by_ticker={
+            ticker: _bars(first, last_session) for ticker in ("VCB", "FPT", "XYZ")
+        },
+        vn30=["VCB"],
+        vn100=["VCB", "FPT"],
+    )
+    fake.index_bars_end = last_session  # the holiday session has no bar
+    rules = replace(DEFAULT_MARKET_RULES, trading_holidays=frozenset({holiday}))
+    service = V2PrecomputeService(
+        session_factory=factory,
+        sources=fake.to_sources(),
+        settings=V2DataSettings(precompute_pre_screen_enabled=False),
+        now_provider=_Clock(date(2026, 11, 25), hour_ict=10),
+        rules=rules,
+    )
+
+    with caplog.at_level(logging.WARNING, logger="data.v2.precompute"):
+        report = service.run(mode="full", start=first)
+
+    assert report.ok, report
+    assert report.as_of == last_session
+    assert report.quality_errors == 0, caplog.text
+    # No request ever asks for a session the exchange has not completed.
+    assert all(call[2] <= last_session for call in fake.bar_calls)
+    assert all(call[2] <= last_session for call in fake.index_calls)
+
+
+def test_staleness_tolerance_excuses_a_known_one_session_lag(
+    factory: sessionmaker[Session], caplog: pytest.LogCaptureFixture
+) -> None:
+    """A one-session provider lag fails strictly and passes with a tolerance of 1."""
+    previous = AS_OF - timedelta(days=1)
+    fake = FakeSources(
+        bars_by_ticker={
+            ticker: _bars(START, previous) for ticker in ("VCB", "FPT", "XYZ")
+        },
+        vn30=["VCB"],
+        vn100=["VCB", "FPT"],
+    )
+    fake.index_bars_end = previous
+
+    strict = _service(factory, fake.to_sources(), _Clock(AS_OF))
+    strict_report = strict.run(mode="full", start=START, as_of=AS_OF)
+    assert strict_report.quality_errors == 2  # stale benchmark + stale dataset
+    assert not strict_report.ok
+
+    tolerant = V2PrecomputeService(
+        session_factory=factory,
+        sources=fake.to_sources(),
+        settings=V2DataSettings(
+            precompute_pre_screen_enabled=False,
+            precompute_staleness_tolerance_sessions=1,
+        ),
+        now_provider=_Clock(AS_OF),
+    )
+    with caplog.at_level(logging.WARNING, logger="data.v2.precompute"):
+        report = tolerant.run(mode="full", start=START, as_of=AS_OF)
+
+    assert report.ok, report
+    assert report.as_of == AS_OF
+    assert report.quality_errors == 0
+    assert "within the 1-session tolerance" in caplog.text
+
+
+def test_unpriced_run_finishes_the_tail_without_refetching_priced_tickers(
+    factory: sessionmaker[Session],
+) -> None:
+    """``only_unpriced`` spends every ``limit`` slot on a ticker that has no bars."""
+    fake = _fake()
+    clock = _Clock(AS_OF)
+    service = _service(factory, fake.to_sources(), clock)
+    # Price only VCB (the sole VN30 member); FPT and XYZ stay unpriced.
+    assert service.run(mode="full", start=START, members="VN30").ok
+
+    newer = date(2026, 1, 6)
+    _extend(fake, date(2026, 1, 1), newer)
+    clock.today = newer
+    fake.bar_calls.clear()
+
+    report = service.run(mode="full", start=START, limit=1, only_unpriced=True)
+
+    assert report.ok, report
+    # VCB already has bars, so the single slot goes to the first unpriced name (FPT
+    # is a VN100 member, ahead of XYZ) and the priced ticker is never re-fetched.
+    assert {call[0] for call in fake.bar_calls} == {"FPT"}
+    with session_scope(factory) as session:
+        store = V2Store(session)
+        assert store.latest_price_date("FPT") == newer
+        assert store.latest_price_date("XYZ") is None
+
 

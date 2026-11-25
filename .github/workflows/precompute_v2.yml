@@ -9,8 +9,10 @@ name: Precompute V2 datasets
 #   2. set a repository secret DATABASE_URL pointing at a persistent Postgres (a
 #      runner's local SQLite file is discarded after the job), e.g. Supabase;
 #   3. enable this workflow. Heavy backfills are chunked: dispatch it with
-#      mode=full and a limit (e.g. 150) repeatedly; each run resumes where the
-#      previous one stopped because every ticker commits independently.
+#      mode=full, limit=150 and unpriced=true repeatedly; each run resumes where
+#      the previous one stopped because every ticker commits independently, and
+#      unpriced=true spends every slot on a ticker that still has no bars instead
+#      of re-fetching the ones that are already stored.
 #
 # Two schedules run the same job, so a missed or partial trading-day run is
 # repaired the same night:
@@ -22,7 +24,12 @@ name: Precompute V2 datasets
 #      scheduled mode is `incremental`, a second pass only fetches new dates.
 #
 # Both minutes are deliberately off :00/:30, where GitHub's scheduler queue is
-# busiest and a cron can be delayed by many minutes.
+# busiest and a cron can be delayed by many minutes. GitHub delivers a scheduled
+# run in UTC and may delay it; the "Report trigger" step prints the event, the
+# cron expression that fired and both clocks, so a run that lands outside the
+# expected window can be identified from the job log instead of guessed at. The
+# job itself targets the last *completed* session, so a late or pre-close run
+# still processes settled data.
 on:
   schedule:
     # Weekdays 09:37 UTC = 16:37 ICT, after the 15:00 ICT close.
@@ -43,9 +50,13 @@ on:
         required: false
         default: ""
       limit:
-        description: "Max tickers this run (blank = no cap); chunk a heavy backfill"
+        description: "Max tickers this run (blank = no cap, usually a timeout)"
         required: false
-        default: ""
+        default: "150"
+      unpriced:
+        description: "Only price tickers with no stored bars (finish a backfill)"
+        type: boolean
+        default: false
       profiles:
         description: "Force a market-cap / corporate-action refresh"
         type: boolean
@@ -77,11 +88,12 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       MODE: ${{ github.event_name == 'schedule' && 'incremental' || inputs.mode }}
       START: ${{ inputs.start }}
-      # Blank = automatic: the pipeline uses today's Vietnam date and, when the
-      # upstream VNINDEX bars for that session have not been published yet (a
-      # daytime manual run or a market holiday), falls back to the last published
-      # session with a warning instead of failing the quality gate. An explicit
-      # value keeps the strict stale-benchmark / stale-dataset errors.
+      # Blank = automatic: the pipeline targets the last *completed* Vietnam
+      # session (today only after the 15:00 ICT close), and when the upstream
+      # VNINDEX bars for it have not been published yet (an unknown holiday or a
+      # provider that publishes late) falls back to the last published session with
+      # a warning instead of failing the quality gate. An explicit value keeps the
+      # strict stale-benchmark / stale-dataset errors.
       AS_OF: ${{ inputs.as_of }}
       # A scheduled run processes the active tickers plus a bounded batch of new
       # ones (150) so the nightly/post-close cron cannot time out while it walks a
@@ -89,8 +101,10 @@ jobs:
       # resumes from there. The batch is ordered tracked tickers first, then
       # unpriced VN100/VN30 members, then the rest, and the cap is spent only on
       # tickers that survive the pre-screen, so no slot goes to a rejected symbol.
-      # A manual dispatch still accepts a blank (no cap) or custom limit.
+      # A manual dispatch defaults to the same 150 and still accepts a custom
+      # value; blank means no cap, which normally exceeds the job timeout.
       LIMIT: ${{ github.event_name == 'schedule' && '150' || inputs.limit }}
+      UNPRICED: ${{ inputs.unpriced }}
       PROFILES: ${{ inputs.profiles }}
       # Optional tuning knobs, read from Settings -> Secrets and variables ->
       # Actions -> Variables. An unset variable falls back to the default below,
@@ -103,12 +117,30 @@ jobs:
       VNOPT_V2_CLIENT_REQUESTS_PER_SECOND: ${{ vars.VNOPT_V2_CLIENT_REQUESTS_PER_SECOND || '1.5' }}
       VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED: ${{ vars.VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED || 'true' }}
       VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME: ${{ vars.VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME || '10000' }}
+      # 0 = strict: any session the benchmark or the price dataset lags the last
+      # completed session is an error. Set the variable to 1 only while an
+      # upstream feed is known to publish a session late (an unknown exchange
+      # holiday); the run then logs a warning instead of failing the gate.
+      VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS: ${{ vars.VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS || '0' }}
       # Unbuffered stdout so every progress line reaches the Actions log as it is
       # written instead of being flushed on exit.
       PYTHONUNBUFFERED: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Report trigger
+        run: |
+          # GitHub runs `schedule` crons in UTC and can deliver them late, and a
+          # `concurrency` queue starts a run later than it was created. Print the
+          # event, the cron expression that fired (empty for a dispatch), the ref
+          # and both clocks, so a run outside the expected window is identifiable
+          # from the log instead of inferred from the local time of the browser.
+          echo "event        : ${{ github.event_name }}"
+          echo "cron         : ${{ github.event.schedule }}"
+          echo "ref          : ${{ github.ref }}"
+          date -u '+UTC          : %Y-%m-%d %H:%M:%S'
+          TZ=Asia/Ho_Chi_Minh date '+ICT (UTC+7)  : %Y-%m-%d %H:%M:%S'
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -138,6 +170,7 @@ jobs:
           if [ -n "${START}" ]; then args+=(--start "${START}"); fi
           if [ -n "${LIMIT}" ]; then args+=(--limit "${LIMIT}"); fi
           if [ -n "${AS_OF}" ]; then args+=(--as-of "${AS_OF}"); fi
+          if [ "${UNPRICED}" = "true" ]; then args+=(--unpriced); fi
           if [ "${PROFILES}" = "true" ]; then args+=(--profiles); fi
           python -u -m data.v2.jobs.precompute "${args[@]}" 2>&1 | tee precompute_report.txt
 

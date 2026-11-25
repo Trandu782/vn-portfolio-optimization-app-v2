@@ -512,3 +512,30 @@ compared with whom.
 label); keeping the full general set (mostly-null columns in the Fundamentals UI).
 
 
+## D-022 — `as_of` is the last *completed* session, and a backfill can select unpriced tickers
+
+**Decision.** An automatic run resolves its target with
+`data.calendar.last_completed_session`: the current Vietnam date only at or after
+`MarketRules.session_close` (15:00 ICT), otherwise the previous calendar day, rolled
+back over weekends and known holidays. `_settle_target` then falls back to the last
+published `VNINDEX` session, and every price and benchmark fetch ends at that target
+instead of `now`. A run may also select its price candidates with
+`only_unpriced=True` (`--unpriced`, the `unpriced` dispatch input), which keeps only
+the tickers with no stored bar.
+
+**Why.** A 2026-11-25 dispatch at 10:02 ICT (2026-11-24 was a holiday) stored a
+provisional intraday `VNINDEX` bar for 11-25, so `_settle_target` saw
+`benchmark_latest >= target`, kept 11-25 as the target and the gate failed with
+`quality: stale dataset, latest price bar 2026-11-23` — while all 150 `--limit` slots
+went to already-priced tickers that could only return `+0 bars`, so the 1,025
+unpriced tickers never got one. Clamping the fetch window to the target is what keeps
+an unsettled intraday bar out of the dataset; a clock that knows the close is what
+makes the target correct before the run starts.
+
+**Rejected.** Treating `today` as the target and widening the staleness tolerance
+(the default stays `0`, strict; the env knob exists only for a known upstream lag);
+inferring the session from the *stock* series' max date (one fresh ticker would hide
+a dataset that stopped updating); recording a pre-screen rejection as a `done`
+checkpoint (it would silently exclude the ticker forever, so the rejection is logged
+and `--unpriced` overrides the selection instead).
+

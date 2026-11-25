@@ -8,6 +8,43 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### V2 precompute pipeline
 
+- **A pre-close or holiday run targets the last *completed* session.** The
+  2026-11-25 dispatch that failed with `quality: stale dataset, latest price bar
+  2026-11-23 (target 2026-11-25)` was caused by two gaps: `run()` resolved `as_of`
+  from the Vietnam *date* with no notion of the 15:00 ICT close, and the benchmark /
+  price fetches ran to `today`, so an intraday `VNINDEX` bar for 2026-11-25 was
+  stored while the per-stock EOD bars still ended on the 2026-11-23 session
+  (2026-11-24 was a holiday), which made `_settle_target` short-circuit and the
+  `overall_latest < target` check fail. `MarketRules.session_close` (default
+  15:00), the new `data.calendar.last_completed_session` and
+  `V2PrecomputeService._resolve_target` now resolve the target before the run, all
+  fetch windows end at that target instead of `today`, and the
+  `today_provider`/`--as-of` plumbing became a timezone-aware `now_provider` (the
+  job passes `datetime.now(UTC)`). `_run_quality` additionally compares the
+  benchmark and the dataset against the target in *trading sessions* and honours the
+  new `VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS` setting (default `0`, i.e.
+  strict; `1` logs a warning instead of failing while an upstream feed is known to
+  publish a session late). Covered by
+  `test_calendar.py::test_last_completed_session_*` and
+  `test_v2_precompute.py::test_pre_close_run_targets_the_last_completed_session` /
+  `..._staleness_tolerance_excuses_a_known_one_session_lag`.
+- **`--unpriced` finishes a large backfill without re-fetching the priced names.**
+  A 1,519-ticker master with 1,482 `v2_progress` rows (494 priced tickers × 3
+  dataset kinds) left 1,025 tickers with no prices: they had no checkpoint at all,
+  so every scheduled run spent its 150 slots on the priced tickers instead (whose
+  target was the unsettled session, so `latest >= target` never skipped them and
+  each returned `+0 bars`), and a `--full` run *without* a limit set
+  `check_pending=False` and re-fetched all 494 from `--start` (DCS, HLT, PCG, SCC,
+  VST, ...) until the 350-minute timeout. `run(only_unpriced=True)` /
+  `--unpriced` selects only tickers with no stored bar, so each chunk makes
+  deterministic progress without touching the priced tickers (add `--profiles` to
+  re-check the known-empty ones in the same pass).
+  `_select_candidates` also logs the pre-screen rejections
+  (`prices: pre-screen rejected N candidate(s) ...`) that used to be invisible, and
+  `scripts/verify_v2_db.py` prints `tickers without prices` and the `v2_progress`
+  state counts plus the exact backfill command. New test
+  `test_unpriced_run_finishes_the_tail_without_refetching_priced_tickers`.
+
 - **Backfill candidates are prioritized and `--limit` is spent after the
   pre-screen.** `V2PrecomputeService._order_price_candidates` now returns three
   tiers: already-tracked tickers (stored bars or a positive checkpoint count),
@@ -40,6 +77,17 @@ project follows [Semantic Versioning](https://semver.org/).
   the Actions log shows progress instead of staying silent until `ratio_quality`.
 
 ### Infrastructure / deployment
+
+- **`precompute_v2.yml` reports which trigger fired, in both clocks.** A new
+  `Report trigger` step prints `github.event_name`, `github.event.schedule` (the
+  cron expression that fired), the ref and the UTC/ICT timestamps, because a cron
+  observed at an unexpected local hour can only be explained from the run itself:
+  GitHub evaluates `schedule` in UTC and can delay delivery, and a `concurrency`
+  queue starts a run later than it was created. The dispatch `limit` input now
+  defaults to `150` (blank means no cap, which normally exceeds the 350-minute
+  timeout) and a new `unpriced` input adds `--unpriced`, so a backfill is dispatched
+  as `mode=full, limit=150, unpriced=true`. The job also forwards
+  `VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS` (default `0`).
 
 - **`precompute_v2.yml` schedules moved off the busiest GitHub minutes.** The
   post-close cron is now `37 9 * * 1-5` (16:37 ICT) and the nightly cron

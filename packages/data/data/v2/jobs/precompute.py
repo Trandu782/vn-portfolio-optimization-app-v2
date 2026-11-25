@@ -9,6 +9,7 @@ Usage:
     python -m data.v2.jobs.precompute --full --start 2023-01-01 --limit 50
     python -m data.v2.jobs.precompute --incremental --create-schema
     python -m data.v2.jobs.precompute --incremental --as-of 2025-12-31
+    python -m data.v2.jobs.precompute --full --unpriced --limit 150
 """
 
 from __future__ import annotations
@@ -16,9 +17,8 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
-from datetime import date
+from datetime import UTC, date, datetime
 
-from data.calendar import vietnam_today
 from data.db.base import create_all, create_engine_for, create_session_factory
 from data.settings import get_settings
 from data.v2.context import V2DataContext
@@ -49,14 +49,23 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="YYYY-MM-DD",
         help=(
-            "Dataset as-of date. Blank: today's Vietnam date, falling back to the last "
-            "published VNINDEX session when today's EOD bars have not settled yet "
-            "(a daytime or holiday run). Explicit: strict, so a stale benchmark or "
-            "dataset still fails the quality gate."
+            "Dataset as-of date. Blank: the last completed session (after the 15:00 ICT "
+            "close) in Vietnam time, rolled back over weekends/holidays and to the last "
+            "published VNINDEX session when the upstream feed lags. Explicit: strict, so "
+            "a stale benchmark or dataset still fails the quality gate."
         ),
     )
     parser.add_argument(
         "--limit", type=int, default=None, help="Max tickers for the price/profile steps."
+    )
+    parser.add_argument(
+        "--unpriced",
+        action="store_true",
+        help=(
+            "Price only the tickers that have no stored bars yet, so a large backfill "
+            "finishes in --limit chunks without re-fetching the tickers that are "
+            "already stored. Add --profiles to re-check the known-empty symbols too."
+        ),
     )
     parser.add_argument(
         "--profiles",
@@ -145,8 +154,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             service = V2PrecomputeService(
                 session_factory=session_factory,
                 sources=sources_from_context(context),
-                # The runner's clock is UTC; a market session is a Vietnam date.
-                today_provider=vietnam_today,
+                # The runner's clock is UTC; a market session is a Vietnam date, and a
+                # run before the 15:00 ICT close targets the previous completed one.
+                now_provider=lambda: datetime.now(UTC),
             )
             report = service.run(
                 mode="full" if args.full else "incremental",
@@ -155,6 +165,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 profiles=True if args.profiles else None,
                 members=args.members,
                 as_of=as_of,
+                only_unpriced=args.unpriced,
             )
     finally:
         engine.dispose()

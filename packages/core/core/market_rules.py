@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, time
 from decimal import Decimal
 
 
@@ -33,6 +33,14 @@ class MarketRules:
     """Sell-side tax as a fraction of trade value (0.001 == 0.1%)."""
     trading_holidays: frozenset[date]
     """Illustrative exchange holidays. Unused in V1; keep in sync with the official calendar."""
+    session_close: time = time(15, 0)
+    """Local (ICT) wall-clock time at which a session's end-of-day bars exist.
+
+    HOSE, HNX and UPCoM run the closing auction from 14:45 and publish the official
+    close at 15:00, so a bar for today cannot exist before this time. The precompute
+    pipeline uses it to target the last *completed* session, so a run dispatched
+    before the close never asks upstream for a bar that cannot exist yet.
+    """
 
 
 # Illustrative Vietnamese public holidays on which HOSE/HNX/UPCoM are closed.

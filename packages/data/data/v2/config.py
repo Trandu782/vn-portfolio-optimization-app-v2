@@ -120,6 +120,16 @@ class V2DataSettings(BaseSettings):
     #: "All Stocks" universe is not silently filtered. Set to 0 to disable.
     precompute_pre_screen_min_median_volume: int = 10_000
 
+    #: How many *trading sessions* the benchmark series (`VNINDEX`) and the overall
+    #: price series may lag the resolved target before the quality gate fails. ``0``
+    #: (default) keeps the strict check — any missing session is an error. Raise it to
+    #: ``1`` (``VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS=1``) only while an
+    #: upstream feed is known to publish a session late, e.g. right after an exchange
+    #: holiday that the illustrative ``MarketRules.trading_holidays`` set does not know:
+    #: the run then logs a warning instead of failing `quality: stale dataset`. An
+    #: absent series (no bars at all) is never tolerated.
+    precompute_staleness_tolerance_sessions: int = 0
+
     #: Incremental re-base detection. SSI's adjusted closes change retroactively
     #: when a new corporate action's ex-date lands, so an incremental fetch that
     #: only grabs new dates would leave old rows stale. When a ticker has new

@@ -23,10 +23,15 @@ then the remaining unpriced names. ``--limit`` caps the tickers that survive the
 pre-screen, so a symbol the screen rejects never consumes a slot and every chunked run
 makes real progress.
 
-As-of handling: without an explicit ``--as-of`` the pipeline retargets itself to the
-latest published ``VNINDEX`` session when today's upstream EOD bars have not settled
-yet (a daytime or holiday run), so the quality gate reports data defects instead of an
-upstream timing problem.
+As-of handling: without an explicit ``--as-of`` the pipeline targets the last
+*completed* session — today only after the 15:00 ICT close, otherwise the previous
+trading day — and then rolls back to the latest published ``VNINDEX`` session when
+the upstream EOD bars have not settled yet (a holiday the built-in calendar does not
+know, or a provider that publishes late). Fetch windows never extend past that
+target, so a provisional intraday bar is never stored as a session. The quality gate
+reports data defects instead of an upstream timing problem, and
+``precompute_staleness_tolerance_sessions`` can excuse a known one-session publish
+lag without disabling the check.
 
 The pipeline is pure orchestration over injected :class:`PrecomputeSources`, so tests
 run it against a temporary database and fake sources without touching the network.
@@ -35,15 +40,22 @@ run it against a temporary database and fake sources without touching the networ
 from __future__ import annotations
 
 import logging
+import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from statistics import median
 
 from sqlalchemy.orm import Session, sessionmaker
 
 from core.market_rules import DEFAULT_MARKET_RULES, MarketRules
-from data.calendar import last_trading_day, trading_days_from_dates
+from data.calendar import (
+    last_completed_session,
+    last_trading_day,
+    trading_days_between,
+    trading_days_from_dates,
+    vietnam_today,
+)
 from data.db.base import session_scope
 from data.db.models import utcnow
 from data.db.repositories import SqlIndexRepository
@@ -100,6 +112,15 @@ RATIO_WARNING_LOG_LIMIT = 30
 #: Print a progress line every this many tickers inside the per-ticker loops, so a
 #: GitHub Actions log shows live progress instead of staying silent for hours.
 PROGRESS_LOG_EVERY = 10
+
+#: Cap on the number of pre-screen rejections the price step logs per run; the rest
+#: are summarised in one count, so a 1,000-name universe cannot flood the log.
+PRE_SCREEN_LOG_LIMIT = 30
+
+
+def _utc_now() -> datetime:
+    """Return the current UTC instant (a runner's clock; sessions are Vietnam dates)."""
+    return datetime.now(UTC)
 
 
 @dataclass(frozen=True)
@@ -208,7 +229,7 @@ def recompute_adjustment_flags_offline(
     actions, never the network, so the flags can be refreshed after a policy change
     without re-downloading any price.
     """
-    today = (today_provider or date.today)()
+    today = (today_provider or vietnam_today)()
     target = last_trading_day(today, rules.trading_holidays)
     report = PrecomputeReport(mode="recompute_flags", as_of=target, started_at=utcnow())
     with session_scope(session_factory) as session:
@@ -235,17 +256,23 @@ class V2PrecomputeService:
         session_factory: sessionmaker[Session],
         sources: PrecomputeSources,
         settings: V2DataSettings | None = None,
-        today_provider: Callable[[], date] | None = None,
+        now_provider: Callable[[], datetime] | None = None,
         rules: MarketRules = DEFAULT_MARKET_RULES,
         logger: logging.Logger | None = None,
     ) -> None:
         self._session_factory = session_factory
         self._sources = sources
         self._settings = settings or get_v2_settings()
-        self._today: Callable[[], date] = today_provider or date.today
+        #: The clock the run resolves its Vietnam session with. The runner is UTC, so
+        #: a pre-close run and the nightly 02:13 ICT run resolve different dates.
+        self._now: Callable[[], datetime] = now_provider or _utc_now
         self._rules = rules
         self._log = logger or logging.getLogger("data.v2.precompute")
         self._backfill_start = date.fromisoformat(self._settings.backfill_start_date)
+
+    def _vietnam_today(self) -> date:
+        """Return the current Vietnam calendar date (the runner clock is UTC)."""
+        return vietnam_today(self._now())
 
     @property
     def window(self) -> int:
@@ -261,6 +288,7 @@ class V2PrecomputeService:
         profiles: bool | None = None,
         members: str | None = None,
         as_of: date | None = None,
+        only_unpriced: bool = False,
     ) -> PrecomputeReport:
         """Run every step and return one report.
 
@@ -281,16 +309,22 @@ class V2PrecomputeService:
                 price, profile, liquidity, quality and adjustment-flag steps only
                 process that index's stored members; the master, membership and
                 benchmark steps still cover the full universe.
-            as_of: Explicit dataset as-of date. When omitted, the pipeline starts
-                from today's Vietnam date and falls back to the latest *published*
-                ``VNINDEX`` session if that date has no upstream bar yet (a daytime
-                or holiday run), logging a warning. An explicit date keeps the
-                strict staleness errors, so a genuinely stale dataset still fails.
+            as_of: Explicit dataset as-of date. When omitted, the pipeline targets the
+                last *completed* Vietnam session (today only after the 15:00 ICT
+                close) and then falls back to the latest *published* ``VNINDEX``
+                session if that date has no upstream bar yet (an unknown holiday or a
+                provider that publishes late), logging a warning. An explicit date
+                keeps the strict staleness errors, so a genuinely stale dataset still
+                fails.
+            only_unpriced: Restrict the price step to tickers with no stored bars at
+                all, which is the deterministic way to finish a large backfill in
+                chunks: the priced tickers are never re-fetched, so every ``limit``
+                slot goes to a ticker that still has no data. Combine it with
+                ``profiles`` to also re-check the known-empty symbols.
         """
         if mode not in {"incremental", "full"}:
             raise ValueError("mode must be 'incremental' or 'full'")
-        requested = as_of if as_of is not None else self._today()
-        target = last_trading_day(requested, self._rules.trading_holidays)
+        target = self._resolve_target(as_of)
         fetch_start = start or self._backfill_start
         force_profiles = profiles if profiles is not None else (mode == "full" and limit is None)
         report = PrecomputeReport(mode=mode, as_of=target, started_at=utcnow())
@@ -320,6 +354,7 @@ class V2PrecomputeService:
                 limit=limit,
                 universe=universe,
                 refresh_profiles=force_profiles,
+                only_unpriced=only_unpriced,
             )
         )
         report.steps.append(
@@ -364,17 +399,35 @@ class V2PrecomputeService:
         with session_scope(self._session_factory) as session:
             return V2Store(session).list_ticker_master()
 
+    def _resolve_target(self, as_of: date | None) -> date:
+        """Return the session this run targets, before any benchmark settlement.
+
+        An explicit ``as_of`` is only rolled back over weekends and the known
+        holidays, so a caller asking for a real defect still gets the strict quality
+        errors. An automatic run instead targets the last *completed* session: before
+        the 15:00 ICT close no official close exists yet, and a market holiday has no
+        session at all, so a pre-close or holiday dispatch would otherwise ask for a
+        bar that cannot exist and fail the gate with a false ``stale dataset``.
+        """
+        if as_of is not None:
+            return last_trading_day(as_of, self._rules.trading_holidays)
+        return last_completed_session(
+            self._now(),
+            holidays=self._rules.trading_holidays,
+            session_close=self._rules.session_close,
+        )
+
     def _settle_target(self, target: date) -> date:
         """Return the last session the upstream benchmark has actually published.
 
-        The post-close and nightly crons run after the close, when the session's EOD
-        bars exist. A manual daytime dispatch or a market holiday leaves the stored
-        ``VNINDEX`` series at the previous session, and treating that as a defect
-        would fail the run with ``quality: stale benchmark`` / ``quality: stale
-        dataset`` for what is only an upstream timing problem. An automatic run
-        therefore retargets itself to the latest published benchmark session and
-        warns; an explicit ``--as-of`` never takes this path, so the strict errors
-        still catch a genuinely stale dataset.
+        ``target`` is already the last *completed* session (see ``_resolve_target``),
+        so a benchmark that is still behind it means the upstream feed published
+        nothing for that session: a holiday the built-in calendar does not know, or a
+        provider that is late. Treating that as a defect would fail the run with
+        ``quality: stale benchmark`` / ``quality: stale dataset`` for what is only an
+        upstream timing problem, so an automatic run retargets itself to the latest
+        published benchmark session and warns. An explicit ``--as-of`` never takes
+        this path, so the strict errors still catch a genuinely stale dataset.
         """
         with session_scope(self._session_factory) as session:
             latest = SqlIndexRepository(session).latest_date("VNINDEX")
@@ -445,6 +498,14 @@ class V2PrecomputeService:
 
     # -- step 3: benchmarks ------------------------------------------------
     def _sync_benchmarks(self, target: date, *, mode: str, start: date) -> StepResult:
+        """Fetch the index series up to ``target`` and never past it.
+
+        ``target`` is the last settled session, so clamping the request to it keeps a
+        provisional intraday index bar (which the upstream publishes during the
+        session) out of ``indices_daily``; a stored provisional bar would otherwise
+        make the benchmark look fresher than every stock bar and break the as-of
+        settlement.
+        """
         processed = 0
         failures = 0
         for code in V2_BENCHMARKS:
@@ -455,10 +516,10 @@ class V2PrecomputeService:
             fetch_start = start if (mode == "full" or latest is None) else latest + timedelta(
                 days=1
             )
-            if fetch_start > self._today():
+            if fetch_start > target:
                 continue
             try:
-                bars = self._sources.index_bars(code, fetch_start, self._today())
+                bars = self._sources.index_bars(code, fetch_start, target)
             except EmptyResultError:
                 continue
             except DataError as exc:
@@ -500,12 +561,16 @@ class V2PrecomputeService:
         limit: int | None,
         universe: Sequence[TickerRecord] | None = None,
         refresh_profiles: bool = False,
+        only_unpriced: bool = False,
     ) -> StepResult:
         """Fetch and store adjusted daily bars, resumably and incrementally.
 
         ``refresh_profiles`` mirrors the forced ``--profiles`` refresh: it keeps the
         known-empty tickers in the candidate set, so a periodic full refresh can
-        re-check a symbol that stopped trading.
+        re-check a symbol that stopped trading. ``only_unpriced`` additionally drops
+        every ticker that already has a bar, so a chunked backfill can finish the
+        unpriced tail without re-fetching the priced names (combine it with
+        ``--profiles`` to re-check the known-empty ones as well).
 
         Candidates are ordered tracked-first, then unpriced index members, then the
         remaining unpriced names, and ``limit`` is spent only on tickers that pass
@@ -528,7 +593,13 @@ class V2PrecomputeService:
         # The pre-screen runs while the limit is spent, so a rejected symbol never
         # consumes a slot; an incremental (or chunked full) run keeps only the
         # tickers whose stored prices are not current.
-        tickers = self._select_candidates(ordered, target=target, mode=mode, limit=limit)
+        tickers = self._select_candidates(
+            ordered,
+            target=target,
+            mode=mode,
+            limit=limit,
+            only_unpriced=only_unpriced,
+        )
         total = len(tickers)
         processed = 0
         fetched = 0
@@ -558,7 +629,9 @@ class V2PrecomputeService:
 
         An up-to-date or empty ticker returns ``(0, False)``; a provider failure is
         recorded in ``v2_progress`` and reported as ``(0, True)`` so the caller can
-        fail the step without losing the other tickers.
+        fail the step without losing the other tickers. Every request ends at
+        ``target`` (the last settled session), so a provisional intraday bar is never
+        stored as a finished session.
         """
         with session_scope(self._session_factory) as session:
             latest = V2Store(session).latest_price_date(ticker)
@@ -578,10 +651,10 @@ class V2PrecomputeService:
                 latest - timedelta(days=2 * self._settings.precompute_rebase_overlap_sessions),
             )
             overlap_end = latest
-        if fetch_start > self._today():
+        if fetch_start > target:
             return 0, False
         try:
-            bars = self._sources.stock_bars(ticker, fetch_start, self._today())
+            bars = self._sources.stock_bars(ticker, fetch_start, target)
         except EmptyResultError:
             self._record_progress(ticker, "prices", "done", last_date=latest)
             return 0, False
@@ -596,7 +669,7 @@ class V2PrecomputeService:
                 # The stored tail disagrees with the fresh adjusted closes: SSI
                 # re-based history, so replace the whole series in this run.
                 try:
-                    bars = self._sources.stock_bars(ticker, start, self._today())
+                    bars = self._sources.stock_bars(ticker, start, target)
                 except DataError as exc:
                     self._record_progress(
                         ticker,
@@ -703,31 +776,56 @@ class V2PrecomputeService:
         return tracked + indexed + rest
 
     def _select_candidates(
-        self, ordered: Sequence[str], *, target: date, mode: str, limit: int | None
+        self,
+        ordered: Sequence[str],
+        *,
+        target: date,
+        mode: str,
+        limit: int | None,
+        only_unpriced: bool = False,
     ) -> list[str]:
         """Return the tickers to backfill, in priority order, capped at ``limit``.
 
-        An incremental run, and a chunked ``--full --limit`` run, keeps only the
-        tickers whose stored prices are not current, so repeated runs walk the
-        universe instead of re-processing the finished names (and a same-day run
-        has nothing to do). The pre-screen then runs while the budget is spent, so
-        a symbol it rejects costs no ``--limit`` slot and every limited run makes
-        real backfill progress.
+        An incremental run, a chunked ``--full --limit`` run and an ``--unpriced`` run
+        keep only the tickers whose stored prices are not current, so repeated runs
+        walk the universe instead of re-processing the finished names (and a same-day
+        run has nothing to do); ``only_unpriced`` drops every ticker that already has
+        a bar, whatever its date. The pre-screen then runs while the budget is spent,
+        so a symbol it rejects costs no ``--limit`` slot and every limited run makes
+        real backfill progress; the rejections are logged once per run, so an unpriced
+        ticker can be explained instead of silently disappearing from every run.
         """
         selected: list[str] = []
         if limit is not None and limit <= 0:
             return selected
-        check_pending = mode == "incremental" or limit is not None
+        check_pending = mode == "incremental" or limit is not None or only_unpriced
+        rejected: list[str] = []
         for ticker in ordered:
             if limit is not None and len(selected) >= limit:
                 break
+            latest: date | None = None
             if check_pending:
                 with session_scope(self._session_factory) as session:
                     latest = V2Store(session).latest_price_date(ticker)
                 if latest is not None and latest >= target:
                     continue
+            if only_unpriced and latest is not None:
+                continue
             if self._passes_pre_screen(ticker):
                 selected.append(ticker)
+            else:
+                rejected.append(ticker)
+        if rejected:
+            listed = ", ".join(rejected[:PRE_SCREEN_LOG_LIMIT])
+            more = "" if len(rejected) <= PRE_SCREEN_LOG_LIMIT else ", ..."
+            self._log.info(
+                "prices: pre-screen rejected %d candidate(s) (median volume below %d "
+                "shares): %s%s",
+                len(rejected),
+                self._settings.precompute_pre_screen_min_median_volume,
+                listed,
+                more,
+            )
         return selected
 
     def _passes_pre_screen(self, ticker: str) -> bool:
@@ -737,17 +835,20 @@ class V2PrecomputeService:
         ticker only when its recent median volume is below the (low, 10k-share
         default) ``precompute_pre_screen_min_median_volume`` so the priced universe
         stays affordable. It is not a tradability/liquidity rule, and setting the
-        threshold to 0 disables it, so "All Stocks" is not silently filtered. A
-        transient screening failure keeps the ticker.
+        threshold to 0 (or ``..._PRE_SCREEN_ENABLED=false``) disables it, so "All
+        Stocks" is not silently filtered — run one backfill chunk with the pre-screen
+        off to price the illiquid tail. A transient screening failure keeps the
+        ticker.
         """
         if not self._settings.precompute_pre_screen_enabled:
             return True
         threshold = self._settings.precompute_pre_screen_min_median_volume
         if threshold <= 0:
             return True
-        start = self._today() - timedelta(days=self._settings.precompute_pre_screen_days)
+        today = self._vietnam_today()
+        start = today - timedelta(days=self._settings.precompute_pre_screen_days)
         try:
-            bars = self._sources.screen_bars(ticker, start, self._today())
+            bars = self._sources.screen_bars(ticker, start, today)
         except EmptyResultError:
             return False  # no recent prints: illiquid, skip the SSI calls
         except DataError:
@@ -1097,6 +1198,25 @@ class V2PrecomputeService:
         )
 
     # -- step 7: loud quality checks ---------------------------------------
+    def _sessions_behind(self, latest: date | None, target: date) -> int:
+        """Return how many trading sessions ``latest`` lags ``target`` (0 = current).
+
+        An absent series reports :data:`sys.maxsize`, so a configured tolerance can
+        never excuse a dataset or benchmark that has no bars at all. The count uses
+        the market calendar (weekends plus ``rules.trading_holidays``); an unknown
+        holiday is already absorbed by ``_settle_target``, which moves the target back
+        to the last session the benchmark published.
+        """
+        if latest is None:
+            return sys.maxsize
+        if latest >= target:
+            return 0
+        return len(
+            trading_days_between(
+                latest + timedelta(days=1), target, self._rules.trading_holidays
+            )
+        )
+
     def _run_quality(
         self, target: date, *, universe: Sequence[TickerRecord] | None = None
     ) -> tuple[StepResult, int]:
@@ -1104,11 +1224,12 @@ class V2PrecomputeService:
 
         Integrity errors are dataset-level and hard: an empty benchmark calendar
         (missing benchmark), a benchmark or overall price series older than ``target``
-        (stale latest date), a universe member with no stored bars (no data), a
-        duplicate date, and any schema error surfaced by a check. Per-ticker
-        data-quality findings (missing days, zero-volume runs, suspicious moves,
-        adjusted-vs-raw mismatch) are warnings: they are logged and stored as adjustment
-        flags but never fail the step.
+        by more than ``precompute_staleness_tolerance_sessions`` (stale latest date), a
+        universe member with no stored bars (no data), a duplicate date, and any
+        schema error surfaced by a check. Per-ticker data-quality findings (missing
+        days, zero-volume runs, suspicious moves, adjusted-vs-raw mismatch) are
+        warnings: they are logged and stored as adjustment flags but never fail the
+        step.
         """
         with session_scope(self._session_factory) as session:
             store = V2Store(session)
@@ -1118,23 +1239,42 @@ class V2PrecomputeService:
             trading_days = trading_days_from_dates(store.list_index_dates("VNINDEX"))
             benchmark_latest = SqlIndexRepository(session).latest_date("VNINDEX")
             overall_latest = store.overall_latest_price_date()
+        tolerance = max(0, self._settings.precompute_staleness_tolerance_sessions)
         errors = 0
+        benchmark_lag = self._sessions_behind(benchmark_latest, target)
         if not trading_days:
             self._log.error("quality: benchmark VNINDEX has no stored trading days")
             errors += 1
-        elif benchmark_latest is None or benchmark_latest < target:
+        elif benchmark_lag > tolerance:
             errors += 1
             self._log.error(
                 "quality: stale benchmark, latest VNINDEX bar %s (target %s)",
                 benchmark_latest.isoformat() if benchmark_latest else "none",
                 target.isoformat(),
             )
-        if master and (overall_latest is None or overall_latest < target):
+        elif benchmark_lag:
+            self._log.warning(
+                "quality: benchmark is %d session(s) behind %s (within the %d-session "
+                "tolerance)",
+                benchmark_lag,
+                target.isoformat(),
+                tolerance,
+            )
+        dataset_lag = self._sessions_behind(overall_latest, target)
+        if master and dataset_lag > tolerance:
             errors += 1
             self._log.error(
                 "quality: stale dataset, latest price bar %s (target %s)",
                 overall_latest.isoformat() if overall_latest else "none",
                 target.isoformat(),
+            )
+        elif master and dataset_lag:
+            self._log.warning(
+                "quality: dataset is %d session(s) behind %s (within the %d-session "
+                "tolerance)",
+                dataset_lag,
+                target.isoformat(),
+                tolerance,
             )
         checked = 0
         for record in master:
@@ -1210,6 +1350,7 @@ class V2PrecomputeService:
 
 
 __all__ = [
+    "PRE_SCREEN_LOG_LIMIT",
     "PROGRESS_LOG_EVERY",
     "RATIO_WARNING_LOG_LIMIT",
     "V2_BENCHMARKS",

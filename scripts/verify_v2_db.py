@@ -117,6 +117,13 @@ def main() -> int:
                     " WHERE state <> 'done' ORDER BY kind, symbol"
                 )
             ).all()
+            master_count = int(session.scalar(text("SELECT COUNT(*) FROM v2_ticker_master")) or 0)
+            price_progress = session.execute(
+                text(
+                    "SELECT state, COUNT(*) AS n FROM v2_progress"
+                    " WHERE kind = 'prices' GROUP BY state ORDER BY state"
+                )
+            ).all()
             row_counts = session.execute(
                 text(
                     " UNION ALL ".join(
@@ -144,6 +151,19 @@ def main() -> int:
         for table, count in row_counts:
             print(f"  {table:<24} {count}")
         print(f"tickers with prices       : {priced}")
+        unpriced = max(0, master_count - priced)
+        print(f"tickers without prices    : {unpriced} (of {master_count} in the master)")
+        print(
+            "price progress states     : "
+            + (", ".join(f"{state}={count}" for state, count in price_progress) or "(none)")
+        )
+        if unpriced:
+            print(
+                "backfill hint             : dispatch precompute_v2 with mode=full, "
+                "limit=150, unpriced=true; set "
+                "VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME=0 to include the "
+                "illiquid tail"
+            )
         print(f"VN100 members with prices : {vn100_priced}")
         print(f"sector coverage           : {coverage.covered} covered, {coverage.missing} missing")
         print(f"market-cap coverage       : {market_caps} (of {priced} priced tickers)")
