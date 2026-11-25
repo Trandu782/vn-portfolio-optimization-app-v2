@@ -108,18 +108,26 @@ def _configure_logging() -> None:
 
     Without this the root logger defaults to ``WARNING``, which silently drops the
     operator messages the pipeline emits at ``INFO`` (ticker-master exclusions, re-base
-    refreshes, the number of ratio warnings). ``VNOPT_LOG_LEVEL`` overrides the level;
-    the default is ``INFO``, which the precompute path can afford because it never uses
-    the failover runner's per-request ``INFO`` lines.
+    refreshes, pre-screen rejections). ``VNOPT_LOG_LEVEL`` overrides the level of our
+    own ``data`` loggers (default ``INFO``); the root stays at ``WARNING`` and the HTTP
+    clients are kept at ``WARNING`` too, because ``httpx`` logs one line per request and
+    a backfill makes thousands of them.
     """
     raw = os.environ.get("VNOPT_LOG_LEVEL", "INFO").upper()
     level = getattr(logging, raw, None)
+    level = level if isinstance(level, int) else logging.INFO
     logging.basicConfig(
-        level=level if isinstance(level, int) else logging.INFO,
+        level=logging.WARNING,
         format="%(levelname)s %(name)s: %(message)s",
         stream=sys.stdout,
         force=True,
     )
+    # Ours: the operator-facing diagnostics.
+    logging.getLogger("data").setLevel(level)
+    # Third-party request/connection logging: only per-request noise, keep it quiet
+    # unless the caller explicitly asks for DEBUG.
+    for name in ("httpx", "httpcore", "urllib3", "asyncio"):
+        logging.getLogger(name).setLevel(level if level < logging.INFO else logging.WARNING)
 
 
 def _print_report(report: PrecomputeReport) -> None:
