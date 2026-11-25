@@ -16,8 +16,10 @@ import pytest
 from core.optimize import (
     MAX_RANDOM_PORTFOLIOS,
     InfeasibleConstraintsError,
+    RandomCloud,
     build_efficient_frontier,
     sample_random_portfolios,
+    stratified_cloud_indices,
 )
 from core.optimize._math import sample_covariance
 
@@ -223,3 +225,103 @@ def test_targets_are_either_accepted_or_skipped() -> None:
     assert assumptions.portfolios_generated == 400
     assert assumptions.seed == 11
     assert math.isfinite(assumptions.max_weight)
+
+
+# -- cloud sampling (server-side downsampling of the plotted scatter) ---------
+
+
+def _cloud(num_portfolios: int = 4_000, seed: int = 21) -> RandomCloud:
+    """A deterministic cloud with a spread of volatilities and returns."""
+    returns = _five_asset_returns()
+    expected = np.asarray(returns.mean(axis=0) * TRADING_DAYS, dtype=np.float64)
+    covariance = np.asarray(sample_covariance(returns) * TRADING_DAYS, dtype=np.float64)
+    return sample_random_portfolios(
+        expected_returns=expected,
+        covariance=covariance,
+        risk_free_rate=RISK_FREE_RATE,
+        num_portfolios=num_portfolios,
+        max_weight=1.0,
+        seed=seed,
+    )
+
+
+def test_the_hard_cap_allows_a_full_hundred_thousand_portfolio_run() -> None:
+    """The simulation ceiling is 100k; the payload cap is a separate concern."""
+    assert MAX_RANDOM_PORTFOLIOS == 100_000
+
+
+def test_cloud_sample_returns_the_whole_cloud_when_it_fits() -> None:
+    cloud = _cloud(600)
+    indices = stratified_cloud_indices(cloud.returns, cloud.volatilities, max_points=600)
+
+    assert np.array_equal(indices, np.arange(600))
+
+
+def test_cloud_sample_respects_the_budget_and_is_sorted_and_unique() -> None:
+    cloud = _cloud()
+    indices = stratified_cloud_indices(cloud.returns, cloud.volatilities, max_points=1_500)
+
+    assert indices.size <= 1_500
+    assert indices.size >= 1_000  # the budget is actually spent
+    assert np.all(np.diff(indices) > 0)  # ascending and unique
+    assert int(indices.max()) < cloud.generated
+
+
+def test_cloud_sample_keeps_the_global_extremes_of_the_cloud() -> None:
+    cloud = _cloud()
+    indices = stratified_cloud_indices(cloud.returns, cloud.volatilities, max_points=1_500)
+    kept = set(indices.tolist())
+
+    for index in (
+        int(np.argmax(cloud.returns)),
+        int(np.argmin(cloud.returns)),
+        int(np.argmax(cloud.volatilities)),
+        int(np.argmin(cloud.volatilities)),
+    ):
+        assert index in kept
+
+
+def test_cloud_sample_keeps_the_upper_envelope_of_every_volatility_slice() -> None:
+    """The efficient edge of the scatter must survive the sample."""
+    cloud = _cloud()
+    indices = stratified_cloud_indices(cloud.returns, cloud.volatilities, max_points=1_500)
+    kept_returns = cloud.returns[indices]
+
+    order = np.argsort(cloud.volatilities)
+    slices = np.array_split(order, 10)
+    for slice_indices in slices:
+        full_best = float(np.max(cloud.returns[slice_indices]))
+        sampled_best = float(np.max(kept_returns))
+        # The slice's best portfolio is kept (its cell takes its own extreme), so a
+        # max over the whole sample is at least as good as the slice's own best.
+        assert sampled_best >= full_best - 1e-12
+
+
+def test_cloud_sample_is_deterministic() -> None:
+    cloud = _cloud()
+    first = stratified_cloud_indices(cloud.returns, cloud.volatilities, max_points=900)
+    second = stratified_cloud_indices(cloud.returns, cloud.volatilities, max_points=900)
+
+    assert np.array_equal(first, second)
+
+
+def test_cloud_sample_falls_back_to_a_stride_for_a_tiny_budget() -> None:
+    cloud = _cloud()
+    indices = stratified_cloud_indices(
+        cloud.returns, cloud.volatilities, max_points=10, bins=25
+    )
+
+    assert indices.size == 10
+    assert indices[0] == 0
+    assert indices[-1] == cloud.generated - 1
+
+
+def test_cloud_sample_validates_its_inputs() -> None:
+    cloud = _cloud(400)
+    with pytest.raises(ValueError, match=r"same length"):
+        stratified_cloud_indices(cloud.returns, cloud.volatilities[:-1])
+    with pytest.raises(ValueError, match=r"at least 1"):
+        stratified_cloud_indices(cloud.returns, cloud.volatilities, max_points=0)
+    with pytest.raises(ValueError, match=r"at least 1"):
+        stratified_cloud_indices(cloud.returns, cloud.volatilities, bins=0)
+

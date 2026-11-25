@@ -145,6 +145,7 @@ export function OptimizeBuilder() {
   const [benchmark, setBenchmark] = useState("");
   const [varConfidence, setVarConfidence] = useState(95);
   const [numPortfolios, setNumPortfolios] = useState(5000);
+  const [maxPortfolios, setMaxPortfolios] = useState<number | null>(null);
   const [seed, setSeed] = useState("");
   const [maxSectorPct, setMaxSectorPct] = useState("");
   const [maxStocks, setMaxStocks] = useState(HARD_MAX_STOCKS);
@@ -196,6 +197,10 @@ export function OptimizeBuilder() {
         setLatestDate(freshness.latest_date);
         if (optimizePayload.frontier_defaults.max_stocks) {
           setMaxStocks(optimizePayload.frontier_defaults.max_stocks);
+        }
+        // The cloud cap is published by the API so the input never hardcodes it.
+        if (optimizePayload.frontier_defaults.max_portfolios) {
+          setMaxPortfolios(optimizePayload.frontier_defaults.max_portfolios);
         }
       })
       .catch(function () {
@@ -481,7 +486,14 @@ export function OptimizeBuilder() {
             </label>
             <label className="block text-sm">
               <span className="block font-medium">Number of random portfolios</span>
-              <input type="number" min={1} max={20000} value={numPortfolios} onChange={(event) => setNumPortfolios(Number(event.target.value))} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900" />
+              <input type="number" min={1} max={maxPortfolios ?? undefined} value={numPortfolios} onChange={(event) => setNumPortfolios(Number(event.target.value))} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900" />
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                {maxPortfolios
+                  ? `Up to ${maxPortfolios.toLocaleString()}. `
+                  : ""}
+                The statistics use every portfolio; the chart plots a sampled subset of
+                them.
+              </span>
             </label>
             <label className="block text-sm">
               <span className="block font-medium">Seed</span>
@@ -507,9 +519,9 @@ export function OptimizeBuilder() {
       </div>
 
       <p className="rounded-md bg-gray-50 p-2 text-xs text-gray-600 dark:bg-gray-900 dark:text-gray-300">
-        Price source: the optimizer currently uses V1 provider prices (raw, unadjusted). V2
-        adjusted prices drive the sector filter only; feeding them to the optimizer is a planned
-        follow-up.
+        Price source: the optimizer, P&amp;L and risk pages read the V2 precomputed dataset
+        (adjusted closes for returns, raw closes for share sizing). A ticker whose V2 history is
+        missing or stale is reported explicitly instead of being valued from an older V1 series.
       </p>
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}

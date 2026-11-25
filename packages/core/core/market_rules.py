@@ -44,7 +44,11 @@ class MarketRules:
 
 
 # Illustrative Vietnamese public holidays on which HOSE/HNX/UPCoM are closed.
-# Not consumed by V1 features; replace with the official exchange calendar.
+# Kept in sync with the observed exchange calendar: a date that really traded must
+# never be listed here (it would hide a genuinely stale price series). The fixed
+# solar-calendar holidays are always correct; Tet and ad-hoc closures are added as
+# they are confirmed. ``2026-11-24`` is a confirmed non-trading holiday, so the
+# freshness checks expect ``2026-11-25`` as the next valid session.
 _TRADING_HOLIDAYS: frozenset[date] = frozenset(
     {
         date(2025, 1, 1),  # New Year's Day
@@ -57,6 +61,11 @@ _TRADING_HOLIDAYS: frozenset[date] = frozenset(
         date(2025, 4, 30),  # Reunification Day
         date(2025, 5, 1),  # International Labour Day
         date(2025, 9, 2),  # National Day
+        date(2026, 1, 1),  # New Year's Day
+        date(2026, 4, 30),  # Reunification Day
+        date(2026, 5, 1),  # International Labour Day
+        date(2026, 9, 2),  # National Day
+        date(2026, 11, 24),  # Confirmed market holiday (Tue); 2026-11-25 is a session
     }
 )
 

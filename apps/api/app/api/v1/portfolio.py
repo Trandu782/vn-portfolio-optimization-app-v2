@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from app.api.v1.data import get_data_service
-from app.api.v1.universe import _looks_suspended
+from app.api.v1.universe import _has_stale_bars
 from core.portfolio import (
     Holding,
     Portfolio,
@@ -159,7 +159,8 @@ def _holding_warnings(
 
     ``series.warnings`` already carries the "queued for next sync" and "stale"
     messages produced by the data layer; this adds a per-holding missing-price,
-    trailing-bar, suspended and illiquid flags.
+    trailing-bar (stale) and illiquid flag. A trailing bar is reported as stale, never
+    as a suspension: a real suspension comes from authoritative exchange metadata.
     """
     warnings = list(series.warnings)
     if not rows:
@@ -168,10 +169,10 @@ def _holding_warnings(
     latest_date = max(row.date for row in rows)
     if global_latest is not None and latest_date < global_latest:
         warnings.append(f"stale ({latest_date.isoformat()}): bar is behind the latest session")
-    if _looks_suspended(rows, today):
+    if _has_stale_bars(rows, today):
         warnings.append(
-            "suspended or halted: no price bar for the most recent trading "
-            "session (may be a suspension, a long halt or pending data)"
+            "stale price data: no price bar for the most recent trading session "
+            "(the latest bar trails the market; a V1/V2 backfill may be incomplete)"
         )
     adv = average_daily_value(_to_daily_bars(rows), _ILLIQUIDITY_SESSIONS)
     if adv <= 0.0:

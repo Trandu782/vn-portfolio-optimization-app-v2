@@ -38,6 +38,12 @@ Deployment prerequisite.txt
 # Local scratch notes that must not ship.
 V2 update.txt
 
+# Downloaded `precompute-report` CI artifacts (precompute_report.txt /
+# verify_report.txt) kept for comparison; never committed.
+precompute-report*/
+precompute_report.txt
+verify_report.txt
+
 # Vercel
 .vercel
 

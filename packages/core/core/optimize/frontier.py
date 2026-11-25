@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy.optimize import minimize
 
 from core.optimize.interfaces import (
@@ -47,9 +48,17 @@ from core.optimize.sector_caps import (
 #: Default number of random portfolios drawn for the cloud.
 DEFAULT_RANDOM_PORTFOLIOS = 5_000
 #: Hard ceiling on the random cloud (configurable through ``Settings``).
-MAX_RANDOM_PORTFOLIOS = 20_000
+#: The engine runs the whole simulation; the API plots a stratified sample of it
+#: (see :func:`stratified_cloud_indices`), so a larger run costs compute, not
+#: payload size.
+MAX_RANDOM_PORTFOLIOS = 100_000
 #: Number of target returns swept for the exact frontier.
 DEFAULT_FRONTIER_POINTS = 40
+#: Default number of cloud points an API payload carries. ``Settings
+#: .frontier_cloud_points`` (env ``VNOPT_FRONTIER_CLOUD_POINTS``) overrides it.
+DEFAULT_CLOUD_SAMPLE_POINTS = 6_000
+#: Quantile bins per axis used when stratifying the cloud sample.
+CLOUD_SAMPLE_BINS = 25
 #: Rejection-sampling batch size when capping the Dirichlet draws.
 _BATCH_SIZE = 1_024
 #: Numerical slack used when comparing volatilities along the frontier.
@@ -400,6 +409,135 @@ def sample_random_portfolios(
     )
 
 
+# -- cloud sampling ----------------------------------------------------------
+
+
+def _bin_cells(values: Vector, bins: int) -> NDArray[np.intp]:
+    """Return the quantile-bin index of every value (``0 .. bins-1``).
+
+    The edges come from ``values`` itself, so each bin holds roughly the same
+    number of points and a dense region is not overweighted merely because it has
+    more draws. Repeated values can collapse an edge, which leaves a bin empty; an
+    empty bin simply contributes no points.
+    """
+    edges = np.quantile(values, np.linspace(0.0, 1.0, bins + 1)[1:-1])
+    return np.searchsorted(edges, values, side="right").astype(np.intp)
+
+
+def _largest_remainder(counts: NDArray[np.intp], budget: int) -> NDArray[np.intp]:
+    """Split ``budget`` over ``counts`` proportionally, largest remainder first.
+
+    Proportional allocation alone leaves rounding residue, so the cells with the
+    largest fractional share take the remaining points; ties stay in cell order so
+    the result is deterministic.
+    """
+    total = int(counts.sum())
+    if budget <= 0 or total == 0:
+        return np.zeros(counts.size, dtype=np.intp)
+    share = counts.astype(np.float64) * (budget / float(total))
+    quota = np.floor(share).astype(np.intp)
+    leftover = int(budget - int(quota.sum()))
+    if leftover > 0:
+        by_remainder = np.argsort(-(share - quota), kind="stable")
+        quota[by_remainder[:leftover]] += 1
+    return quota
+
+
+def stratified_cloud_indices(
+    returns: Vector,
+    volatilities: Vector,
+    *,
+    max_points: int = DEFAULT_CLOUD_SAMPLE_POINTS,
+    bins: int = CLOUD_SAMPLE_BINS,
+) -> NDArray[np.intp]:
+    """Return the indices of a stratified subsample of the random cloud.
+
+    A 100,000-portfolio cloud is worth running for the statistics but not worth
+    sending to a browser, so the API plots a sample of it. The sample is drawn on a
+    quantile grid over (volatility, return), which keeps the two visual properties
+    of the cloud:
+
+    * **the hull** — every occupied cell contributes its lowest- and
+      highest-return point and the four global extremes are always kept, so the
+      upper-left envelope (the efficient edge) and the outer boundary survive;
+    * **the density** — the remaining budget is spread over the cells in
+      proportion to how many portfolios each holds, taking evenly spaced members
+      inside a cell, so a dense region still looks dense.
+
+    This is presentation only: the statistics (counts, Sharpe, the frontier and
+    the marked portfolios) are computed from the full simulation and are never
+    affected by the sample.
+
+    Args:
+        returns: The cloud's expected returns (annualized).
+        volatilities: The cloud's volatilities (annualized), same length.
+        max_points: Budget for the plotted sample (at least 1). A cloud that
+            already fits is returned whole.
+        bins: Quantile bins per axis (at least 1).
+
+    Returns:
+        Ascending, unique indices into the cloud arrays, at most ``max_points`` of
+        them. Deterministic: the same cloud and budget always give the same sample.
+
+    Raises:
+        ValueError: When the two vectors differ in length, or a count is out of
+            range.
+    """
+    if returns.shape != volatilities.shape:
+        raise ValueError("returns and volatilities must have the same length")
+    if max_points < 1:
+        raise ValueError("max_points must be at least 1")
+    if bins < 1:
+        raise ValueError("bins must be at least 1")
+    count = int(returns.size)
+    if count <= max_points:
+        return np.arange(count, dtype=np.intp)
+
+    cells = _bin_cells(volatilities, bins) * bins + _bin_cells(returns, bins)
+    order = np.argsort(cells, kind="stable")
+    boundaries = np.flatnonzero(np.diff(cells[order])) + 1
+    starts = np.concatenate(([0], boundaries))
+    stops = np.concatenate((boundaries, [count]))
+
+    chosen = np.zeros(count, dtype=bool)
+    # 1. The hull: each cell's lowest and highest return, plus the global extremes.
+    for start, stop in zip(starts, stops, strict=True):
+        members = order[start:stop]
+        cell_returns = returns[members]
+        chosen[members[int(np.argmin(cell_returns))]] = True
+        chosen[members[int(np.argmax(cell_returns))]] = True
+    chosen[int(np.argmin(returns))] = True
+    chosen[int(np.argmax(returns))] = True
+    chosen[int(np.argmin(volatilities))] = True
+    chosen[int(np.argmax(volatilities))] = True
+    hull = int(chosen.sum())
+    if hull >= max_points:
+        # Too small a budget to carry the hull: a plain stride keeps the payload
+        # bounded and still spans the whole cloud.
+        return np.unique(np.linspace(0, count - 1, max_points).round().astype(np.intp))
+
+    # 2. The density: spend the rest over the cells in proportion to their size.
+    quotas = _largest_remainder((stops - starts).astype(np.intp), max_points - hull)
+    for index, (start, stop) in enumerate(zip(starts, stops, strict=True)):
+        members = order[start:stop]
+        take = int(min(int(quotas[index]), members.size))
+        if take <= 0:
+            continue
+        # Evenly spaced in return order so the cell's interior is covered instead
+        # of one corner of it.
+        by_return = members[np.argsort(returns[members], kind="stable")]
+        picks = np.linspace(0, by_return.size - 1, take).round().astype(np.intp)
+        chosen[by_return[np.unique(picks)]] = True
+
+    # 3. Hull points already spent part of a cell's quota: fill the remainder.
+    missing = max_points - int(chosen.sum())
+    if missing > 0:
+        spare = np.flatnonzero(~chosen)
+        picks = np.linspace(0, spare.size - 1, missing).round().astype(np.intp)
+        chosen[spare[np.unique(picks)]] = True
+    return np.flatnonzero(chosen)
+
+
 # -- frontier ----------------------------------------------------------------
 
 
@@ -585,6 +723,8 @@ def build_efficient_frontier(
 
 
 __all__ = [
+    "CLOUD_SAMPLE_BINS",
+    "DEFAULT_CLOUD_SAMPLE_POINTS",
     "DEFAULT_FRONTIER_POINTS",
     "DEFAULT_RANDOM_PORTFOLIOS",
     "MAX_RANDOM_PORTFOLIOS",
@@ -594,4 +734,5 @@ __all__ = [
     "RandomCloud",
     "build_efficient_frontier",
     "sample_random_portfolios",
+    "stratified_cloud_indices",
 ]

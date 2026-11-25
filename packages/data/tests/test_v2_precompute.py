@@ -1105,3 +1105,92 @@ def test_unpriced_run_finishes_the_tail_without_refetching_priced_tickers(
         assert store.latest_price_date("XYZ") is None
 
 
+
+
+def test_upsert_prices_collapses_duplicate_dates(
+    factory: sessionmaker[Session],
+) -> None:
+    """A repeated ``(symbol, date)`` in one batch must not raise CardinalityViolation.
+
+    ``ON CONFLICT DO UPDATE`` cannot name the same row twice in one statement, so the
+    store must collapse duplicate conflict keys before the upsert: one row survives and
+    the last value wins.
+    """
+    day = date(2025, 11, 25)
+    with session_scope(factory) as session:
+        store = V2Store(session)
+        written = store.upsert_prices(
+            "VHM",
+            [
+                AdjustedOHLCV(
+                    date=day,
+                    open=100.0,
+                    high=100.0,
+                    low=100.0,
+                    close=100.0,
+                    close_raw=100.0,
+                    volume=1_000,
+                    source="ssi_statistics",
+                ),
+                # The same (symbol, date): a provider duplicated the row.
+                AdjustedOHLCV(
+                    date=day,
+                    open=101.0,
+                    high=101.0,
+                    low=101.0,
+                    close=101.0,
+                    close_raw=101.0,
+                    volume=2_000,
+                    source="ssi_statistics",
+                ),
+            ],
+            price_adjustment_basis="ssi_adjusted",
+            data_as_of=day,
+        )
+        bars = store.get_prices("VHM")
+    assert written == 1
+    assert len(bars) == 1
+    assert bars[0].close == pytest.approx(101.0)  # the last copy wins
+
+
+def test_price_upsert_failure_is_contained_to_one_ticker(
+    factory: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A DB error on one ticker is recorded and never aborts the remaining tickers.
+
+    Background: an undeduplicated batch raised ``CardinalityViolation`` inside
+    ``upsert_prices`` and aborted the whole ``_backfill_prices`` loop, leaving every
+    later ticker un-updated. The per-ticker guard records the failure and continues.
+    """
+    fake = _fake()
+    clock = _Clock(AS_OF)
+    service = _service(factory, fake.to_sources(), clock)
+    tickers = [
+        TickerRecord(ticker=code, exchange="HOSE", source="test", data_as_of=AS_OF)
+        for code in ("VCB", "FPT", "XYZ")
+    ]
+    original = V2Store.upsert_prices
+
+    def flaky(self, symbol, bars, **kwargs):
+        if symbol.upper() == "FPT":
+            raise RuntimeError("simulated batch upsert failure")
+        return original(self, symbol, bars, **kwargs)
+
+    monkeypatch.setattr(V2Store, "upsert_prices", flaky)
+
+    step = service._backfill_prices(
+        AS_OF, mode="full", start=START, limit=None, universe=tickers
+    )
+
+    assert step.ok is False
+    assert "1 failed" in (step.message or "")
+    with session_scope(factory) as session:
+        store = V2Store(session)
+        progress = store.get_progress("prices", "FPT")
+        assert progress is not None and progress.state == "failed"
+        # The failing ticker stored nothing and was left for the next run ...
+        assert store.latest_price_date("FPT") is None
+        # ... while the other tickers still wrote their bars.
+        assert store.latest_price_date("VCB") == AS_OF
+        assert store.latest_price_date("XYZ") == AS_OF
+

@@ -440,3 +440,44 @@ def test_overall_latest_price_date_spans_v1_and_v2(factory: sessionmaker[Session
         )
 
     assert service.overall_latest_price_date() == date(2024, 1, 8)
+
+
+def test_get_prices_v2_is_v2_only_and_reports_missing(
+    factory: sessionmaker[Session],
+) -> None:
+    """The V2-only reader never falls back to V1; a ticker without V2 data is missing."""
+    from data.v2.schemas import AdjustedOHLCV
+    from data.v2.store import V2Store
+
+    service = _data_service(factory, [])
+    with session_scope(factory) as session:
+        # FPT has only V1 data; HPG has V2 data; ZZZ has neither.
+        SqlPriceRepository(session).upsert_many("FPT", daily_bars(date(2024, 1, 2), 3))
+        V2Store(session).upsert_prices(
+            "HPG",
+            [
+                AdjustedOHLCV(
+                    date=date(2024, 1, 8),
+                    open=100.0,
+                    high=100.0,
+                    low=100.0,
+                    close=100.0,
+                    close_raw=100.0,
+                    volume=1000,
+                    source="ssi_statistics",
+                )
+            ],
+            price_adjustment_basis="ssi_adjusted",
+            data_as_of=TODAY,
+        )
+
+    hpg = service.get_prices_v2("HPG", start=date(2024, 1, 2), end=TODAY)
+    assert hpg.status == "ok"
+    assert hpg.source == "ssi_statistics"
+    assert [row.date for row in hpg.rows] == [date(2024, 1, 8)]
+
+    # A ticker with only V1 data is "missing" from the V2 layer (no silent fallback).
+    fpt = service.get_prices_v2("FPT", start=date(2024, 1, 2), end=TODAY)
+    assert fpt.status == "missing"
+    assert fpt.rows == []
+    assert any("no V2 price data" in warning for warning in fpt.warnings)

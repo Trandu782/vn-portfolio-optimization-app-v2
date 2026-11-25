@@ -17,14 +17,12 @@ import data as data_pkg
 from app.main import create_app
 from data.context import DataContext
 from data.db.base import create_all, session_scope
-from data.db.repositories import (
-    SqlIndexRepository,
-    SqlPriceRepository,
-    SqlSymbolRepository,
-)
+from data.db.repositories import SqlIndexRepository, SqlSymbolRepository
 from data.models import PriceBar, SymbolInfo
 from data.offline import StaticHttpClient
 from data.settings import get_settings
+from data.v2.schemas import AdjustedOHLCV
+from data.v2.store import V2Store
 
 TODAY = date(2024, 1, 8)  # a Monday, so the last trading day is TODAY itself.
 BUY = date(2023, 12, 20)
@@ -32,7 +30,7 @@ START = date(2023, 12, 1)
 
 
 def _bars(early: float, late: float, switch: date) -> list[PriceBar]:
-    """Daily bars from START to TODAY; ``late`` from the day after ``switch``."""
+    """Daily benchmark bars from START to TODAY; ``late`` after ``switch``."""
     rows: list[PriceBar] = []
     day = START
     while day <= TODAY:
@@ -54,6 +52,29 @@ def _bars(early: float, late: float, switch: date) -> list[PriceBar]:
     return rows
 
 
+def _v2_bars(early: float, late: float, switch: date) -> list[AdjustedOHLCV]:
+    """Daily V2 stock bars from START to TODAY; ``late`` after ``switch``."""
+    rows: list[AdjustedOHLCV] = []
+    day = START
+    while day <= TODAY:
+        close = early if day <= switch else late
+        rows.append(
+            AdjustedOHLCV(
+                date=day,
+                open=close,
+                high=close,
+                low=close,
+                close=close,
+                close_raw=close,
+                volume=100_000,
+                value=close * 100_000.0,
+                source="test",
+            )
+        )
+        day += timedelta(days=1)
+    return rows
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
     monkeypatch.setenv("VNOPT_DATABASE_URL", f"sqlite:///{tmp_path / 'pnl.db'}")
@@ -66,12 +87,17 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
     data_pkg.set_context(context)
     with session_scope(context.session_factory) as session:
         symbols = SqlSymbolRepository(session)
-        prices = SqlPriceRepository(session)
+        store = V2Store(session)
         indices = SqlIndexRepository(session)
         for code in ("VNM", "FPT"):
             symbols.upsert(SymbolInfo(code=code, exchange="HOSE", type="stock", source="test"))
-        prices.upsert_many("VNM", _bars(early=40_000.0, late=50_000.0, switch=BUY))
-        prices.upsert_many("FPT", _bars(early=80_000.0, late=80_000.0, switch=BUY))
+        for code, early, late in (("VNM", 40_000.0, 50_000.0), ("FPT", 80_000.0, 80_000.0)):
+            store.upsert_prices(
+                code,
+                _v2_bars(early=early, late=late, switch=BUY),
+                price_adjustment_basis="ssi_adjusted",
+                data_as_of=TODAY,
+            )
         indices.upsert_many("VNINDEX", _bars(early=1_000.0, late=1_100.0, switch=BUY))
     with TestClient(create_app()) as test_client:
         yield test_client

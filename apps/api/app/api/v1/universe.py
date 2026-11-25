@@ -38,6 +38,9 @@ router = APIRouter(tags=["universe"])
 
 #: ``SymbolInfo.type`` values that mark a security as no longer tradable.
 _DELISTED_TYPES = frozenset({"delisted", "delisting", "removed"})
+#: ``SymbolInfo.type`` values that authoritatively mark a security as suspended/halted.
+#: A trailing price bar is **not** evidence of suspension (see ``_has_stale_bars``).
+_SUSPENDED_TYPES = frozenset({"suspended", "halted"})
 
 
 class FilterOption(BaseModel):
@@ -223,21 +226,21 @@ def _resolve_symbols(request: UniverseBuildRequest, service: DataService) -> lis
 
 
 def _load_symbol_series(
-    service: DataService, code: str, start: date, end: date, *, adjusted: bool = False
+    service: DataService, code: str, start: date, end: date
 ) -> SymbolSeries:
-    """Load one symbol's series (backfilling on demand) and derive its flags.
+    """Load one symbol's V2 series and derive its authoritative/staleness flags.
 
-    When ``adjusted`` is true the series is read from the V2 precomputed adjusted
-    closes (falling back to V1 when the ticker has no V2 data), so the optimizer and
-    frontier use corporate-action-adjusted prices instead of raw provider closes.
+    Prices always come from the V2 store (``v2_daily_prices``) through
+    :meth:`DataService.get_prices_v2`; there is no silent V1 fallback, so an
+    incomplete V2 backfill surfaces as ``missing_price_history`` / ``stale_price_data``
+    instead of a stale V1 series being used. ``suspended`` and ``delisted`` are set
+    from authoritative ticker metadata only — a trailing bar is ``stale``, never
+    ``suspended`` — so an actively traded name with an incomplete backfill is never
+    mislabelled.
     """
     info = service.get_symbol(code)
     exchange = normalize_exchange(info.exchange) if info and info.exchange else "HOSE"
-    price_series = (
-        service.get_prices_preferring_v2_adjusted(code, start=start, end=end)
-        if adjusted
-        else service.get_prices(code, start=start, end=end, ensure=True)
-    )
+    price_series = service.get_prices_v2(code, start=start, end=end)
     bars = tuple(
         DailyBar(
             date=row.date,
@@ -249,23 +252,26 @@ def _load_symbol_series(
         for row in price_series.rows
         if start <= row.date <= end
     )
-    delisted = bool(info and (info.type or "").strip().lower() in _DELISTED_TYPES)
+    security_type = (info.type or "").strip().lower() if info is not None else ""
     return SymbolSeries(
         code=code,
         exchange=exchange,
         bars=bars,
-        suspended=_looks_suspended(price_series.rows, end),
-        delisted=delisted,
+        suspended=security_type in _SUSPENDED_TYPES,
+        delisted=security_type in _DELISTED_TYPES,
+        stale=_has_stale_bars(price_series.rows, end),
     )
 
 
-def _looks_suspended(rows: list[PriceBar], end: date) -> bool:
-    """Flag a listed symbol whose latest bar trails the range end.
+def _has_stale_bars(rows: list[PriceBar], end: date) -> bool:
+    """Flag a symbol whose latest bar trails the range end (stale, not suspended).
 
-    A symbol that still trades has a bar on the last trading day on or before
-    ``end``; one whose latest bar is several trading days earlier is treated as
-    suspended/halted. The check is relative to ``end`` so historical ranges are not
-    misflagged.
+    A current symbol has a bar on the last trading day on or before ``end``; one
+    whose latest bar is several sessions earlier has stale/incomplete history (a
+    backfill that has not reached ``end`` yet). This is a **data-quality** signal: it
+    is reported as ``stale_price_data`` / a stale warning and is never interpreted as
+    an exchange suspension. The check is relative to ``end`` so historical ranges are
+    not misflagged.
     """
     if not rows:
         return False
@@ -276,6 +282,19 @@ def _looks_suspended(rows: list[PriceBar], end: date) -> bool:
         return False
     missing = trading_days_between(latest + timedelta(days=1), reference, holidays)
     return len(missing) > get_settings().stale_tolerance_days
+
+
+def _stale_warnings(result: UniverseBuildResult) -> list[str]:
+    """Return one warning per kept symbol whose latest V2 bar trails the window end.
+
+    Stale history is surfaced explicitly instead of being used silently; it is a
+    data-availability problem (an incomplete V2 backfill), never a suspension.
+    """
+    return [
+        f"{code}: stale V2 price data (the latest bar trails {result.end.isoformat()})"
+        for code, flags in result.quality_flags.items()
+        if flags.stale
+    ]
 
 
 def _to_response(result: UniverseBuildResult) -> UniverseBuildResponse:

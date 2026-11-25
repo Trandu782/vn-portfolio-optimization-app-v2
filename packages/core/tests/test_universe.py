@@ -53,6 +53,7 @@ def _series(
     value: float | None = None,
     suspended: bool = False,
     delisted: bool = False,
+    stale: bool = False,
 ) -> SymbolSeries:
     """Build a candidate symbol with ``count`` in-range bars."""
     return SymbolSeries(
@@ -61,6 +62,7 @@ def _series(
         bars=_bars(count, base=base, volume=volume, value=value),
         suspended=suspended,
         delisted=delisted,
+        stale=stale,
     )
 
 
@@ -70,7 +72,13 @@ def _window(days: int = 60) -> tuple[date, date]:
 
 def test_builtin_filters_are_registered_with_parameter_schemas() -> None:
     descriptions = {info.id: info for info in universe_filters.describe()}
-    assert {"exchange", "min_adv", "exclude_suspended", "min_history"} <= set(descriptions)
+    assert {
+        "exchange",
+        "min_adv",
+        "exclude_suspended",
+        "exclude_stale_prices",
+        "min_history",
+    } <= set(descriptions)
 
     min_adv_schema = descriptions["min_adv"].parameter_schema
     assert min_adv_schema is not None
@@ -187,6 +195,33 @@ def test_exclude_suspended_filter_drops_flagged_symbols() -> None:
     reasons = {dropped.code: dropped.reason for dropped in result.dropped}
     assert reasons["SUS"] == "suspended"
     assert reasons["DEL"] == "delisted"
+
+
+def test_exclude_stale_prices_filter_drops_stale_with_its_own_reason() -> None:
+    """A trailing bar is dropped as stale data — never mislabelled as suspended."""
+    filters = [build_filter("exclude_stale_prices")]
+
+    result = build_universe(
+        [_series("CURRENT"), _series("STALE", stale=True)], filters, *_window()
+    )
+
+    assert result.symbols == ("CURRENT",)
+    [dropped] = result.dropped
+    assert dropped.code == "STALE"
+    assert dropped.filter_id == "exclude_stale_prices"
+    assert dropped.reason == "stale_price_data"
+
+
+def test_a_stale_symbol_is_flagged_but_not_suspended() -> None:
+    """The quality flags keep suspension and staleness separate."""
+    result = build_universe(
+        [_series("STALE", stale=True), _series("SUS", suspended=True)], [], *_window()
+    )
+
+    assert result.quality_flags["STALE"].stale is True
+    assert result.quality_flags["STALE"].suspended is False
+    assert result.quality_flags["SUS"].suspended is True
+    assert result.quality_flags["SUS"].stale is False
 
 
 def test_symbol_without_data_in_range_is_dropped_with_reason() -> None:

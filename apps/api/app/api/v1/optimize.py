@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, ValidationError
 
 from app.api.v1.data import get_data_service
-from app.api.v1.universe import _load_symbol_series
+from app.api.v1.universe import _load_symbol_series, _stale_warnings
 from core.market_rules import DEFAULT_MARKET_RULES
 from core.optimize import (
     DEFAULT_COVARIANCE_ESTIMATOR,
@@ -45,6 +45,7 @@ from core.optimize import (
     risk_free_rate_providers,
     round_to_lots,
     solvers,
+    stratified_cloud_indices,
     universe_size_warnings,
 )
 from core.registry import Registry
@@ -77,6 +78,14 @@ class FrontierDefaults(BaseModel):
 
     portfolios: int
     max_portfolios: int
+    cloud_points: int = Field(
+        ...,
+        description=(
+            "Scatter points a frontier response plots. The simulation runs every "
+            "requested portfolio and the response carries a stratified sample of "
+            "at most this many."
+        ),
+    )
     frontier_points: int
     seed: int | None = None
     max_stocks: int
@@ -190,7 +199,11 @@ class FrontierRequest(BaseModel):
     num_portfolios: int = Field(
         default=DEFAULT_RANDOM_PORTFOLIOS,
         ge=1,
-        description="Number of random portfolios drawn for the cloud.",
+        description=(
+            "Number of random portfolios drawn for the cloud. The statistics use "
+            "all of them; the response plots a stratified sample (see "
+            "frontier_defaults.cloud_points)."
+        ),
     )
     seed: int | None = Field(default=None, description="Seed for the random cloud.")
     current_weights: dict[str, float] = Field(
@@ -258,6 +271,13 @@ class FrontierAssumptionsResponse(BaseModel):
     max_weight: float
     portfolios_requested: int
     portfolios_generated: int
+    portfolios_plotted: int = Field(
+        ...,
+        description=(
+            "Random-cloud points in this response (a stratified sample of "
+            "portfolios_generated)."
+        ),
+    )
     frontier_points: int
     skipped_targets: int
     trading_days: int
@@ -309,6 +329,7 @@ def read_optimize_options() -> OptimizeOptionsResponse:
         frontier_defaults=FrontierDefaults(
             portfolios=DEFAULT_RANDOM_PORTFOLIOS,
             max_portfolios=Settings().frontier_max_portfolios,
+            cloud_points=Settings().frontier_cloud_points,
             frontier_points=DEFAULT_FRONTIER_POINTS,
             max_stocks=Settings().max_optimize_stocks,
         ),
@@ -338,14 +359,13 @@ def run_optimize(
     sectors = _normalize_sectors(request.sectors, codes)
 
     series = [
-        _load_symbol_series(service, code, request.start, request.end, adjusted=True)
-        for code in codes
+        _load_symbol_series(service, code, request.start, request.end) for code in codes
     ]
     universe = build_universe(series, [], request.start, request.end)
     if not universe.symbols:
         raise HTTPException(
             status_code=422,
-            detail="no price data available for the requested symbols",
+            detail="no V2 price data available for the requested symbols",
         )
     exchanges = {item.code: item.exchange for item in series}
     settings = request.settings or UserSettings()
@@ -385,6 +405,7 @@ def run_optimize(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     warnings = [f"{item.code} dropped: {item.reason}" for item in universe.dropped]
+    warnings.extend(_stale_warnings(universe))
     return _to_response(result, warnings)
 
 
@@ -449,10 +470,10 @@ def _latest_prices(universe: UniverseBuildResult) -> dict[str, float]:
 def _data_sources(
     service: DataService, symbols: tuple[str, ...], start: date, end: date
 ) -> list[str]:
-    """Return the provider ids that served the cached series (no extra fetch)."""
+    """Return the V2 provider ids that served the cached series (no extra fetch)."""
     sources: set[str] = set()
     for code in symbols:
-        series = service.get_prices(code, start=start, end=end, ensure=False)
+        series = service.get_prices_v2(code, start=start, end=end)
         if series.source:
             sources.add(series.source)
     return sorted(sources)
@@ -553,13 +574,12 @@ def run_frontier(
     sectors = _normalize_sectors(request.sectors, codes)
 
     series = [
-        _load_symbol_series(service, code, request.start, request.end, adjusted=True)
-        for code in codes
+        _load_symbol_series(service, code, request.start, request.end) for code in codes
     ]
     universe = build_universe(series, [], request.start, request.end)
     if not universe.symbols:
         raise HTTPException(
-            status_code=422, detail="no price data available for the requested symbols"
+            status_code=422, detail="no V2 price data available for the requested symbols"
         )
     exchanges = {item.code: item.exchange for item in series}
     settings = request.settings or UserSettings()
@@ -591,7 +611,14 @@ def run_frontier(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return _frontier_to_response(
-        result, universe, exchanges, service, request.start, request.end, request.capital
+        result,
+        universe,
+        exchanges,
+        service,
+        request.start,
+        request.end,
+        request.capital,
+        config,
     )
 
 
@@ -603,25 +630,35 @@ def _frontier_to_response(
     start: date,
     end: date,
     capital: int,
+    config: Settings,
 ) -> FrontierResponse:
-    """Map the core frontier result onto the API response, rounding every point."""
+    """Map the core frontier result onto the API response, rounding every point.
+
+    The cloud is plotted as a stratified sample of at most
+    ``config.frontier_cloud_points`` points: the simulation itself always runs every
+    requested portfolio, and the sample keeps the hull and the density of the cloud
+    while keeping the payload small. The exact frontier and the marked portfolios
+    are never sampled.
+    """
     prices = _latest_prices(universe)
     lot_sizes = _lot_sizes_for(universe.symbols, exchanges)
-    cloud = [
+    cloud = result.random_cloud
+    plotted = stratified_cloud_indices(
+        cloud.returns,
+        cloud.volatilities,
+        max_points=config.frontier_cloud_points,
+    )
+    cloud_points = [
         RandomCloudPointResponse(
-            expected_return=float(return_value),
-            volatility=float(volatility),
-            sharpe=float(sharpe),
+            expected_return=float(cloud.returns[index]),
+            volatility=float(cloud.volatilities[index]),
+            sharpe=float(cloud.sharpes[index]),
         )
-        for return_value, volatility, sharpe in zip(
-            result.random_cloud.returns,
-            result.random_cloud.volatilities,
-            result.random_cloud.sharpes,
-            strict=True,
-        )
+        for index in plotted
     ]
     assumptions = result.assumptions
     warnings = [f"{item.code} dropped: {item.reason}" for item in universe.dropped]
+    warnings.extend(_stale_warnings(universe))
     warnings.extend(universe_size_warnings(len(universe.symbols)))
     warnings.append(
         "In-sample: these weights come from historical estimates over the selected "
@@ -635,7 +672,7 @@ def _frontier_to_response(
     return FrontierResponse(
         symbols=list(result.symbols),
         risk_free_rate=float(assumptions.risk_free_rate),
-        random_cloud=cloud,
+        random_cloud=cloud_points,
         frontier=[_round_point(point, prices, lot_sizes, capital) for point in result.frontier],
         min_variance=_round_point(result.min_variance, prices, lot_sizes, capital),
         tangency=_round_point(result.tangency, prices, lot_sizes, capital),
@@ -653,6 +690,7 @@ def _frontier_to_response(
             max_weight=float(assumptions.max_weight),
             portfolios_requested=assumptions.portfolios_requested,
             portfolios_generated=assumptions.portfolios_generated,
+            portfolios_plotted=len(cloud_points),
             frontier_points=assumptions.frontier_points,
             skipped_targets=assumptions.skipped_targets,
             trading_days=assumptions.trading_days,

@@ -102,11 +102,14 @@ registration** — see `docs/EXTENDING.md`. Deferred features
   Long-only and fully invested are always enforced; lot rounding uses
   `market_rules`. `engine.optimize` runs the single-shot path, while
   `frontier.build_efficient_frontier` draws a long-only, `max_weight`-capped
-  Dirichlet cloud (default 5,000 portfolios, hard cap 20,000, explicit seed),
+  Dirichlet cloud (default 5,000 portfolios, hard cap 100,000, explicit seed),
   sweeps target returns between the minimum-variance and best single-stock
   returns to build the exact frontier, and returns the minimum-variance,
   maximum-Sharpe (tangency), equal-weight and current-portfolio points with
-  integer lots and residual cash. `guardrails` holds the default cap and size
+  integer lots and residual cash. A large cloud is simulated in full and the API
+  plots a stratified sample of it (`frontier.stratified_cloud_indices`, default
+  6,000 points): the statistics and the marked portfolios use every draw, only the
+  scatter is sampled. `guardrails` holds the default cap and size
   warnings.
 - **`core.risk`** — a `RiskMetric` registry (annualized volatility, maximum
   drawdown with its series, beta, Sharpe, Treynor, Jensen's alpha, historical
@@ -123,8 +126,11 @@ registration** — see `docs/EXTENDING.md`. Deferred features
   never oversells, rounds to lots, skips orders below a minimum notional and
   funds buys from cash plus proceeds.
 - **`core.universe`** — `UniverseFilter` registry (`exchange`, `min_adv`,
-  `exclude_suspended`, `min_history`) and `build_universe`, returning aligned
-  price/returns matrices plus ADV, quality flags and dropped-ticker reasons.
+  `exclude_suspended`, `exclude_stale_prices`, `min_history`) and `build_universe`,
+  returning aligned price/returns matrices plus ADV, quality flags (suspension,
+  delisting, staleness, missing data, liquidity) and dropped-ticker reasons.
+  `exclude_suspended` drops only an authoritative suspension or delisting; a trailing
+  price bar is `stale` and is dropped as `stale_price_data`, never `suspended`.
 - **`core.portfolio`** — holdings and cash valuation shared by the Portfolio,
   P&L and Rebalance pages.
 

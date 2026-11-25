@@ -18,31 +18,33 @@ import data as data_pkg
 from app.main import create_app
 from data.context import DataContext
 from data.db.base import create_all, session_scope
-from data.db.repositories import SqlPriceRepository, SqlSymbolRepository
-from data.models import PriceBar, SymbolInfo
+from data.db.repositories import SqlSymbolRepository
+from data.models import SymbolInfo
 from data.offline import StaticHttpClient
 from data.settings import get_settings
+from data.v2.schemas import AdjustedOHLCV
+from data.v2.store import V2Store
 
 TODAY = date(2024, 1, 8)
 START = date(2023, 1, 2)
 END = START + timedelta(days=259)
 
 
-def _price_series(
+def _v2_bars(
     start: date, count: int, *, base: float, phase: float
-) -> list[PriceBar]:
-    """A smooth, strictly positive price path (so returns are non-degenerate)."""
-    rows: list[PriceBar] = []
+) -> list[AdjustedOHLCV]:
+    """A smooth, strictly positive V2 price path (so returns are non-degenerate)."""
+    rows: list[AdjustedOHLCV] = []
     for offset in range(count):
         close = base * (1.0 + 0.05 * math.sin((offset + phase) / 5.0))
         rows.append(
-            PriceBar(
+            AdjustedOHLCV(
                 date=start + timedelta(days=offset),
                 open=close,
                 high=close * 1.01,
                 low=close * 0.99,
                 close=close,
-                adj_close=close,
+                close_raw=close,
                 volume=100_000,
                 value=2_000_000_000.0,
                 source="test",
@@ -63,7 +65,7 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
     data_pkg.set_context(context)
     with session_scope(context.session_factory) as session:
         symbols = SqlSymbolRepository(session)
-        prices = SqlPriceRepository(session)
+        store = V2Store(session)
         for code, base, phase in (
             ("AAA", 50_000.0, 0.0),
             ("BBB", 30_000.0, 2.0),
@@ -72,7 +74,12 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
             symbols.upsert(
                 SymbolInfo(code=code, exchange="HOSE", type="stock", source="test")
             )
-            prices.upsert_many(code, _price_series(START, 260, base=base, phase=phase))
+            store.upsert_prices(
+                code,
+                _v2_bars(START, 260, base=base, phase=phase),
+                price_adjustment_basis="ssi_adjusted",
+                data_as_of=TODAY,
+            )
     with TestClient(create_app()) as test_client:
         yield test_client
     data_pkg.set_context(None)
@@ -206,7 +213,8 @@ def test_options_publish_frontier_defaults(client: TestClient) -> None:
     assert response.status_code == 200
     defaults = response.json()["frontier_defaults"]
     assert defaults["portfolios"] == 5000
-    assert defaults["max_portfolios"] == 20_000
+    assert defaults["max_portfolios"] == 100_000
+    assert defaults["cloud_points"] == 6_000
     assert defaults["frontier_points"] == 40
 
 
@@ -247,6 +255,45 @@ def test_frontier_is_reproducible_with_the_same_seed(client: TestClient) -> None
     )
 
 
+def test_frontier_plots_a_stratified_sample_of_the_cloud(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The simulation runs every portfolio; the response carries a bounded sample.
+
+    ``VNOPT_FRONTIER_CLOUD_POINTS`` caps the plotted scatter, so a 100,000-portfolio
+    run keeps its statistics without inflating the payload. The sample must be a
+    subset of the simulated cloud (same seed), and the marked portfolios, which are
+    computed separately from the frontier, are never dropped.
+    """
+    monkeypatch.setenv("VNOPT_FRONTIER_CLOUD_POINTS", "150")
+    sampled = client.post(
+        "/api/v1/optimize/frontier", json=_frontier_payload(num_portfolios=800)
+    )
+    assert sampled.status_code == 200, sampled.text
+    body = sampled.json()
+
+    assumptions = body["assumptions"]
+    assert assumptions["portfolios_generated"] == 800
+    assert assumptions["portfolios_requested"] == 800
+    assert assumptions["portfolios_plotted"] == len(body["random_cloud"]) == 150
+    for key in ("min_variance", "tangency", "equal_weight"):
+        assert body[key]["weights"]
+
+    monkeypatch.setenv("VNOPT_FRONTIER_CLOUD_POINTS", "10000")
+    full = client.post(
+        "/api/v1/optimize/frontier", json=_frontier_payload(num_portfolios=800)
+    ).json()
+    assert len(full["random_cloud"]) == 800
+    simulated = {
+        (point["expected_return"], point["volatility"])
+        for point in full["random_cloud"]
+    }
+    assert all(
+        (point["expected_return"], point["volatility"]) in simulated
+        for point in body["random_cloud"]
+    )
+
+
 def test_frontier_infeasible_cap_is_422(client: TestClient) -> None:
     response = client.post("/api/v1/optimize/frontier", json=_frontier_payload(max_weight=0.1))
     assert response.status_code == 422
@@ -268,7 +315,7 @@ def test_frontier_start_after_end_is_422(client: TestClient) -> None:
 
 def test_frontier_over_the_portfolio_cap_is_422(client: TestClient) -> None:
     response = client.post(
-        "/api/v1/optimize/frontier", json=_frontier_payload(num_portfolios=20_001)
+        "/api/v1/optimize/frontier", json=_frontier_payload(num_portfolios=100_001)
     )
     assert response.status_code == 422
     assert "at most" in response.json()["detail"].lower()

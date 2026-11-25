@@ -18,14 +18,12 @@ from app.main import app, create_app
 from core.settings import UserSettings
 from data.context import DataContext
 from data.db.base import create_all, session_scope
-from data.db.repositories import (
-    SqlIndexRepository,
-    SqlPriceRepository,
-    SqlSymbolRepository,
-)
+from data.db.repositories import SqlIndexRepository, SqlSymbolRepository
 from data.models import PriceBar, SymbolInfo
 from data.offline import StaticHttpClient
 from data.settings import get_settings
+from data.v2.schemas import AdjustedOHLCV
+from data.v2.store import V2Store
 
 TODAY = date(2024, 1, 8)
 START = date(2023, 1, 2)
@@ -46,7 +44,7 @@ _REGISTERED_METRICS = {
 def _price_series(
     start: date, count: int, *, base: float, phase: float
 ) -> list[PriceBar]:
-    """A smooth, strictly positive price path (so returns are non-degenerate)."""
+    """A smooth, strictly positive benchmark price path (stored in ``indices_daily``)."""
     rows: list[PriceBar] = []
     for offset in range(count):
         close = base * (1.0 + 0.05 * math.sin((offset + phase) / 5.0))
@@ -58,6 +56,29 @@ def _price_series(
                 low=close * 0.99,
                 close=close,
                 adj_close=close,
+                volume=100_000,
+                value=2_000_000_000.0,
+                source="test",
+            )
+        )
+    return rows
+
+
+def _v2_bars(
+    start: date, count: int, *, base: float, phase: float
+) -> list[AdjustedOHLCV]:
+    """A smooth, strictly positive V2 price path for a stock ticker."""
+    rows: list[AdjustedOHLCV] = []
+    for offset in range(count):
+        close = base * (1.0 + 0.05 * math.sin((offset + phase) / 5.0))
+        rows.append(
+            AdjustedOHLCV(
+                date=start + timedelta(days=offset),
+                open=close,
+                high=close * 1.01,
+                low=close * 0.99,
+                close=close,
+                close_raw=close,
                 volume=100_000,
                 value=2_000_000_000.0,
                 source="test",
@@ -78,7 +99,7 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
     data_pkg.set_context(context)
     with session_scope(context.session_factory) as session:
         symbols = SqlSymbolRepository(session)
-        prices = SqlPriceRepository(session)
+        store = V2Store(session)
         indices = SqlIndexRepository(session)
         for code, base, phase in (
             ("AAA", 50_000.0, 0.0),
@@ -88,7 +109,12 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
             symbols.upsert(
                 SymbolInfo(code=code, exchange="HOSE", type="stock", source="test")
             )
-            prices.upsert_many(code, _price_series(START, 260, base=base, phase=phase))
+            store.upsert_prices(
+                code,
+                _v2_bars(START, 260, base=base, phase=phase),
+                price_adjustment_basis="ssi_adjusted",
+                data_as_of=TODAY,
+            )
         indices.upsert_many(
             "VNINDEX", _price_series(START, 260, base=1_200.0, phase=1.0)
         )
@@ -118,14 +144,17 @@ def long_client(tmp_path, monkeypatch) -> Iterator[TestClient]:
     data_pkg.set_context(context)
     with session_scope(context.session_factory) as session:
         symbols = SqlSymbolRepository(session)
-        prices = SqlPriceRepository(session)
+        store = V2Store(session)
         indices = SqlIndexRepository(session)
         for code, base, phase in (("AAA", 50_000.0, 0.0), ("BBB", 30_000.0, 2.0)):
             symbols.upsert(
                 SymbolInfo(code=code, exchange="HOSE", type="stock", source="test")
             )
-            prices.upsert_many(
-                code, _price_series(LONG_START, 1500, base=base, phase=phase)
+            store.upsert_prices(
+                code,
+                _v2_bars(LONG_START, 1500, base=base, phase=phase),
+                price_adjustment_basis="ssi_adjusted",
+                data_as_of=TODAY,
             )
         indices.upsert_many(
             "VNINDEX", _price_series(LONG_START, 1500, base=1_200.0, phase=1.0)

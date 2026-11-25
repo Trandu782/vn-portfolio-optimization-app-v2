@@ -68,6 +68,20 @@ function pointTitle(point: ChartPoint): string {
   return point.kind;
 }
 
+/**
+ * Header caption for the cloud. The API runs the whole simulation and plots a
+ * stratified sample of it, so say how many of the generated portfolios are drawn:
+ * the chart must never imply it shows every one.
+ */
+function cloudLabel(result: FrontierResult): string {
+  const plotted = result.assumptions.portfolios_plotted;
+  const generated = result.assumptions.portfolios_generated;
+  if (plotted < generated) {
+    return `showing ${plotted.toLocaleString()} of ${generated.toLocaleString()} random mixes`;
+  }
+  return `${generated.toLocaleString()} random mixes`;
+}
+
 function FrontierTooltip({ active, payload, symbols }: TooltipProps) {
   if (!active || !payload || payload.length === 0) return null;
   const point = payload
@@ -165,6 +179,9 @@ export function FrontierChart({
       }))
       .sort((a, b) => a.volatility - b.volatility);
 
+    // The API already sends a stratified sample of the simulation; thin it once
+    // more here because Recharts renders one SVG node per point (the sample's
+    // extremes sit within a dot's width of each other at this size).
     const step = Math.max(1, Math.ceil(result.random_cloud.length / 1200));
     const cloudPoints: ChartPoint[] = result.random_cloud
       .filter((_, index) => index % step === 0)
@@ -210,8 +227,7 @@ export function FrontierChart({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Risk and return</h3>
         <span className="text-xs text-gray-500 dark:text-gray-400">
-          {result.random_cloud.length.toLocaleString()} random mixes &middot; {result.frontier.length}{" "}
-          frontier points
+          {cloudLabel(result)} &middot; {result.frontier.length} frontier points
         </span>
       </div>
 

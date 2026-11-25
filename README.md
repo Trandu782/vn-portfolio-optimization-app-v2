@@ -40,7 +40,10 @@ units, and the interactive views support hover/tap tooltips, a clickable frontie
 that keeps the risk slider in sync, show/hide toggles, a performance brush with a
 reset button and a correlation heatmap that highlights the hovered row/column. The
 P&L by-stock / market-value charts and the Rebalance current-versus-target weights
-are built the same way, with VND and percent axes.
+are built the same way, with VND and percent axes. The random-portfolio cloud can
+be run up to 100,000 portfolios; the API simulates all of them and plots a
+stratified sample (6,000 points by default), so the chart stays responsive and
+still shows the cloud's hull and density.
 
 Only CFA Level 1/2 methods are implemented: mean, variance, covariance,
 correlation, beta, Sharpe, Treynor, Jensen's alpha, maximum drawdown, historical
@@ -190,8 +193,9 @@ bundle size, the cron schedule and the full environment-variable table.
 | `API_URL` | Web | Base URL the Next.js server proxies `/api/*` to. |
 
 Optional tuning keys (`VNOPT_SYNC_BATCH_SIZE`, `VNOPT_SYNC_TIME_BUDGET_SECONDS`,
-`VNOPT_ON_DEMAND_HISTORY_DAYS`, `VNOPT_FRONTIER_MAX_PORTFOLIOS`, ...) are
-documented in `.env.example` and `docs/DATA.md`.
+`VNOPT_ON_DEMAND_HISTORY_DAYS`, `VNOPT_FRONTIER_MAX_PORTFOLIOS`,
+`VNOPT_FRONTIER_CLOUD_POINTS`, ...) are documented in `.env.example` and
+`docs/DATA.md`.
 
 ## Documentation
 

@@ -218,7 +218,8 @@ Vercel.
 
 Optional API variables (all have in-code defaults): `VNOPT_ENVIRONMENT=production`,
 `VNOPT_SYNC_BATCH_SIZE`, `VNOPT_SYNC_TIME_BUDGET_SECONDS`,
-`VNOPT_ON_DEMAND_HISTORY_DAYS`, `VNOPT_FRONTIER_MAX_PORTFOLIOS`,
+`VNOPT_ON_DEMAND_HISTORY_DAYS`, `VNOPT_FRONTIER_MAX_PORTFOLIOS` (default 100,000),
+`VNOPT_FRONTIER_CLOUD_POINTS` (default 6,000 plotted scatter points),
 `VNOPT_FRONTIER_TIME_BUDGET`, `VNOPT_MAX_OPTIMIZE_STOCKS`.
 
 Vercel Cron runs against production only; a preview never triggers
@@ -299,7 +300,8 @@ provider (`ssi_statistics` once the V2 precompute is current). The
 | `VNOPT_SYNC_BATCH_SIZE` | API | no | Symbols per sync batch (default 50). |
 | `VNOPT_SYNC_TIME_BUDGET_SECONDS` | API | no | Wall-clock budget per batch (default 45). |
 | `VNOPT_ON_DEMAND_HISTORY_DAYS` | API | no | History depth for first fetch (default 365). |
-| `VNOPT_FRONTIER_MAX_PORTFOLIOS` | API | no | Hard cap on the random-portfolio cloud (default 20000). |
+| `VNOPT_FRONTIER_MAX_PORTFOLIOS` | API | no | Hard cap on the simulated random-portfolio cloud (default 100000). |
+| `VNOPT_FRONTIER_CLOUD_POINTS` | API | no | Scatter points a frontier response plots (default 6000). The simulation always runs every requested portfolio; only the plotted sample is stratified and capped. |
 | `VNOPT_FRONTIER_TIME_BUDGET` | API | no | Wall-clock budget for a frontier run (default 30s). |
 
 Every API variable must be present in **both** the Production and Preview scopes;
@@ -361,10 +363,19 @@ after the job), so use the same Supabase database as the API.
    dispatch `precompute_v2.yml` with `mode=full`, `limit=150` and `unpriced=true`
    repeatedly until `tickers without prices` reaches 0; each run touches only the
    tickers that still have no stored bar, so no chunk re-fetches the priced ones.
-   Set the repo variable `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME=0` for
-   those chunks if the remaining names are the illiquid tail the 10k-share floor
-   rejects (the job then logs `prices: pre-screen rejected N candidate(s) ...` when
-   names are dropped, and nothing when the floor is disabled). Then let the schedule
+   **The remaining tail needs the pre-screen lowered, and it is optional.** Run #11
+   (2026-11-26) selected **0 of the 1,023** unpriced candidates because every one of
+   them trades below the 10k-share median-volume floor
+   (`prices: processed=0`, `prices: pre-screen rejected 1023 candidate(s)`), so
+   repeating that dispatch changes nothing; set the repo variable
+   `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME=0` (or
+   `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED=false`) for those chunks. Weigh the cost
+   first: the tail trades under 10,000 shares/day, so it fails every liquidity
+   preset (the smallest ADV floor is 100,000 shares/day) and only feeds the
+   "All Stocks" preset, while pricing all 1,023 names costs ~25 requests each
+   (~25k requests). The 496-name priced universe already covers VN100 (100/100) and
+   leaves 13 sectors with ≥3 Standard-Retail constituents, i.e. Optimize and the
+   Sector tab are fully served without it. Then let the schedule
    run `--incremental`: weekdays at `7 13 * * 1-5` (13:07 UTC = 20:07 ICT, late
    enough for SSI to publish) and nightly at `13 19 * * *` (19:13 UTC = 02:13 ICT), which repairs a
    failed weekday run. Both share the `precompute-v2` concurrency group with

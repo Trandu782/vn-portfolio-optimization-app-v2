@@ -1,5 +1,13 @@
 ### Task: Server-Side Downsampling for 100k Monte Carlo Efficient Frontier Cloud
 
+**Status: implemented (V2.1).** See `docs/CHANGELOG.md` → "Optimize / efficient
+frontier (V2.1 patch)": the simulation runs every requested portfolio (hard cap
+100,000), `core.optimize.frontier.stratified_cloud_indices` returns a stratified
+sample on a quantile grid over (volatility, return), `_frontier_to_response`
+serialises only that sample (`VNOPT_FRONTIER_CLOUD_POINTS`, default 6,000), and the
+marked portfolios (Max Sharpe / tangency, minimum variance, equal weight, current)
+plus the exact frontier vertices are never sampled away.
+
 **Goal:** Run the full 100,000-portfolio Monte Carlo simulation on the backend for statistical accuracy while reducing HTTP payload size and frontend chart lag by downsampling points during response serialization.
 
 **Implementation Requirements:**

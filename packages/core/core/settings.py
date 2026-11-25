@@ -40,9 +40,16 @@ class Settings(BaseSettings):
 
     # Efficient-frontier guardrails. The API reads these and passes them to the
     # frontier engine so a runaway random-portfolio cloud fails fast instead of
-    # tripping the serverless limit. The hard cap is 20,000 portfolios.
-    frontier_max_portfolios: int = 20_000
+    # tripping the serverless limit. The hard cap is 100,000 portfolios: the engine
+    # runs the whole simulation for the statistics and the API then plots a
+    # stratified sample of `frontier_cloud_points` points, so a large run costs
+    # compute but not response size (docs/Update patch v2.1.md).
+    frontier_max_portfolios: int = 100_000
     frontier_time_budget: float = 30.0
+    # Scatter points in a frontier response. The cloud statistics and the marked
+    # portfolios always come from the full simulation; only the plotted sample is
+    # capped. Configurable via VNOPT_FRONTIER_CLOUD_POINTS.
+    frontier_cloud_points: int = Field(default=6_000, ge=1)
 
     # Maximum number of tickers the guided Optimize tab may send to the optimizer.
     # Configurable via VNOPT_MAX_OPTIMIZE_STOCKS; the default keeps the sample

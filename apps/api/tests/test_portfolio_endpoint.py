@@ -169,7 +169,7 @@ def test_wishlist_holding_has_zero_value_and_weight(client: TestClient) -> None:
     assert body["weights"]["FPT"] == 0.0
 
 
-def test_evaluate_warns_for_illiquid_and_suspended(client: TestClient) -> None:
+def test_evaluate_warns_for_illiquid_and_stale(client: TestClient) -> None:
     response = client.post(
         "/api/v1/portfolio/evaluate",
         json={"holdings": [{"symbol": "THIN", "shares": 10}, {"symbol": "SUSP", "shares": 10}]},
@@ -177,8 +177,13 @@ def test_evaluate_warns_for_illiquid_and_suspended(client: TestClient) -> None:
     assert response.status_code == 200
     holdings = {item["symbol"]: item for item in response.json()["holdings"]}
     assert any("illiquid" in warning for warning in holdings["THIN"]["warnings"])
-    suspended = [warning for warning in holdings["SUSP"]["warnings"] if "suspended" in warning]
-    assert suspended and "no price bar for the most recent trading session" in suspended[0]
+    # A trailing bar is reported as stale data, never as a suspension: an active
+    # ticker with an incomplete backfill must not be mislabelled as suspended.
+    stale = [
+        warning for warning in holdings["SUSP"]["warnings"] if "stale price data" in warning
+    ]
+    assert stale and "no price bar for the most recent trading session" in stale[0]
+    assert not any("suspended" in warning for warning in holdings["SUSP"]["warnings"])
 
 
 def test_evaluate_warns_for_low_liquidity(client: TestClient) -> None:

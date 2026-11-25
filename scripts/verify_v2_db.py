@@ -158,11 +158,24 @@ def main() -> int:
             + (", ".join(f"{state}={count}" for state, count in price_progress) or "(none)")
         )
         if unpriced:
+            # An `--unpriced` chunk only advances on a candidate the pre-screen
+            # accepts. Run #11 (2026-11-26) selected 0 of 1,023 because every
+            # remaining name traded below the 10k-share median-volume floor, so
+            # repeating the dispatch made no progress at all.
             print(
                 "backfill hint             : dispatch precompute_v2 with mode=full, "
-                "limit=150, unpriced=true; set "
-                "VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME=0 to include the "
-                "illiquid tail"
+                "limit=150, unpriced=true"
+            )
+            print(
+                "backfill floor            : set "
+                "VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME=0 first when every "
+                "remaining name trades below the 10k-share floor: an --unpriced chunk "
+                "then selects nothing (run #11: 0 of 1,023)"
+            )
+            print(
+                "backfill value            : that tail fails every liquidity preset "
+                "(the smallest ADV floor is 100,000 shares/day), so it only feeds the "
+                "\"All Stocks\" preset"
             )
         print(f"VN100 members with prices : {vn100_priced}")
         print(f"sector coverage           : {coverage.covered} covered, {coverage.missing} missing")

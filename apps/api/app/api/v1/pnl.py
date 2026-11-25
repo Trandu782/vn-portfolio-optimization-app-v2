@@ -117,8 +117,20 @@ def evaluate_pnl(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     settings = request.settings or UserSettings()
+    # Every price/return query resolves from the unified V2 dataset (no silent V1
+    # fallback). The history starts at the earliest *past* buy date so the dated
+    # comparison has enough bars, while a future buy date (or none) still reads the
+    # latest V2 bar instead of blanking the valuation.
+    earliest_buy = min(
+        (
+            holding.buy_date
+            for holding in portfolio.holdings
+            if holding.buy_date is not None and holding.buy_date <= service.today
+        ),
+        default=None,
+    )
     series_by_symbol = {
-        holding.symbol: service.get_prices(holding.symbol, ensure=True)
+        holding.symbol: service.get_prices_v2(holding.symbol, start=earliest_buy)
         for holding in portfolio.holdings
     }
     latest_prices = {

@@ -691,20 +691,35 @@ class V2PrecomputeService:
             self._record_progress(ticker, "prices", "done", last_date=latest)
             return 0, False
         prepared, basis = self._prepare_bars(exchange, bars)
-        with session_scope(self._session_factory) as session:
-            store = V2Store(session)
-            store.upsert_prices(ticker, prepared, price_adjustment_basis=basis, data_as_of=target)
-            store.set_progress(
-                ProgressRecord(
-                    kind="prices",
-                    symbol=ticker,
-                    state="done",
-                    last_date=store.latest_price_date(ticker),
-                    # The cumulative stored bar count, so an incremental run that
-                    # adds a session or two keeps the historical count.
-                    rows=store.count_prices(ticker),
+        # Persist in this ticker's own session. A duplicate-key batch (Postgres
+        # ``CardinalityViolation`` on ``ON CONFLICT DO UPDATE``) or any other
+        # database error is contained here and recorded as a failed checkpoint, so
+        # one ticker can never abort the whole run and leave every later ticker
+        # un-updated. ``_bulk_upsert`` already collapses duplicate ``(symbol, date)``
+        # rows before the statement, so this is the last-resort guard.
+        try:
+            with session_scope(self._session_factory) as session:
+                store = V2Store(session)
+                store.upsert_prices(
+                    ticker, prepared, price_adjustment_basis=basis, data_as_of=target
                 )
+                store.set_progress(
+                    ProgressRecord(
+                        kind="prices",
+                        symbol=ticker,
+                        state="done",
+                        last_date=store.latest_price_date(ticker),
+                        # The cumulative stored bar count, so an incremental run that
+                        # adds a session or two keeps the historical count.
+                        rows=store.count_prices(ticker),
+                    )
+                )
+        except Exception as exc:
+            self._log.error("prices %s upsert failed: %s", ticker, exc)
+            self._record_progress(
+                ticker, "prices", "failed", last_date=latest, error=str(exc)[:1000]
             )
+            return 0, True
         return len(prepared), False
 
     def _needs_rebase(

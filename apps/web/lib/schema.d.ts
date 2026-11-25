@@ -1215,6 +1215,11 @@ export interface components {
             max_weight: number;
             /** Portfolios Generated */
             portfolios_generated: number;
+            /**
+             * Portfolios Plotted
+             * @description Random-cloud points in this response (a stratified sample of portfolios_generated).
+             */
+            portfolios_plotted: number;
             /** Portfolios Requested */
             portfolios_requested: number;
             /** Prices Adjusted */
@@ -1240,6 +1245,11 @@ export interface components {
          * @description Defaults and limits for the efficient-frontier view.
          */
         FrontierDefaults: {
+            /**
+             * Cloud Points
+             * @description Scatter points a frontier response plots. The simulation runs every requested portfolio and the response carries a stratified sample of at most this many.
+             */
+            cloud_points: number;
             /** Frontier Points */
             frontier_points: number;
             /** Max Portfolios */
@@ -1316,7 +1326,7 @@ export interface components {
             max_weight: number;
             /**
              * Num Portfolios
-             * @description Number of random portfolios drawn for the cloud.
+             * @description Number of random portfolios drawn for the cloud. The statistics use all of them; the response plots a stratified sample (see frontier_defaults.cloud_points).
              * @default 5000
              */
             num_portfolios: number;

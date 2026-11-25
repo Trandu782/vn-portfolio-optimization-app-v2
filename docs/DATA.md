@@ -279,7 +279,13 @@ financial ratios.
   known-empty symbols in the same pass). Each ticker commits its own session and the
   `v2_progress` checkpoint records the last committed date and the cumulative bar
   count, so a run resumes where it stopped; an incremental fetch that returns no new
-  bar never blanks that count.
+  bar never blanks that count. An `--unpriced` chunk only advances on a candidate
+  the pre-screen accepts, so it stops making progress once only the illiquid tail is
+  left (run #11 on 2026-11-26: `prices: processed=0` while 1,023 candidates were
+  rejected, because every one of them trades below the 10k-share median-volume
+  floor); lower that floor (`..._PRE_SCREEN_MIN_MEDIAN_VOLUME=0`) before dispatching
+  another chunk. The tail is optional though: it fails every liquidity preset (the
+  smallest ADV floor is 100,000 shares/day) and only feeds "All Stocks".
 - **As-of date** — without `--as-of` the pipeline targets the last *completed*
   Vietnam session: today only after the 15:00 ICT close (`MarketRules.session_close`),
   otherwise the previous trading day, rolled back over weekends and holidays

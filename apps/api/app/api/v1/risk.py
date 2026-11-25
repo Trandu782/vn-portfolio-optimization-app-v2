@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.api.v1.data import get_data_service
 from app.api.v1.schemas import Assumptions, assumptions_from
-from app.api.v1.universe import _load_symbol_series
+from app.api.v1.universe import _load_symbol_series, _stale_warnings
 from core.registry import Registry
 from core.risk import (
     DEFAULT_CONFIDENCE,
@@ -329,6 +329,7 @@ def analyse_risk(
         code for code in request.weights if code.strip().upper() not in known
     )
     warnings = [f"{item.code} dropped: {item.reason}" for item in universe.dropped]
+    warnings.extend(_stale_warnings(universe))
     warnings.extend(
         f"weight ignored for {code}: not in the analysed universe" for code in ignored
     )
@@ -438,6 +439,7 @@ def compare_risk(
 
     known = set(universe.symbols)
     warnings = [f"{item.code} dropped: {item.reason}" for item in universe.dropped]
+    warnings.extend(_stale_warnings(universe))
     for label, weights in (
         ("current", request.current_weights),
         ("optimized", request.optimized_weights),

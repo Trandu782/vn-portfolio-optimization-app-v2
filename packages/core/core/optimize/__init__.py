@@ -15,6 +15,8 @@ from core.optimize import risk_free_rate as _risk_free_rate  # noqa: F401
 from core.optimize import solvers as _solvers  # noqa: F401
 from core.optimize.engine import lot_size_for, optimize
 from core.optimize.frontier import (
+    CLOUD_SAMPLE_BINS,
+    DEFAULT_CLOUD_SAMPLE_POINTS,
     DEFAULT_FRONTIER_POINTS,
     DEFAULT_RANDOM_PORTFOLIOS,
     MAX_RANDOM_PORTFOLIOS,
@@ -24,6 +26,7 @@ from core.optimize.frontier import (
     RandomCloud,
     build_efficient_frontier,
     sample_random_portfolios,
+    stratified_cloud_indices,
 )
 from core.optimize.guardrails import (
     HARD_MAX_STOCKS,
@@ -73,6 +76,8 @@ from core.optimize.interfaces import (
 from core.optimize.lot_rounding import LotRoundingResult, round_to_lots
 
 __all__ = [
+    "CLOUD_SAMPLE_BINS",
+    "DEFAULT_CLOUD_SAMPLE_POINTS",
     "DEFAULT_COVARIANCE_ESTIMATOR",
     "DEFAULT_FRONTIER_POINTS",
     "DEFAULT_MAX_WEIGHT",
@@ -126,5 +131,6 @@ __all__ = [
     "round_to_lots",
     "sample_random_portfolios",
     "solvers",
+    "stratified_cloud_indices",
     "universe_size_warnings",
 ]

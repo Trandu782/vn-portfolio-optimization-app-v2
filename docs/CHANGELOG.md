@@ -6,7 +6,89 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Data quality and V2 price routing
+
+- **A trailing price bar is now `stale_price_data`, never `suspended`.** Optimize
+  (via `POST /universe/build`), Risk and Portfolio used `_looks_suspended`
+  (`apps/api/app/api/v1/universe.py`), which treated "latest bar trails the range
+  end" as an exchange suspension. Because the V2 backfill is incomplete for some
+  actively traded tickers (`VHM`, `DCM`), the `exclude_suspended` filter dropped
+  them with `Reason: suspended`. Suspension and delisting are now set only from
+  authoritative `SymbolInfo.type` metadata (`_SUSPENDED_TYPES` / `_DELISTED_TYPES`);
+  staleness is a separate `SymbolSeries.stale` / `QualityFlags.stale` signal surfaced
+  by the new `exclude_stale_prices` filter (reason `stale_price_data`) and a
+  per-ticker warning. A missing series now reports `missing_price_history`. Covered
+  by `test_universe.py::test_exclude_stale_prices_filter_drops_stale_with_its_own_reason`,
+  `test_a_stale_symbol_is_flagged_but_not_suspended` and the updated portfolio test
+  (`test_evaluate_warns_for_illiquid_and_stale`).
+- **Optimize, P&L and Risk read only the V2 price layer.** A new
+  `DataService.get_prices_v2` returns `v2_daily_prices` bars with **no V1 fallback**;
+  a ticker without V2 bars is `status="missing"` with an explicit warning. The
+  `_load_symbol_series` helper (shared by `/universe/build`, `/optimize`,
+  `/optimize/frontier`, `/risk` and `/risk/compare`) now calls it, P&L values
+  holdings from the V2 raw close (history starts at the earliest past buy date),
+  Optimize provenance (`data_sources`) reports the V2 provider, and every kept
+  symbol whose latest bar trails the window is named in the response warnings. The
+  Optimize page's outdated V1 note is corrected. Covered by
+  `test_sync.py::test_get_prices_v2_is_v2_only_and_reports_missing` and the updated
+  endpoint fixtures, which now seed V2 bars.
+- **A per-ticker V2 price upsert failure no longer aborts the whole run.**
+  `V2PrecomputeService._backfill_ticker` wraps `store.upsert_prices` so a duplicate
+  `(ticker, date)` batch (Postgres `CardinalityViolation`) or any other database
+  error is logged and recorded as a `failed` checkpoint while the remaining tickers
+  still update; `_bulk_upsert`'s `_dedupe_rows` remains the first-line guard.
+  `test_v2_precompute.py::test_upsert_prices_collapses_duplicate_dates` and
+  `test_price_upsert_failure_is_contained_to_one_ticker` cover both.
+- **The trading calendar recognises `2026-11-24` as a market holiday.** The
+  illustrative `MarketRules.trading_holidays` set only carried 2025 dates, so the
+  freshness and staleness checks counted `2026-11-24` as a session. The 2026 fixed
+  holidays plus the confirmed `2026-11-24` closure are now included, so
+  `2026-11-25` is expected as the next valid session.
+
+### Optimize / efficient frontier (V2.1 patch)
+
+- **The cloud runs to 100,000 portfolios and the API plots a stratified sample.**
+  `docs/Update patch v2.1.md` asked for the full Monte Carlo on the server with a
+  downsampled payload; implemented as: `core.optimize.frontier.MAX_RANDOM_PORTFOLIOS`
+  and `Settings.frontier_max_portfolios` rise from 20,000 to 100,000, and the new
+  pure `core.optimize.frontier.stratified_cloud_indices` picks at most
+  `Settings.frontier_cloud_points` (`VNOPT_FRONTIER_CLOUD_POINTS`, default 6,000)
+  cloud points on a quantile grid over (volatility, return). Every occupied cell
+  contributes its lowest- and highest-return point and the four global extremes are
+  always kept, so the efficient edge and the outer boundary survive; the remaining
+  budget is spread over the cells in proportion to their size with evenly spaced
+  members, so a dense region still looks dense. The sample is drawn from the same
+  deterministic cloud the statistics use — Sharpe, the frontier sweep and the
+  marked portfolios are computed from every simulated portfolio and are never
+  sampled. `_frontier_to_response` calls the sampler, the response's
+  `assumptions` gains `portfolios_plotted`, `/optimize/options` publishes
+  `frontier_defaults.cloud_points` and `max_portfolios`, and the web client renders
+  the cap from the API instead of a hardcoded `20,000` and captions the chart
+  "showing 6,000 of 100,000 random mixes". Measured locally on 30 assets: 100,000
+  portfolios in 0.15 s (0.15 s with a 25% cap) and a 6,000-point sample in 0.024 s,
+  so the extra simulation costs compute, not latency; the plotted cloud's JSON
+  drops from 2,083 KiB (20,000 points) to 625 KiB (6,000 points) while the
+  simulation behind it grows five-fold. Covered by
+  `test_frontier.py::test_cloud_sample_*` (budget, ordering, hull/envelope,
+  determinism, tiny-budget fallback, input validation) and
+  `test_optimize_endpoint.py::test_frontier_plots_a_stratified_sample_of_the_cloud`
+  (the plotted points are a subset of the same seeded simulation and the marked
+  portfolios are never dropped).
+
 ### V2 precompute pipeline
+
+- **The `--unpriced` backfill hint no longer promises progress it cannot make.**
+  Run #11 (2026-11-26) finished green — `quality_errors=0`, the dataset current at
+  `2026-11-25`, `ssi_statistics` owning the latest bar — but its price step
+  processed `0` tickers while `prices: pre-screen rejected 1023 candidate(s)`:
+  every remaining unpriced name trades below the 10k-share median-volume floor, so
+  repeating the documented `mode=full, limit=150, unpriced=true` dispatch cannot
+  move `tickers without prices` off 1,023. `scripts/verify_v2_db.py` now prints the
+  floor as a separate line (`backfill floor`, naming the setting and the run #11
+  evidence) plus a `backfill value` line stating that the tail fails every liquidity
+  preset (the smallest ADV floor is 100,000 shares/day) and therefore only feeds
+  "All Stocks"; `docs/DEPLOYMENT.md` step 5 and `docs/DATA.md` carry the same
+  evidence and the cost (~25 requests per ticker, ~25k for the whole tail).
 
 - **A pre-close or holiday run targets the last *completed* session.** The
   2026-11-25 dispatch that failed with `quality: stale dataset, latest price bar

@@ -249,8 +249,44 @@ class DataService:
             return self.get_prices(symbol, start=start, end=end, ensure=True)
         return self._price_series_from_v2(code, bars, today)
 
+    def get_prices_v2(
+        self,
+        symbol: str,
+        *,
+        start: date | None = None,
+        end: date | None = None,
+    ) -> PriceSeries:
+        """Return prices from the V2 store **only** (no V1 fallback).
+
+        The Optimize, P&L and Risk routes call this so every price, return and
+        valuation query resolves from the unified V2 dataset (``v2_daily_prices``).
+        A ticker without V2 bars returns an empty series with ``status="missing"``
+        and an explicit warning, so the caller surfaces a data-availability problem
+        instead of silently using a stale V1 series. Staleness uses the same
+        calendar/tolerance rule as the V1 path.
+        """
+        code = symbol.upper()
+        today = self._today()
+        range_end = end or today
+        range_start = start or (range_end - timedelta(days=self._settings.on_demand_history_days))
+        with session_scope(self._session_factory) as session:
+            bars = V2Store(session).get_prices(code, range_start, range_end)
+        if not bars:
+            return PriceSeries(
+                symbol=code,
+                source=None,
+                stale=False,
+                status="missing",
+                warnings=[
+                    f"no V2 price data for {code}; run the V2 precompute/backfill "
+                    "(V1 prices are not used for this calculation)"
+                ],
+                rows=[],
+            )
+        return self._price_series_from_v2(code, bars, today)
+
     def _price_series_from_v2(
-        self, code: str, bars: list[AdjustedOHLCV], today: date
+        self, code: str, bars: list[AdjustedOHLCV], today: date, *, status: str = "ok"
     ) -> PriceSeries:
         """Build a :class:`PriceSeries` from stored V2 bars.
 
@@ -283,7 +319,7 @@ class DataService:
             symbol=code,
             source=rows[-1].source if rows else None,
             stale=stale,
-            status="ok",
+            status=status,
             warnings=warnings,
             rows=rows,
         )

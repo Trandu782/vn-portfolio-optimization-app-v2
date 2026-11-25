@@ -6,6 +6,6 @@ Adding a filter is one new module in this package plus one ``@register`` call.
 
 from __future__ import annotations
 
-from core.filters import exchange, history, liquidity, tradability
+from core.filters import exchange, history, liquidity, quality, tradability
 
-__all__ = ["exchange", "history", "liquidity", "tradability"]
+__all__ = ["exchange", "history", "liquidity", "quality", "tradability"]

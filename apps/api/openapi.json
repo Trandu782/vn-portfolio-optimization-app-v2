@@ -1053,6 +1053,11 @@
             "title": "Portfolios Generated",
             "type": "integer"
           },
+          "portfolios_plotted": {
+            "description": "Random-cloud points in this response (a stratified sample of portfolios_generated).",
+            "title": "Portfolios Plotted",
+            "type": "integer"
+          },
           "portfolios_requested": {
             "title": "Portfolios Requested",
             "type": "integer"
@@ -1106,6 +1111,7 @@
           "max_weight",
           "portfolios_requested",
           "portfolios_generated",
+          "portfolios_plotted",
           "frontier_points",
           "skipped_targets",
           "trading_days",
@@ -1117,6 +1123,11 @@
       "FrontierDefaults": {
         "description": "Defaults and limits for the efficient-frontier view.",
         "properties": {
+          "cloud_points": {
+            "description": "Scatter points a frontier response plots. The simulation runs every requested portfolio and the response carries a stratified sample of at most this many.",
+            "title": "Cloud Points",
+            "type": "integer"
+          },
           "frontier_points": {
             "title": "Frontier Points",
             "type": "integer"
@@ -1148,6 +1159,7 @@
         "required": [
           "portfolios",
           "max_portfolios",
+          "cloud_points",
           "frontier_points",
           "max_stocks"
         ],
@@ -1261,7 +1273,7 @@
           },
           "num_portfolios": {
             "default": 5000,
-            "description": "Number of random portfolios drawn for the cloud.",
+            "description": "Number of random portfolios drawn for the cloud. The statistics use all of them; the response plots a stratified sample (see frontier_defaults.cloud_points).",
             "minimum": 1.0,
             "title": "Num Portfolios",
             "type": "integer"

@@ -50,13 +50,21 @@ class DailyBar:
 
 @dataclass(frozen=True)
 class SymbolSeries:
-    """A candidate symbol: metadata plus its in-range price history."""
+    """A candidate symbol: metadata plus its in-range price history.
+
+    ``suspended`` and ``delisted`` are **authoritative exchange status** signals,
+    never inferred from a trailing price bar. A ticker whose latest V2 bar merely
+    trails the requested window end is ``stale`` (an explicit data-quality signal),
+    so an actively traded name with an incomplete backfill is not mislabelled as
+    suspended.
+    """
 
     code: str
     exchange: str
     bars: tuple[DailyBar, ...]
     suspended: bool = False
     delisted: bool = False
+    stale: bool = False
 
 
 @dataclass(frozen=True)
@@ -67,6 +75,7 @@ class QualityFlags:
     delisted: bool
     missing_data: bool
     illiquid: bool
+    stale: bool = False
 
 
 @dataclass(frozen=True)
@@ -226,10 +235,14 @@ def build_universe(
             bars=in_range,
             suspended=raw.suspended,
             delisted=raw.delisted,
+            stale=raw.stale,
         )
         if not series.bars:
             dropped.append(
-                DroppedTicker(code=code, reason="no price data in the requested date range")
+                DroppedTicker(
+                    code=code,
+                    reason="missing_price_history: no price data in the requested date range",
+                )
             )
             continue
         reason, filter_id = _first_drop(series, filters)
@@ -303,6 +316,7 @@ def _assemble(
             delisted=series.delisted,
             missing_data=bool(np.isnan(price[:, column]).any()),
             illiquid=adv_by_symbol[series.code] <= 0.0,
+            stale=series.stale,
         )
         for column, series in enumerate(kept)
     }
