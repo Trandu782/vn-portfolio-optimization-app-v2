@@ -300,7 +300,7 @@ financial ratios.
   An `--unpriced` backfill reports that dataset-level lag as a warning (it refreshes
   no priced ticker, so it cannot fix it); the scheduled runs keep the hard check.
 - **Daily jobs** — the scheduled GitHub Actions workflow (`precompute_v2.yml`)
-  runs `--incremental` after the close (weekdays `37 9 * * 1-5` = 16:37 ICT) and
+  runs `--incremental` after the close (weekdays `7 13 * * 1-5` = 20:07 ICT) and
   nightly (`13 19 * * *` = 02:13 ICT); the off-`:00`/`:30` minutes avoid GitHub's
   busiest scheduler slots. Overlapping triggers queue in the `precompute-v2`
   concurrency group. A scheduled run passes `--limit 150`, so it refreshes the

@@ -365,8 +365,8 @@ after the job), so use the same Supabase database as the API.
    those chunks if the remaining names are the illiquid tail the 10k-share floor
    rejects (the job then logs `prices: pre-screen rejected N candidate(s) ...` when
    names are dropped, and nothing when the floor is disabled). Then let the schedule
-   run `--incremental`: weekdays at `37 9 * * 1-5` (09:37 UTC = 16:37 ICT, after the
-   close) and nightly at `13 19 * * *` (19:13 UTC = 02:13 ICT), which repairs a
+   run `--incremental`: weekdays at `7 13 * * 1-5` (13:07 UTC = 20:07 ICT, late
+   enough for SSI to publish) and nightly at `13 19 * * *` (19:13 UTC = 02:13 ICT), which repairs a
    failed weekday run. Both share the `precompute-v2` concurrency group with
    `cancel-in-progress: false`, so they queue instead of overlapping (a queued run
    starts later than it was created, never earlier). The odd minutes keep the crons
@@ -386,9 +386,9 @@ after the job), so use the same Supabase database as the API.
    `--as-of`) to force a date and keep those errors strict. Note that
    `ssi_statistics` publishes the stock EOD bars hours after the close (on
    2026-11-25 it had nothing for the 11-25 session at 18:40 ICT, while VCI and KBS
-   already did), so the 16:37 ICT cron legitimately lags one session: set
-   `VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS=1` to log that as a warning, or
-   move the cron later. `VNOPT_LOG_LEVEL` (default `INFO`) controls the diagnostics
+   already did), so the post-close cron runs at 20:07 ICT (`7 13 * * 1-5`) and
+   `VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS=1` logs a remaining lag as a
+   warning instead of failing. `VNOPT_LOG_LEVEL` (default `INFO`) controls the diagnostics
    that now reach the job log (excluded securities, pre-screen rejections, re-bases).
 
    Budget: SSI `stock-info` pages 40 rows and the adapter walks 366-day windows,

@@ -94,6 +94,13 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Infrastructure / deployment
 
+- **The post-close cron moved to 20:07 ICT.** `7 13 * * 1-5` (13:07 UTC) replaces
+  `37 9 * * 1-5`: `ssi_statistics` publishes the stock EOD bars hours after the
+  15:00 ICT close (on 2026-11-25 it still had no bar for that session at 18:40 ICT
+  while VCI and KBS already did), so the 16:37 run only re-fetched an unchanged tail
+  and the quality gate reported a false `stale dataset`. The nightly `13 19 * * *`
+  (02:13 ICT) pass is unchanged and remains the guaranteed repair.
+
 - **`precompute_v2.yml` reports which trigger fired, in both clocks.** A new
   `Report trigger` step prints `github.event_name`, `github.event.schedule` (the
   cron expression that fired), the ref and the UTC/ICT timestamps, because a cron

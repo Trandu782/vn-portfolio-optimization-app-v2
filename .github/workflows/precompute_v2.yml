@@ -17,8 +17,11 @@ name: Precompute V2 datasets
 # Two schedules run the same job, so a missed or partial trading-day run is
 # repaired the same night:
 #
-#   1. `37 9 * * 1-5` -> 09:37 UTC = 16:37 ICT, weekdays, right after the
-#      15:00 ICT close (same-session data).
+#   1. `7 13 * * 1-5`  -> 13:07 UTC = 20:07 ICT, weekdays. Deliberately not right
+#      after the 15:00 ICT close: `ssi_statistics` publishes the stock EOD bars
+#      hours later (on 2026-11-25 it still had no bar for that session at 18:40
+#      ICT while VCI and KBS already did), so a run at 16:37 only re-fetched an
+#      unchanged tail. The nightly pass remains the guaranteed repair.
 #   2. `13 19 * * *`  -> 19:13 UTC = 02:13 ICT (UTC+7), nightly, which picks up
 #      late provider corrections plus any weekday run that failed. Because the
 #      scheduled mode is `incremental`, a second pass only fetches new dates.
@@ -32,8 +35,8 @@ name: Precompute V2 datasets
 # still processes settled data.
 on:
   schedule:
-    # Weekdays 09:37 UTC = 16:37 ICT, after the 15:00 ICT close.
-    - cron: "37 9 * * 1-5"
+    # Weekdays 13:07 UTC = 20:07 ICT, after SSI actually publishes the EOD bars.
+    - cron: "7 13 * * 1-5"
     # Nightly 19:13 UTC = 02:13 AM Vietnam time (UTC+7).
     - cron: "13 19 * * *"
   workflow_dispatch:

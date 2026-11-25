@@ -61,8 +61,9 @@ Only simple returns are used (CFA Level 1/2), matching the rest of the app.
 ## D-004 — Scheduler: GitHub Actions primary, manual CLI for local use
 
 **Decision.** Run the pipeline in `.github/workflows/precompute_v2.yml` (a runner,
-not a short serverless function), scheduled at `37 9 * * 1-5` UTC = 16:37 ICT on
-weekdays (after the 15:00 ICT close) and nightly at `13 19 * * *` UTC = 02:13 ICT,
+not a short serverless function), scheduled at `7 13 * * 1-5` UTC = 20:07 ICT on
+weekdays (late enough for `ssi_statistics` to publish the session) and nightly at
+`13 19 * * *` UTC = 02:13 ICT,
 with `workflow_dispatch` for manual and heavy-backfill runs. Provide the manual
 equivalent `python -m data.v2.jobs.precompute`. The Vercel cron keeps the V1
 `/api/v1/data/refresh` only; heavy backfill must never run in the 120-second
