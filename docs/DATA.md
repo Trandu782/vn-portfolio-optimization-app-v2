@@ -293,7 +293,12 @@ financial ratios.
   disables the fallback, so a genuinely stale benchmark or dataset still fails loudly.
   `VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS` (default `0`) is the only
   tolerance: set it to `1` while an upstream feed is known to publish one session
-  late, and the lag is logged as a warning instead of failing the gate.
+  late, and the lag is logged as a warning instead of failing the gate. That is the
+  normal situation for `ssi_statistics`: on 2026-11-25 it still had no bar for the
+  11-25 session at 18:40 ICT while VCI and KBS already did, so a post-close run
+  targets a session the price feed cannot serve yet and the nightly pass completes it.
+  An `--unpriced` backfill reports that dataset-level lag as a warning (it refreshes
+  no priced ticker, so it cannot fix it); the scheduled runs keep the hard check.
 - **Daily jobs** — the scheduled GitHub Actions workflow (`precompute_v2.yml`)
   runs `--incremental` after the close (weekdays `37 9 * * 1-5` = 16:37 ICT) and
   nightly (`13 19 * * *` = 02:13 ICT); the off-`:00`/`:30` minutes avoid GitHub's

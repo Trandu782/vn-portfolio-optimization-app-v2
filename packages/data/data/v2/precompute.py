@@ -368,7 +368,9 @@ class V2PrecomputeService:
         )
         report.steps.append(self._compute_sector_statistics(target))
         report.steps.append(self._run_ratio_quality(target))
-        quality_step, quality_errors = self._run_quality(target, universe=universe)
+        quality_step, quality_errors = self._run_quality(
+            target, universe=universe, only_unpriced=only_unpriced
+        )
         report.steps.append(quality_step)
         report.steps.append(self._compute_adjustment_flags(target, universe=universe))
         report.quality_errors = quality_errors
@@ -818,9 +820,10 @@ class V2PrecomputeService:
         if rejected:
             listed = ", ".join(rejected[:PRE_SCREEN_LOG_LIMIT])
             more = "" if len(rejected) <= PRE_SCREEN_LOG_LIMIT else ", ..."
-            self._log.info(
+            self._log.warning(
                 "prices: pre-screen rejected %d candidate(s) (median volume below %d "
-                "shares): %s%s",
+                "shares; set VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME=0 to include "
+                "them): %s%s",
                 len(rejected),
                 self._settings.precompute_pre_screen_min_median_volume,
                 listed,
@@ -1218,7 +1221,11 @@ class V2PrecomputeService:
         )
 
     def _run_quality(
-        self, target: date, *, universe: Sequence[TickerRecord] | None = None
+        self,
+        target: date,
+        *,
+        universe: Sequence[TickerRecord] | None = None,
+        only_unpriced: bool = False,
     ) -> tuple[StepResult, int]:
         """Run the quality checks; only integrity errors fail the step.
 
@@ -1230,6 +1237,11 @@ class V2PrecomputeService:
         days, zero-volume runs, suspicious moves, adjusted-vs-raw mismatch) are
         warnings: they are logged and stored as adjustment flags but never fail the
         step.
+
+        An ``only_unpriced`` backfill never refreshes the priced tickers, so it cannot
+        make the dataset-level series current: it reports that lag as a warning
+        instead of failing a run whose job is to add tickers. The scheduled
+        (non-backfill) runs keep the hard check.
         """
         with session_scope(self._session_factory) as session:
             store = V2Store(session)
@@ -1261,7 +1273,7 @@ class V2PrecomputeService:
                 tolerance,
             )
         dataset_lag = self._sessions_behind(overall_latest, target)
-        if master and dataset_lag > tolerance:
+        if master and dataset_lag and not (only_unpriced or dataset_lag <= tolerance):
             errors += 1
             self._log.error(
                 "quality: stale dataset, latest price bar %s (target %s)",
@@ -1269,12 +1281,27 @@ class V2PrecomputeService:
                 target.isoformat(),
             )
         elif master and dataset_lag:
+            # Name the cause: a price feed that publishes after the index is the usual
+            # reason, and a backfill run cannot fix it by design.
+            cause = (
+                "the price source has not published that session yet (the VNINDEX "
+                "benchmark already has it)"
+                if benchmark_latest is not None and benchmark_latest >= target
+                else "the upstream feeds are behind it"
+            )
+            scope = (
+                "an --unpriced backfill does not refresh the priced tickers"
+                if only_unpriced
+                else f"within the {tolerance}-session tolerance"
+            )
             self._log.warning(
-                "quality: dataset is %d session(s) behind %s (within the %d-session "
-                "tolerance)",
+                "quality: latest price bar %s is %d session(s) behind %s: %s; not failing "
+                "this run (%s)",
+                overall_latest.isoformat() if overall_latest else "none",
                 dataset_lag,
                 target.isoformat(),
-                tolerance,
+                cause,
+                scope,
             )
         checked = 0
         for record in master:

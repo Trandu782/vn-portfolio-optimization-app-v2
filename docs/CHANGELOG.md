@@ -28,7 +28,23 @@ project follows [Semantic Versioning](https://semver.org/).
   `test_calendar.py::test_last_completed_session_*` and
   `test_v2_precompute.py::test_pre_close_run_targets_the_last_completed_session` /
   `..._staleness_tolerance_excuses_a_known_one_session_lag`.
-- **`--unpriced` finishes a large backfill without re-fetching the priced names.**
+- **A backfill run no longer fails the freshness gate it cannot influence, and the
+  price-feed lag is named.** Run #9 (2026-11-25) priced `PVI` (+967 bars) and was still
+  marked failed by `quality: stale dataset, latest price bar 2026-11-23 (target
+  2026-11-25)`: an `--unpriced` chunk refreshes no priced ticker, and `SSI stock-info`
+  had not published the 2026-11-25 session yet (VCI and KBS already had it — verified
+  at 18:40 ICT), so no run could make the dataset current. `_run_quality` now takes
+  `only_unpriced` and downgrades that specific case to a warning that names the cause
+  (`quality: latest price bar ... the price source has not published that session yet
+  (the VNINDEX benchmark already has it); not failing this run (an --unpriced backfill
+  does not refresh the priced tickers)`), while the scheduled runs keep the hard check.
+  The pre-screen rejection summary is now a `WARNING` (it was `INFO`, i.e. invisible at
+  the default log level — which is why run #9 gave no hint that only 2 of 1,023
+  candidates were selected) and `python -m data.v2.jobs.precompute` calls
+  `logging.basicConfig` (`VNOPT_LOG_LEVEL`, default `INFO`, to stdout), so the
+  ticker-master exclusion counts, re-base refreshes and ratio-warning totals reach the
+  Actions log.
+
   A 1,519-ticker master with 1,482 `v2_progress` rows (494 priced tickers × 3
   dataset kinds) left 1,025 tickers with no prices: they had no checkpoint at all,
   so every scheduled run spent its 150 slots on the priced tickers instead (whose

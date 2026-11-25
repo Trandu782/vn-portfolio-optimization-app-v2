@@ -15,6 +15,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import logging
+import os
 import sys
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
@@ -101,6 +103,25 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _configure_logging() -> None:
+    """Send the pipeline's diagnostics to stdout so they reach the Actions log.
+
+    Without this the root logger defaults to ``WARNING``, which silently drops the
+    operator messages the pipeline emits at ``INFO`` (ticker-master exclusions, re-base
+    refreshes, the number of ratio warnings). ``VNOPT_LOG_LEVEL`` overrides the level;
+    the default is ``INFO``, which the precompute path can afford because it never uses
+    the failover runner's per-request ``INFO`` lines.
+    """
+    raw = os.environ.get("VNOPT_LOG_LEVEL", "INFO").upper()
+    level = getattr(logging, raw, None)
+    logging.basicConfig(
+        level=level if isinstance(level, int) else logging.INFO,
+        format="%(levelname)s %(name)s: %(message)s",
+        stream=sys.stdout,
+        force=True,
+    )
+
+
 def _print_report(report: PrecomputeReport) -> None:
     status = "ok" if report.ok else "FAIL"
     print(f"[{status}] mode={report.mode} as_of={report.as_of.isoformat()}")
@@ -117,6 +138,7 @@ def _print_report(report: PrecomputeReport) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the pipeline selected by the CLI arguments."""
     args = _build_parser().parse_args(list(argv) if argv is not None else None)
+    _configure_logging()
     recompute_members: str | None = None
     if args.recompute_flags:
         if args.members is None:

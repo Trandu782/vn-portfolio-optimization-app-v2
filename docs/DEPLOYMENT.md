@@ -383,7 +383,13 @@ after the job), so use the same Supabase database as the API.
    last published session instead of failing `quality: stale benchmark` /
    `quality: stale dataset`; a run *before* the 15:00 ICT close or on a holiday
    simply targets the previous completed session. Pass the `as_of` input (or
-   `--as-of`) to force a date and keep those errors strict.
+   `--as-of`) to force a date and keep those errors strict. Note that
+   `ssi_statistics` publishes the stock EOD bars hours after the close (on
+   2026-11-25 it had nothing for the 11-25 session at 18:40 ICT, while VCI and KBS
+   already did), so the 16:37 ICT cron legitimately lags one session: set
+   `VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS=1` to log that as a warning, or
+   move the cron later. `VNOPT_LOG_LEVEL` (default `INFO`) controls the diagnostics
+   that now reach the job log (excluded securities, pre-screen rejections, re-bases).
 
    Budget: SSI `stock-info` pages 40 rows and the adapter walks 366-day windows,
    so a first history from `2023-01-01` costs roughly 25 requests per ticker

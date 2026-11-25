@@ -740,6 +740,37 @@ def test_incremental_ratio_refresh_is_skipped_on_the_same_day(
     assert fake.ratio_calls == []  # already refreshed on the target date
 
 
+def test_unpriced_run_reports_a_dataset_lag_instead_of_failing(
+    factory: sessionmaker[Session], caplog: pytest.LogCaptureFixture
+) -> None:
+    """A backfill that cannot refresh the priced tickers warns about the lag, not fails.
+
+    Run #9 (2026-11-25) priced PVI while SSI still had no bar for that session and the
+    run failed `quality: stale dataset`; the work was correct, the gate was out of scope
+    for an --unpriced chunk.
+    """
+    previous = AS_OF - timedelta(days=1)
+    fake = FakeSources(
+        bars_by_ticker={
+            ticker: _bars(START, previous) for ticker in ("VCB", "FPT", "XYZ")
+        },
+        vn30=["VCB"],
+        vn100=["VCB", "FPT"],
+    )
+    # The benchmark has the target session; the price feed does not (the real SSI lag).
+    service = _service(factory, fake.to_sources(), _Clock(AS_OF))
+    service.run(mode="full", start=START, limit=1)  # prices one ticker only
+
+    fake.bar_calls.clear()
+    with caplog.at_level(logging.WARNING, logger="data.v2.precompute"):
+        report = service.run(mode="full", start=START, as_of=AS_OF, only_unpriced=True)
+
+    assert report.ok, report
+    assert report.quality_errors == 0
+    assert "has not published that session yet" in caplog.text
+    assert "does not refresh the priced tickers" in caplog.text
+
+
 def test_limit_prioritizes_index_members_and_spends_it_after_the_prescreen(
     factory: sessionmaker[Session], caplog: pytest.LogCaptureFixture
 ) -> None:
