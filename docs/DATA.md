@@ -309,13 +309,16 @@ financial ratios.
   runs `--incremental` after the close (weekdays `7 13 * * 1-5` = 20:07 ICT) and
   nightly (`13 19 * * *` = 02:13 ICT); the off-`:00`/`:30` minutes avoid GitHub's
   busiest scheduler slots. Overlapping triggers queue in the `precompute-v2`
-  concurrency group. A scheduled run passes `--limit 150`, so it refreshes the
-  tracked tickers plus a bounded batch of index members and other new ones well
-  inside the 350-minute job timeout (the next cron continues the backfill); a
-  manual dispatch defaults to the same `150` (blank means no cap). The job keys the
+  concurrency group. A scheduled run passes `--limit 1000`, so a single incremental
+  pass covers the whole priced universe (an incremental refresh is about one page
+  per ticker) and stays inside the 350-minute job timeout; the pending tickers are
+  ordered **most-stale-first**, so a name that has fallen behind (for example one
+  still on `2026-11-23` after the `2026-11-24` holiday) is refreshed before a
+  recently updated one and can never be starved by the alphabetical head. A manual
+  dispatch defaults to the same `1000` (blank means no cap). The job keys the
   pip cache on both `pyproject.toml` files and runs Python unbuffered (`python -u`
   with `PYTHONUNBUFFERED=1`), both per-ticker loops print a
-  `[prices] 37/150 FPT (+968 bars)` / `[ratios] ...` line every 10 tickers, and a
+  `[prices] 370/1000 FPT (+968 bars)` / `[ratios] ...` line every 10 tickers, and a
   `Report trigger` step prints the event, the cron expression that fired and the
   UTC/ICT timestamps, so a run outside the expected window can be identified from
   the log. The Vercel cron only refreshes the V1 tables. Manual commands:

@@ -1194,3 +1194,58 @@ def test_price_upsert_failure_is_contained_to_one_ticker(
         assert store.latest_price_date("VCB") == AS_OF
         assert store.latest_price_date("XYZ") == AS_OF
 
+
+
+def test_latest_price_dates_reports_one_row_per_ticker(
+    factory: sessionmaker[Session],
+) -> None:
+    """The batch staleness lookup returns the newest bar date for every ticker."""
+    with session_scope(factory) as session:
+        store = V2Store(session)
+        store.upsert_prices(
+            "AAA",
+            _bars(START, START + timedelta(days=2)),
+            price_adjustment_basis="raw",
+            data_as_of=AS_OF,
+        )
+        store.upsert_prices(
+            "BBB",
+            _bars(START, START + timedelta(days=5)),
+            price_adjustment_basis="raw",
+            data_as_of=AS_OF,
+        )
+        latest = store.latest_price_dates()
+    assert set(latest) == {"AAA", "BBB"}
+    assert latest["AAA"] < latest["BBB"]
+
+
+def test_select_candidates_prefers_the_most_stale_ticker(
+    factory: sessionmaker[Session],
+) -> None:
+    """A limited run refreshes the oldest bar first, not the alphabetical head.
+
+    The observed bug: a ticker could sit at 2026-11-23 for days because a ``--limit``
+    run spent its slots on the alphabetical tracked head. The pending set is now
+    ordered most-stale-first, so a name that fell behind is fixed on the next run.
+    """
+    fake = _fake()
+    service = _service(factory, fake.to_sources(), _Clock(AS_OF))
+    older = AS_OF - timedelta(days=5)
+    newer = AS_OF - timedelta(days=2)
+    with session_scope(factory) as session:
+        store = V2Store(session)
+        store.upsert_prices(
+            "VCB", _bars(START, older), price_adjustment_basis="raw", data_as_of=older
+        )
+        store.upsert_prices(
+            "FPT", _bars(START, newer), price_adjustment_basis="raw", data_as_of=newer
+        )
+
+    # FPT sorts first alphabetically and is only two sessions behind; VCB is five
+    # sessions behind and must win the single slot.
+    selected = service._select_candidates(
+        ["FPT", "VCB"], target=AS_OF, mode="incremental", limit=1
+    )
+
+    assert selected == ["VCB"]
+

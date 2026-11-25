@@ -98,15 +98,17 @@ jobs:
       # a warning instead of failing the quality gate. An explicit value keeps the
       # strict stale-benchmark / stale-dataset errors.
       AS_OF: ${{ inputs.as_of }}
-      # A scheduled run processes the active tickers plus a bounded batch of new
-      # ones (150) so the nightly/post-close cron cannot time out while it walks a
-      # large universe; every ticker commits independently, so the next cron run
-      # resumes from there. The batch is ordered tracked tickers first, then
-      # unpriced VN100/VN30 members, then the rest, and the cap is spent only on
-      # tickers that survive the pre-screen, so no slot goes to a rejected symbol.
-      # A manual dispatch defaults to the same 150 and still accepts a custom
-      # value; blank means no cap, which normally exceeds the job timeout.
-      LIMIT: ${{ github.event_name == 'schedule' && '150' || inputs.limit }}
+      # A scheduled run must bring the whole tracked universe to the latest session,
+      # not just a 150-name slice: with a cap that small, a ticker late in the order
+      # (or one that slipped behind) could sit at an older session for days while the
+      # cap was spent on the same alphabetical head. The incremental refresh is cheap
+      # (~1 page per ticker), so the cap is raised to 1000 and the pipeline orders the
+      # pending tickers most-stale-first, which fixes a lagging tail on the next run
+      # even if the job does hit its timeout. Every ticker commits independently, so a
+      # later run resumes from the committed progress. A manual dispatch defaults to
+      # the same 1000 and accepts a custom value; blank means no cap (a full backfill,
+      # which normally exceeds the job timeout).
+      LIMIT: ${{ github.event_name == 'schedule' && '1000' || inputs.limit }}
       UNPRICED: ${{ inputs.unpriced }}
       PROFILES: ${{ inputs.profiles }}
       # Optional tuning knobs, read from Settings -> Secrets and variables ->

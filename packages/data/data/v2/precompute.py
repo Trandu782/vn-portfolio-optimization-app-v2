@@ -801,33 +801,44 @@ class V2PrecomputeService:
         limit: int | None,
         only_unpriced: bool = False,
     ) -> list[str]:
-        """Return the tickers to backfill, in priority order, capped at ``limit``.
+        """Return the tickers to backfill, most-stale first, capped at ``limit``.
 
         An incremental run, a chunked ``--full --limit`` run and an ``--unpriced`` run
-        keep only the tickers whose stored prices are not current, so repeated runs
-        walk the universe instead of re-processing the finished names (and a same-day
-        run has nothing to do); ``only_unpriced`` drops every ticker that already has
-        a bar, whatever its date. The pre-screen then runs while the budget is spent,
-        so a symbol it rejects costs no ``--limit`` slot and every limited run makes
-        real backfill progress; the rejections are logged once per run, so an unpriced
-        ticker can be explained instead of silently disappearing from every run.
+        keep only the tickers whose stored prices are not current. The pending set is
+        then **ordered by staleness** (oldest stored bar first) before the budget is
+        spent, so a ticker that has been behind for days is refreshed before a recently
+        updated one; the plain alphabetical tracked-first order alone let a limited run
+        skip a stale tail indefinitely. Never-priced tickers have no bar and sort last
+        (they are the only candidates under ``only_unpriced``). The pre-screen then runs
+        while the budget is spent, so a symbol it rejects costs no ``--limit`` slot and
+        every limited run makes real backfill progress; the rejections are logged once
+        per run, so an unpriced ticker can be explained instead of silently disappearing
+        from every run.
         """
         selected: list[str] = []
         if limit is not None and limit <= 0:
             return selected
         check_pending = mode == "incremental" or limit is not None or only_unpriced
-        rejected: list[str] = []
+        latest_by_ticker: dict[str, date] = {}
+        if check_pending:
+            with session_scope(self._session_factory) as session:
+                latest_by_ticker = V2Store(session).latest_price_dates()
+        pending: list[tuple[date | None, str]] = []
         for ticker in ordered:
-            if limit is not None and len(selected) >= limit:
-                break
-            latest: date | None = None
+            latest = latest_by_ticker.get(ticker.upper()) if check_pending else None
             if check_pending:
-                with session_scope(self._session_factory) as session:
-                    latest = V2Store(session).latest_price_date(ticker)
                 if latest is not None and latest >= target:
                     continue
-            if only_unpriced and latest is not None:
-                continue
+                if only_unpriced and latest is not None:
+                    continue
+            pending.append((latest, ticker))
+        # Oldest stored bar first; a never-priced ticker (``None``) sorts after every
+        # dated one. ``date.min`` makes the key total without comparing ``None``.
+        pending.sort(key=lambda item: (item[0] is None, item[0] or date.min))
+        rejected: list[str] = []
+        for _latest, ticker in pending:
+            if limit is not None and len(selected) >= limit:
+                break
             if self._passes_pre_screen(ticker):
                 selected.append(ticker)
             else:

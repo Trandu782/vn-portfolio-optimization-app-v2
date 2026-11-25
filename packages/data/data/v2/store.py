@@ -391,6 +391,20 @@ class V2Store:
             )
         )
 
+    def latest_price_dates(self) -> dict[str, date]:
+        """Return the newest stored bar date per ticker (one cheap group-by).
+
+        The precompute candidate selector uses this to order pending tickers by
+        staleness in a single query instead of issuing one ``MAX`` per ticker.
+        """
+        statement = select(
+            V2DailyPrice.symbol_code, func.max(V2DailyPrice.date)
+        ).group_by(V2DailyPrice.symbol_code)
+        return {
+            symbol.upper(): latest
+            for symbol, latest in self._session.execute(statement)
+        }
+
     def earliest_price_date(self, symbol: str) -> date | None:
         """Return the oldest stored bar date for ``symbol`` (or ``None``)."""
         return self._session.scalar(

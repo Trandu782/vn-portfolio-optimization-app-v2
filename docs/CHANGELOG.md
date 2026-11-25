@@ -8,6 +8,16 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Data quality and V2 price routing
 
+- **A limited precompute run can no longer leave a ticker stuck on an old session.**
+  The scheduled job passes `LIMIT=1000` (was `150`) and
+  `V2PrecomputeService._select_candidates` orders the pending tickers
+  **most-stale-first** (using a new `V2Store.latest_price_dates` batch lookup)
+  instead of the alphabetical tracked-first order. A name like the ones still stuck
+  on `2026-11-23` after the `2026-11-24` holiday is now refreshed on the next run
+  even if the job hits its timeout, and the larger cap brings the whole priced
+  universe to `2026-11-25` in a single incremental pass. Covered by
+  `test_v2_precompute.py::test_select_candidates_prefers_the_most_stale_ticker` and
+  `test_latest_price_dates_reports_one_row_per_ticker`.
 - **A trailing price bar is now `stale_price_data`, never `suspended`.** Optimize
   (via `POST /universe/build`), Risk and Portfolio used `_looks_suspended`
   (`apps/api/app/api/v1/universe.py`), which treated "latest bar trails the range
