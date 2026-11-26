@@ -591,6 +591,7 @@ class V2PrecomputeService:
         ordered = self._order_price_candidates(
             all_tickers,
             skip_known_empty=mode == "incremental" and not refresh_profiles,
+            target=target,
         )
         # The pre-screen runs while the limit is spent, so a rejected symbol never
         # consumes a slot; an incremental (or chunked full) run keeps only the
@@ -751,7 +752,11 @@ class V2PrecomputeService:
         return False
 
     def _order_price_candidates(
-        self, tickers: Sequence[str], *, skip_known_empty: bool
+        self,
+        tickers: Sequence[str],
+        *,
+        skip_known_empty: bool,
+        target: date | None = None,
     ) -> list[str]:
         """Return the price candidates in backfill priority order.
 
@@ -765,10 +770,12 @@ class V2PrecomputeService:
 
         With ``skip_known_empty`` (an incremental run without a forced
         ``--profiles`` refresh) a ticker whose checkpoint is ``done`` with no
-        stored bar is dropped, so a symbol that never trades stops costing a daily
-        API call; a full run or ``--profiles`` keeps it so the periodic refresh can
-        re-check it. Emptiness is decided by ``v2_daily_prices``, so a legacy zero
-        count on a priced ticker can never hide it from the daily run.
+        stored bar, or whose ``pre_screen_rejected`` checkpoint is still within
+        ``precompute_pre_screen_cooldown_days``, is dropped so a symbol that never
+        trades stops costing a daily API call; a full run or ``--profiles`` keeps
+        it so the periodic refresh can re-check it. Emptiness is decided by
+        ``v2_daily_prices``, so a legacy zero count on a priced ticker can never
+        hide it from the daily run.
         """
         with session_scope(self._session_factory) as session:
             store = V2Store(session)
@@ -776,6 +783,7 @@ class V2PrecomputeService:
             priced = set(store.history_starts())
             index_members = set(store.get_membership("VN100"))
             index_members.update(store.get_membership("VN30"))
+        cooldown_days = self._settings.precompute_pre_screen_cooldown_days
         tracked: list[str] = []
         indexed: list[str] = []
         rest: list[str] = []
@@ -784,7 +792,15 @@ class V2PrecomputeService:
             checkpoint = checkpoints.get(code)
             if code in priced or (checkpoint is not None and checkpoint.rows > 0):
                 tracked.append(ticker)
-            elif skip_known_empty and checkpoint is not None and checkpoint.state == "done":
+            elif skip_known_empty and checkpoint is not None and (
+                checkpoint.state == "done"
+                or (
+                    checkpoint.state == "pre_screen_rejected"
+                    and checkpoint.last_date is not None
+                    and target is not None
+                    and (target - checkpoint.last_date).days < cooldown_days
+                )
+            ):
                 continue
             elif code in index_members:
                 indexed.append(ticker)
@@ -809,23 +825,23 @@ class V2PrecomputeService:
         spent, so a ticker that has been behind for days is refreshed before a recently
         updated one; the plain alphabetical tracked-first order alone let a limited run
         skip a stale tail indefinitely. Never-priced tickers have no bar and sort last
-        (they are the only candidates under ``only_unpriced``). The pre-screen then runs
-        while the budget is spent, so a symbol it rejects costs no ``--limit`` slot and
-        every limited run makes real backfill progress; the rejections are logged once
-        per run, so an unpriced ticker can be explained instead of silently disappearing
-        from every run.
+        (they are the only candidates under ``only_unpriced``). Already-priced tickers
+        bypass the pre-screen so a temporary dip in volume never stalls updates;
+        unpriced rejections are persisted in ``v2_progress`` with
+        ``state='pre_screen_rejected'``.
         """
         selected: list[str] = []
         if limit is not None and limit <= 0:
             return selected
         check_pending = mode == "incremental" or limit is not None or only_unpriced
+        load_latest = check_pending or self._settings.precompute_pre_screen_enabled
         latest_by_ticker: dict[str, date] = {}
-        if check_pending:
+        if load_latest:
             with session_scope(self._session_factory) as session:
                 latest_by_ticker = V2Store(session).latest_price_dates()
         pending: list[tuple[date | None, str]] = []
         for ticker in ordered:
-            latest = latest_by_ticker.get(ticker.upper()) if check_pending else None
+            latest = latest_by_ticker.get(ticker.upper()) if load_latest else None
             if check_pending:
                 if latest is not None and latest >= target:
                     continue
@@ -836,14 +852,27 @@ class V2PrecomputeService:
         # dated one. ``date.min`` makes the key total without comparing ``None``.
         pending.sort(key=lambda item: (item[0] is None, item[0] or date.min))
         rejected: list[str] = []
-        for _latest, ticker in pending:
+        for latest, ticker in pending:
             if limit is not None and len(selected) >= limit:
                 break
-            if self._passes_pre_screen(ticker):
+            if latest is not None or self._passes_pre_screen(ticker):
                 selected.append(ticker)
             else:
                 rejected.append(ticker)
         if rejected:
+            with session_scope(self._session_factory) as session:
+                V2Store(session).set_progress_many(
+                    [
+                        ProgressRecord(
+                            kind="prices",
+                            symbol=ticker,
+                            state="pre_screen_rejected",
+                            last_date=target,
+                            rows=0,
+                        )
+                        for ticker in rejected
+                    ]
+                )
             listed = ", ".join(rejected[:PRE_SCREEN_LOG_LIMIT])
             more = "" if len(rejected) <= PRE_SCREEN_LOG_LIMIT else ", ..."
             self._log.warning(
@@ -1336,7 +1365,7 @@ class V2PrecomputeService:
                 bars = store.get_prices(record.ticker)
                 actions = store.get_corporate_actions(record.ticker)
                 progress = store.get_progress("prices", record.ticker)
-            if progress is None or progress.state == "failed":
+            if progress is None or progress.state in {"failed", "pre_screen_rejected"}:
                 # Not attempted in this run (a chunked backfill or a pre-screened name)
                 # or the prices step already reported the failure; do not count it here.
                 continue

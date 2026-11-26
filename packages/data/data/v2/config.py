@@ -119,6 +119,12 @@ class V2DataSettings(BaseSettings):
     #: backfill stays affordable, and it is deliberately low (10k shares) so the
     #: "All Stocks" universe is not silently filtered. Set to 0 to disable.
     precompute_pre_screen_min_median_volume: int = 10_000
+    #: Days to cache an unpriced ticker's pre-screen rejection before re-checking.
+    precompute_pre_screen_cooldown_days: int = 30
+    #: Days between incremental financial-ratio refreshes per ticker.
+    precompute_ratios_refresh_days: int = 7
+    #: Concurrent worker threads for per-ticker HTTP fetches during precompute.
+    precompute_concurrency: int = 3
 
     #: How many *trading sessions* the benchmark series (`VNINDEX`) and the overall
     #: price series may lag the resolved target before the quality gate fails. ``0``
@@ -138,7 +144,7 @@ class V2DataSettings(BaseSettings):
     #: difference beyond ``precompute_rebase_tolerance``, re-fetches the whole
     #: history and replaces the old rows in the same run. Detection uses prices
     #: only (never the corporate-actions feed, which omits some bonus issues).
-    precompute_rebase_overlap_sessions: int = 40
+    precompute_rebase_overlap_sessions: int = 10
     #: Relative tolerance for the overlap comparison (0.0001 = 0.01%).
     precompute_rebase_tolerance: float = 0.0001
 

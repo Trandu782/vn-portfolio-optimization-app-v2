@@ -554,6 +554,49 @@ class V2Store:
         row = self._session.get(V2Progress, (kind, symbol.upper()))
         return _progress_record(row) if row is not None else None
 
+    def set_progress_many(self, records: Sequence[ProgressRecord]) -> int:
+        """Upsert checkpoints in bulk, preserving existing positive row counts."""
+        if not records:
+            return 0
+        need_existing = {r.symbol.upper() for r in records if r.rows <= 0}
+        existing_rows: dict[tuple[str, str], int] = {}
+        if need_existing:
+            unique_symbols = sorted(need_existing)
+            for idx in range(0, len(unique_symbols), 200):
+                chunk = unique_symbols[idx : idx + 200]
+                stmt = select(
+                    V2Progress.kind, V2Progress.symbol, V2Progress.rows
+                ).where(V2Progress.symbol.in_(chunk), V2Progress.rows > 0)
+                for kind, sym, row_count in self._session.execute(stmt):
+                    existing_rows[(kind, sym)] = int(row_count)
+        now = utcnow()
+        payload = []
+        for record in records:
+            symbol = record.symbol.upper()
+            rows = record.rows
+            if rows <= 0:
+                stored = existing_rows.get((record.kind, symbol))
+                if stored is not None and stored > 0:
+                    rows = stored
+            payload.append(
+                {
+                    "kind": record.kind,
+                    "symbol": symbol,
+                    "state": record.state,
+                    "last_date": record.last_date,
+                    "rows": rows,
+                    "error": record.error,
+                    "updated_at": now,
+                }
+            )
+        return _bulk_upsert(
+            self._session,
+            V2Progress,
+            payload,
+            key_columns=["kind", "symbol"],
+            update_columns=["state", "last_date", "rows", "error", "updated_at"],
+        )
+
     def set_progress(self, record: ProgressRecord) -> int:
         """Upsert one checkpoint (state, last committed date, row count, error).
 
@@ -563,33 +606,7 @@ class V2Store:
         ``updated_at`` still move forward. The stored count is read as a column
         scalar so an already-loaded ORM copy cannot shadow the committed value.
         """
-        symbol = record.symbol.upper()
-        rows = record.rows
-        if rows <= 0:
-            stored = self._session.scalar(
-                select(V2Progress.rows).where(
-                    V2Progress.kind == record.kind, V2Progress.symbol == symbol
-                )
-            )
-            if stored is not None and stored > 0:
-                rows = stored
-        return _bulk_upsert(
-            self._session,
-            V2Progress,
-            [
-                {
-                    "kind": record.kind,
-                    "symbol": symbol,
-                    "state": record.state,
-                    "last_date": record.last_date,
-                    "rows": rows,
-                    "error": record.error,
-                    "updated_at": utcnow(),
-                }
-            ],
-            key_columns=["kind", "symbol"],
-            update_columns=["state", "last_date", "rows", "error", "updated_at"],
-        )
+        return self.set_progress_many([record])
 
     def list_progress(self, kind: str) -> list[ProgressRecord]:
         """Return every checkpoint for ``kind``, sorted by ticker."""

@@ -114,7 +114,7 @@ def main() -> int:
             unfinished = session.execute(
                 text(
                     "SELECT kind, symbol, state, last_date FROM v2_progress"
-                    " WHERE state <> 'done' ORDER BY kind, symbol"
+                    " WHERE state NOT IN ('done', 'pre_screen_rejected') ORDER BY kind, symbol"
                 )
             ).all()
             master_count = int(session.scalar(text("SELECT COUNT(*) FROM v2_ticker_master")) or 0)

@@ -1249,3 +1249,144 @@ def test_select_candidates_prefers_the_most_stale_ticker(
 
     assert selected == ["VCB"]
 
+
+def test_already_priced_tickers_bypass_pre_screen_even_if_volume_dips(
+    factory: sessionmaker[Session],
+) -> None:
+    """An already-priced ticker must be updated without calling screen_bars."""
+    yesterday = AS_OF - timedelta(days=1)
+    with session_scope(factory) as session:
+        store = V2Store(session)
+        store.upsert_prices(
+            "VCB",
+            _bars(START, yesterday),
+            price_adjustment_basis="ssi_adjusted",
+            data_as_of=yesterday,
+        )
+        store.set_progress(
+            ProgressRecord(kind="prices", symbol="VCB", state="done", last_date=yesterday, rows=22)
+        )
+
+    fake = FakeSources(
+        bars_by_ticker={"VCB": _volume(_bars(START, AS_OF), 10)},
+        vn30=["VCB"],
+        vn100=["VCB"],
+        symbols=["VCB"],
+    )
+    service = V2PrecomputeService(
+        session_factory=factory,
+        sources=fake.to_sources(),
+        settings=V2DataSettings(
+            precompute_pre_screen_enabled=True,
+            precompute_pre_screen_min_median_volume=500,
+        ),
+        now_provider=_Clock(AS_OF),
+    )
+
+    report = service.run(mode="incremental", start=START, as_of=AS_OF)
+
+    assert report.ok, report
+    assert fake.screen_calls == []
+    with session_scope(factory) as session:
+        assert V2Store(session).latest_price_date("VCB") == AS_OF
+
+
+def test_prescreen_rejections_are_persisted_and_skipped_during_cooldown(
+    factory: sessionmaker[Session],
+) -> None:
+    """Rejected unpriced tickers persist state='pre_screen_rejected' and respect cooldown."""
+    fake = FakeSources(
+        bars_by_ticker={
+            "AAA": _volume(_bars(START, AS_OF), 0),
+            "VCB": _bars(START, AS_OF),
+        },
+        vn30=["VCB"],
+        vn100=["VCB"],
+        symbols=["AAA", "VCB"],
+    )
+    clock = _Clock(AS_OF)
+    service = V2PrecomputeService(
+        session_factory=factory,
+        sources=fake.to_sources(),
+        settings=V2DataSettings(
+            precompute_pre_screen_enabled=True,
+            precompute_pre_screen_min_median_volume=500,
+        ),
+        now_provider=clock,
+    )
+
+    # Run 1: AAA has 0 volume -> screened once, rejected, persisted as pre_screen_rejected.
+    first = service.run(mode="incremental", start=START, limit=10, as_of=AS_OF)
+    assert first.ok, first
+    assert "AAA" in fake.screen_calls
+    with session_scope(factory) as session:
+        checkpoint = V2Store(session).get_progress("prices", "AAA")
+        assert checkpoint is not None
+        assert checkpoint.state == "pre_screen_rejected"
+        assert checkpoint.last_date == AS_OF
+
+    # Run 2: next trading day, within 30d cooldown -> AAA is skipped without screen_bars call.
+    day2 = date(2026, 1, 1)
+    fake.bars_by_ticker["VCB"] = _bars(START, day2)
+    fake.bars_by_ticker["AAA"] = _volume(_bars(START, day2), 0)
+    clock.today = day2
+    fake.screen_calls.clear()
+    second = service.run(mode="incremental", start=START, limit=10, as_of=day2)
+    assert second.ok, second
+    assert fake.screen_calls == []
+
+    # Run 3: profiles=True forces re-screening of rejected tickers.
+    third = service.run(mode="incremental", start=START, limit=10, profiles=True, as_of=day2)
+    assert third.ok, third
+    assert "AAA" in fake.screen_calls
+
+    # Run 4: after 30d cooldown expires, incremental run re-screens AAA.
+    day33 = AS_OF + timedelta(days=33)  # 2026-02-02 (Monday)
+    fake.bars_by_ticker["VCB"] = _bars(START, day33)
+    fake.bars_by_ticker["AAA"] = _volume(_bars(START, day33), 0)
+    clock.today = day33
+    fake.screen_calls.clear()
+    fourth = service.run(mode="incremental", start=START, limit=10, as_of=day33)
+    assert fourth.ok, fourth
+    assert "AAA" in fake.screen_calls
+
+
+def test_incremental_rebase_overlap_fits_in_single_ssi_page() -> None:
+    """Default overlap (10 sessions -> 20 calendar days) stays well below SSI's 40-row page size."""
+    settings = V2DataSettings()
+    assert settings.precompute_rebase_overlap_sessions == 10
+    assert settings.precompute_pre_screen_cooldown_days == 30
+    assert settings.precompute_ratios_refresh_days == 7
+    assert settings.precompute_concurrency == 3
+
+
+def test_set_progress_many_preserves_nonzero_rows_and_upserts_in_bulk(
+    factory: sessionmaker[Session],
+) -> None:
+    """Bulk progress upsert writes rows together and keeps historical row counts."""
+    with session_scope(factory) as session:
+        store = V2Store(session)
+        store.set_progress(
+            ProgressRecord(kind="prices", symbol="VCB", state="done", last_date=AS_OF, rows=500)
+        )
+        written = store.set_progress_many(
+            [
+                ProgressRecord(
+                    kind="prices", symbol="VCB", state="up_to_date", last_date=AS_OF, rows=0
+                ),
+                ProgressRecord(
+                    kind="prices",
+                    symbol="AAA",
+                    state="pre_screen_rejected",
+                    last_date=AS_OF,
+                    rows=0,
+                ),
+            ]
+        )
+        assert written == 2
+        vcb = store.get_progress("prices", "VCB")
+        aaa = store.get_progress("prices", "AAA")
+    assert vcb is not None and vcb.rows == 500 and vcb.state == "up_to_date"
+    assert aaa is not None and aaa.state == "pre_screen_rejected" and aaa.last_date == AS_OF
+
+
