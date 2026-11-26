@@ -22,9 +22,10 @@ export type SharpeResponse = Schemas["SharpeResponse"];
 export type CostResponse = Schemas["CostResponse"];
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
   const response = await fetch(path, {
     ...init,
-    cache: "no-store",
+    ...(method === "GET" ? {} : { cache: "no-store" as const }),
     headers: { "Content-Type": "application/json" },
   });
   if (!response.ok) {
@@ -251,7 +252,6 @@ export async function fetchSectorAnalytics(
   if (query.exclude_adjustment_flagged) params.set("exclude_adjustment_flagged", "true");
   const suffix = params.toString() ? `?${params.toString()}` : "";
   const response = await fetch(`/api/v1/v2/analytics${suffix}`, {
-    cache: "no-store",
     headers: { "Content-Type": "application/json" },
   });
   if (!response.ok) {
@@ -311,7 +311,7 @@ export async function fetchFundamentals(
   const suffix = params.toString() ? `?${params.toString()}` : "";
   const response = await fetch(
     `/api/v1/v2/fundamentals/${encodeURIComponent(symbol.trim().toUpperCase())}${suffix}`,
-    { cache: "no-store", headers: { "Content-Type": "application/json" } },
+    { headers: { "Content-Type": "application/json" } },
   );
   if (!response.ok) {
     let detail = `API responded with ${response.status}`;

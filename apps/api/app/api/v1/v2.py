@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated, cast
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from data.context import get_context
 from data.v2.analytics.index import WEIGHTING_EQUAL, WEIGHTING_MARKET_CAP
@@ -32,25 +32,33 @@ from data.v2.reader import sector_coverage, ticker_snapshot
 
 router = APIRouter(tags=["v2"])
 
+_V2_CACHE_CONTROL = "public, max-age=300, s-maxage=1800, stale-while-revalidate=3600"
+
 
 @router.get("/v2/ticker/{symbol}", response_model=TickerSnapshot)
 def get_ticker_snapshot(
     symbol: str,
+    response: Response,
     start: Annotated[date | None, Query()] = None,
     end: Annotated[date | None, Query()] = None,
 ) -> TickerSnapshot:
     """Return adjusted returns, liquidity, market cap and sector for ``symbol``."""
-    return ticker_snapshot(get_context().session_factory, symbol, start, end)
+    snapshot = ticker_snapshot(get_context().session_factory, symbol, start, end)
+    response.headers["Cache-Control"] = _V2_CACHE_CONTROL
+    return snapshot
 
 
 @router.get("/v2/coverage", response_model=CoverageSummary)
-def get_sector_coverage() -> CoverageSummary:
+def get_sector_coverage(response: Response) -> CoverageSummary:
     """Return the precomputed universe's sector coverage, with every gap listed."""
-    return sector_coverage(get_context().session_factory)
+    coverage = sector_coverage(get_context().session_factory)
+    response.headers["Cache-Control"] = _V2_CACHE_CONTROL
+    return coverage
 
 
 @router.get("/v2/universe", response_model=UniverseFilterResponse)
 def get_universe(
+    response: Response,
     preset: Annotated[str, Query()] = DEFAULT_PRESET_ID,
     sectors: Annotated[list[str] | None, Query()] = None,
     indexes: Annotated[list[str] | None, Query()] = None,
@@ -68,20 +76,25 @@ def get_universe(
         exclude_adjustment_flagged=exclude_adjustment_flagged,
     )
     try:
-        return UniverseService(get_context().session_factory).filter(request)
+        payload = UniverseService(get_context().session_factory).filter(request)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    response.headers["Cache-Control"] = _V2_CACHE_CONTROL
+    return payload
 
 
 @router.get("/v2/sectors", response_model=SectorListResponse)
 def get_sectors(
+    response: Response,
     preset: Annotated[str, Query()] = DEFAULT_PRESET_ID,
 ) -> SectorListResponse:
     """Return ICB level-2 sectors with total and preset-passing constituent counts."""
     try:
-        return UniverseService(get_context().session_factory).sectors(preset)
+        payload = UniverseService(get_context().session_factory).sectors(preset)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    response.headers["Cache-Control"] = _V2_CACHE_CONTROL
+    return payload
 
 
 class AnalyticsResponse(AnalyticsPayload):
@@ -93,6 +106,7 @@ class AnalyticsResponse(AnalyticsPayload):
 
 @router.get("/v2/analytics", response_model=AnalyticsResponse)
 def get_analytics(
+    response: Response,
     benchmark: Annotated[str, Query()] = "VNINDEX",
     timeframe: Annotated[str, Query()] = "1Y",
     custom_start: Annotated[date | None, Query()] = None,
@@ -148,6 +162,7 @@ def get_analytics(
         ).build_cached(request)
     except (ValueError, KeyError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    response.headers["Cache-Control"] = _V2_CACHE_CONTROL
     return AnalyticsResponse(
         **payload.model_dump(), served_from_cache=from_cache, elapsed_ms=elapsed
     )
@@ -156,6 +171,7 @@ def get_analytics(
 @router.get("/v2/fundamentals/{symbol}", response_model=FundamentalsComparison)
 def get_fundamentals(
     symbol: str,
+    response: Response,
     period: Annotated[date | None, Query()] = None,
     period_type: Annotated[str | None, Query()] = None,
     peer_variant: Annotated[str, Query()] = "all",
@@ -186,7 +202,7 @@ def get_fundamentals(
             ),
         )
     try:
-        return service.compare(
+        comparison = service.compare(
             symbol,
             period=period,
             period_type=period_type,
@@ -195,3 +211,5 @@ def get_fundamentals(
         )
     except (ValueError, KeyError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    response.headers["Cache-Control"] = _V2_CACHE_CONTROL
+    return comparison

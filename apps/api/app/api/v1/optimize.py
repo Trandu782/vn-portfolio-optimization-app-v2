@@ -16,7 +16,7 @@ from datetime import date
 from typing import Annotated, Any
 
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, ValidationError
 
 from app.api.v1.data import get_data_service
@@ -314,8 +314,11 @@ def _describe(registry: Registry[Any]) -> list[OptionResponse]:
 
 
 @router.get("/optimize/options", response_model=OptimizeOptionsResponse)
-def read_optimize_options() -> OptimizeOptionsResponse:
+def read_optimize_options(response: Response) -> OptimizeOptionsResponse:
     """Publish every optimizer concept and the conservative defaults."""
+    response.headers["Cache-Control"] = (
+        "public, max-age=300, s-maxage=3600, stale-while-revalidate=7200"
+    )
     return OptimizeOptionsResponse(
         objectives=_describe(objectives),
         constraints=_describe(constraints),

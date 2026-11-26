@@ -288,3 +288,38 @@ def test_analytics_benchmark_with_no_bars_in_window_is_handled(
         assert "warnings" in body
     else:
         assert "detail" in body
+
+
+def test_v2_read_endpoints_emit_edge_cache_control_headers(client: TestClient) -> None:
+    """Precomputed read-only V2 endpoints emit public s-maxage headers for Vercel Edge."""
+    for path in (
+        "/api/v1/v2/sectors",
+        "/api/v1/v2/universe",
+        "/api/v1/v2/analytics?benchmark=VNINDEX&timeframe=1Y",
+        "/api/v1/v2/coverage",
+    ):
+        resp = client.get(path)
+        assert resp.status_code == 200, path
+        cc = resp.headers.get("cache-control", "")
+        assert "public" in cc and "s-maxage=" in cc, (path, cc)
+
+
+def test_freshness_and_options_emit_cache_control_headers(client: TestClient) -> None:
+    """Freshness and options/symbols endpoints emit public s-maxage headers."""
+    resp = client.get("/api/v1/data/freshness")
+    assert resp.status_code == 200
+    cc = resp.headers.get("cache-control", "")
+    assert "public" in cc and "s-maxage=300" in cc
+
+    for path in (
+        "/api/v1/symbols",
+        "/api/v1/optimize/options",
+        "/api/v1/risk/options",
+        "/api/v1/rebalance/options",
+        "/api/v1/universe/options",
+    ):
+        opt_resp = client.get(path)
+        assert opt_resp.status_code == 200, path
+        opt_cc = opt_resp.headers.get("cache-control", "")
+        assert "public" in opt_cc and "s-maxage=3600" in opt_cc, (path, opt_cc)
+

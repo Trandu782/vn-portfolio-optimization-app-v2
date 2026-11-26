@@ -17,7 +17,7 @@ from collections.abc import Iterable
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, ValidationError
 
 from app.api.v1.data import get_data_service
@@ -116,8 +116,11 @@ def _describe[T](registry: Registry[T]) -> list[OptionResponse]:
 
 
 @router.get("/rebalance/options", response_model=RebalanceOptionsResponse)
-def rebalance_options() -> RebalanceOptionsResponse:
+def rebalance_options(response: Response) -> RebalanceOptionsResponse:
     """Return the cost-model and policy catalogues and the defaults."""
+    response.headers["Cache-Control"] = (
+        "public, max-age=300, s-maxage=3600, stale-while-revalidate=7200"
+    )
     return RebalanceOptionsResponse(
         cost_models=_describe(cost_models),
         policies=_describe(rebalance_policies),

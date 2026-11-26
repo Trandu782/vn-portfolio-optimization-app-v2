@@ -94,43 +94,46 @@ export function UniverseFilterPanel({
       let active = true;
       setLoading(true);
       setError(null);
-      fetchV2Universe({
-        preset: v2Filter.preset,
-        sectors: v2Filter.sectors,
-        indexes: v2Filter.indexes,
-        exchange: v2Filter.exchange,
-        exclude_adjustment_flagged: v2Filter.excludeAdjustmentFlagged,
-      })
-        .then(function (payload) {
-          if (!active) return;
-          setUniverse(payload);
-          const sectorByTicker: Record<string, string> = {};
-          for (const ticker of payload.kept ?? []) {
-            if (ticker.sector) sectorByTicker[ticker.ticker] = ticker.sector;
-          }
-          const passing = [...(payload.kept ?? [])]
-            .sort((a, b) => (b.adtv_median ?? 0) - (a.adtv_median ?? 0))
-            .map((ticker) => ticker.ticker);
-          onUniverseRef.current({
-            available: payload.available,
-            sectorByTicker,
-            warnings: payload.warnings ?? [],
-            flags: payload.adjustment_flags ?? [],
-            flagsAvailable: payload.flags_available ?? false,
-            flagsPolicyCurrent: payload.flags_policy_current ?? false,
-            passing,
+      const timer = setTimeout(function () {
+        fetchV2Universe({
+          preset: v2Filter.preset,
+          sectors: v2Filter.sectors,
+          indexes: v2Filter.indexes,
+          exchange: v2Filter.exchange,
+          exclude_adjustment_flagged: v2Filter.excludeAdjustmentFlagged,
+        })
+          .then(function (payload) {
+            if (!active) return;
+            setUniverse(payload);
+            const sectorByTicker: Record<string, string> = {};
+            for (const ticker of payload.kept ?? []) {
+              if (ticker.sector) sectorByTicker[ticker.ticker] = ticker.sector;
+            }
+            const passing = [...(payload.kept ?? [])]
+              .sort((a, b) => (b.adtv_median ?? 0) - (a.adtv_median ?? 0))
+              .map((ticker) => ticker.ticker);
+            onUniverseRef.current({
+              available: payload.available,
+              sectorByTicker,
+              warnings: payload.warnings ?? [],
+              flags: payload.adjustment_flags ?? [],
+              flagsAvailable: payload.flags_available ?? false,
+              flagsPolicyCurrent: payload.flags_policy_current ?? false,
+              passing,
+            });
+          })
+          .catch(function (err: unknown) {
+            if (!active) return;
+            setError(err instanceof Error ? err.message : "Failed to load the V2 universe.");
+            onUniverseRef.current({ ...EMPTY_VIEW });
+          })
+          .finally(function () {
+            if (active) setLoading(false);
           });
-        })
-        .catch(function (err: unknown) {
-          if (!active) return;
-          setError(err instanceof Error ? err.message : "Failed to load the V2 universe.");
-          onUniverseRef.current({ ...EMPTY_VIEW });
-        })
-        .finally(function () {
-          if (active) setLoading(false);
-        });
+      }, 200);
       return function () {
         active = false;
+        clearTimeout(timer);
       };
     },
     [v2Filter],

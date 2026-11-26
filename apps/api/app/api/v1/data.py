@@ -12,7 +12,7 @@ import hmac
 from datetime import date, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from data.context import get_context
@@ -72,11 +72,15 @@ class SymbolListResponse(BaseModel):
 
 @router.get("/symbols", response_model=SymbolListResponse)
 def list_symbols(
+    response: Response,
     service: Annotated[DataService, Depends(get_data_service)],
     exchange: Annotated[str | None, Query(description="HOSE, HNX or UPCoM")] = None,
 ) -> SymbolListResponse:
     """Return the stored symbols."""
     symbols = service.list_symbols(exchange)
+    response.headers["Cache-Control"] = (
+        "public, max-age=300, s-maxage=3600, stale-while-revalidate=7200"
+    )
     return SymbolListResponse(exchange=exchange, count=len(symbols), symbols=symbols)
 
 
@@ -121,10 +125,15 @@ def providers_status(
 
 @router.get("/data/freshness", response_model=DataFreshness)
 def data_freshness(
+    response: Response,
     service: Annotated[DataService, Depends(get_data_service)],
 ) -> DataFreshness:
     """Return the latest stored price date and the freshest price source."""
-    return service.data_freshness()
+    freshness = service.data_freshness()
+    response.headers["Cache-Control"] = (
+        "public, max-age=60, s-maxage=300, stale-while-revalidate=600"
+    )
+    return freshness
 
 
 class ProviderCatalogueEntry(BaseModel):

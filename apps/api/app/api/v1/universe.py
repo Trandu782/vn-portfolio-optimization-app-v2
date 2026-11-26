@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from datetime import date, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, ValidationError
 
 from app.api.v1.data import get_data_service
@@ -134,8 +134,11 @@ class PresetResponse(BaseModel):
 
 
 @router.get("/universe/options", response_model=UniverseOptionsResponse)
-def read_universe_options() -> UniverseOptionsResponse:
+def read_universe_options(response: Response) -> UniverseOptionsResponse:
     """Publish the filter catalogue (from the registry) and the available presets."""
+    response.headers["Cache-Control"] = (
+        "public, max-age=300, s-maxage=3600, stale-while-revalidate=7200"
+    )
     return UniverseOptionsResponse(
         filters=[
             FilterOption(

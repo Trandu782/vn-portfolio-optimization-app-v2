@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field, ValidationError
 
 from app.api.v1.data import get_data_service
@@ -254,8 +254,11 @@ def _benchmark_options() -> list[BenchmarkOption]:
 
 
 @router.get("/risk/options", response_model=RiskOptionsResponse)
-def read_risk_options() -> RiskOptionsResponse:
+def read_risk_options(response: Response) -> RiskOptionsResponse:
     """Publish every risk metric, the benchmark list and the defaults."""
+    response.headers["Cache-Control"] = (
+        "public, max-age=300, s-maxage=3600, stale-while-revalidate=7200"
+    )
     return RiskOptionsResponse(
         metrics=_describe(risk_metrics),
         benchmarks=_benchmark_options(),
