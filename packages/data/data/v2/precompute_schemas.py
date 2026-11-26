@@ -151,6 +151,7 @@ class StepResult(BaseModel):
     ok: bool = True
     processed: int = 0
     message: str | None = None
+    elapsed_seconds: float | None = None
 
 
 class PrecomputeReport(BaseModel):

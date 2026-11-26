@@ -139,7 +139,8 @@ def _print_report(report: PrecomputeReport) -> None:
     for step in report.steps:
         state = "ok" if step.ok else "FAIL"
         detail = f" {step.message}" if step.message else ""
-        print(f"    [{state}] {step.name}: processed={step.processed}{detail}")
+        timing = f" ({step.elapsed_seconds:.1f}s)" if step.elapsed_seconds is not None else ""
+        print(f"    [{state}] {step.name}: processed={step.processed}{detail}{timing}")
     print(f"    quality_errors={report.quality_errors}")
 
 

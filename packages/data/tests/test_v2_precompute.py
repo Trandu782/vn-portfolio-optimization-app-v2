@@ -8,7 +8,7 @@ from dataclasses import replace
 from datetime import UTC, date, datetime, time, timedelta
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from core.market_rules import DEFAULT_MARKET_RULES
@@ -1431,6 +1431,169 @@ def test_concurrent_price_backfill_commits_all_tickers_and_isolates_failures(
         assert store.latest_price_date("CCC") is None
         fail_prog = store.get_progress("prices", "CCC")
         assert fail_prog is not None and fail_prog.state == "failed"
+
+
+def _capture_sql(factory: sessionmaker[Session]) -> tuple[list[tuple[str, object]], object]:
+    """Attach a cursor-execute listener to ``factory`` and return ``(log, listener)``."""
+    queries: list[tuple[str, object]] = []
+    engine = factory.kw["bind"]
+
+    def _before(conn, cursor, statement, parameters, context, executemany):  # type: ignore[no-untyped-def]
+        queries.append((statement, parameters))
+
+    event.listen(engine, "before_cursor_execute", _before)
+    return queries, _before
+
+
+def test_incremental_noop_run_skips_full_price_and_ratio_scans(
+    factory: sessionmaker[Session],
+) -> None:
+    """A second incremental run on the same target issues O(1) queries and skips scans."""
+    fake = _fake()
+    fake.ratios_by_ticker = {
+        "VCB": _financial_ratios("VCB", roe=15.0),
+        "FPT": _financial_ratios("FPT", roe=25.0),
+        "XYZ": _financial_ratios("XYZ", roe=12.0),
+    }
+    clock = _Clock(AS_OF)
+    service = _service(factory, fake.to_sources(), clock)
+    assert service.run(mode="full", start=START).ok
+
+    queries, listener = _capture_sql(factory)
+    try:
+        report = service.run(mode="incremental", start=START)
+    finally:
+        event.remove(factory.kw["bind"], "before_cursor_execute", listener)
+
+    assert report.ok, report
+    steps = {step.name: step for step in report.steps}
+    assert len(queries) < 35, f"expected < 35 SQL statements, saw {len(queries)}"
+    assert not any(
+        "v2_financial_ratios" in stmt.lower() and stmt.lstrip().upper().startswith("SELECT")
+        for stmt, _ in queries
+    )
+    assert "skipped" in (steps["sector_statistics"].message or "")
+    assert "skipped" in (steps["ratio_quality"].message or "")
+
+
+def test_incremental_single_day_update_only_reads_tail_bars_unless_rebased(
+    factory: sessionmaker[Session],
+) -> None:
+    """Clean +1 bar uses tail-only liquidity/quality/flags; rebased ticker recomputes full."""
+    early = date(2025, 6, 2)
+    fake = FakeSources(
+        bars_by_ticker={"VCB": _bars(early, AS_OF), "FPT": _bars(early, AS_OF)},
+        vn30=["VCB"],
+        vn100=["VCB", "FPT"],
+        symbols=["VCB", "FPT"],
+    )
+    clock = _Clock(AS_OF)
+    service = _service(factory, fake.to_sources(), clock)
+    assert service.run(mode="full", start=early).ok
+
+    newer = date(2026, 1, 2)
+    # VCB gets a clean +1 bar; FPT is retroactively re-based by 0.8x plus +1 bar.
+    fake.bars_by_ticker["VCB"].extend(
+        _bars(date(2026, 1, 1), newer, base=fake.bars_by_ticker["VCB"][-1].close + 1.0)
+    )
+    fake.bars_by_ticker["FPT"] = _rebase(fake.bars_by_ticker["FPT"], 0.8)
+    fake.bars_by_ticker["FPT"].extend(
+        _bars(date(2026, 1, 1), newer, base=fake.bars_by_ticker["FPT"][-1].close + 1.0)
+    )
+    clock.today = newer
+
+    queries, listener = _capture_sql(factory)
+    try:
+        report = service.run(mode="incremental", start=early)
+    finally:
+        event.remove(factory.kw["bind"], "before_cursor_execute", listener)
+
+    assert report.ok, report
+    with session_scope(factory) as session:
+        store = V2Store(session)
+        assert store.get_liquidity("VCB").data_as_of == newer  # type: ignore[union-attr]
+        assert store.get_liquidity("FPT").data_as_of == newer  # type: ignore[union-attr]
+        assert store.get_prices("FPT", early)[0].close == pytest.approx(80.0)
+        flags = {f.ticker: f for f in store.list_adjustment_flags()}
+        assert flags["FPT"].data_as_of == newer
+
+    # Every v2_daily_prices SELECT that mentions VCB via params must have a date >= bound
+    # (no unbounded full-history SELECT for the non-rebased ticker).
+    unbounded_vcb_selects = [
+        stmt
+        for stmt, params in queries
+        if "FROM v2_daily_prices" in stmt
+        and "v2_daily_prices.date >=" not in stmt
+        and "max(" not in stmt.lower()
+        and "min(" not in stmt.lower()
+        and "VCB" in str(params)
+    ]
+    assert unbounded_vcb_selects == [], unbounded_vcb_selects
+
+
+def test_ratios_incremental_respects_refresh_days_cadence_and_loads_once(
+    factory: sessionmaker[Session],
+) -> None:
+    """Incremental ratios honor precompute_ratios_refresh_days and load ratios at most once."""
+    day0 = date(2025, 12, 1)
+    day2 = date(2025, 12, 3)
+    day9 = date(2025, 12, 10)
+    fake = FakeSources(
+        bars_by_ticker={"VCB": _bars(day0, day9), "FPT": _bars(day0, day9)},
+        vn30=["VCB"],
+        vn100=["VCB", "FPT"],
+        symbols=["VCB", "FPT"],
+    )
+    fake.ratios_by_ticker = {
+        "VCB": _financial_ratios("VCB", roe=15.0),
+        "FPT": _financial_ratios("FPT", roe=25.0),
+    }
+    clock = _Clock(day0)
+    service = V2PrecomputeService(
+        session_factory=factory,
+        sources=fake.to_sources(),
+        settings=V2DataSettings(
+            precompute_pre_screen_enabled=False,
+            precompute_ratios_refresh_days=7,
+        ),
+        now_provider=clock,
+    )
+    assert service.run(mode="full", start=day0, as_of=day0).ok
+
+    # Day 2 (within 7d cadence): ratios skipped and v2_financial_ratios is never scanned.
+    clock.today = day2
+    fake.ratio_calls.clear()
+    q2, l2 = _capture_sql(factory)
+    try:
+        assert service.run(mode="incremental", start=day0, as_of=day2).ok
+    finally:
+        event.remove(factory.kw["bind"], "before_cursor_execute", l2)
+    assert fake.ratio_calls == []
+    assert not any("FROM v2_financial_ratios" in stmt for stmt, _ in q2)
+
+    # Day 9 (>= 7d cadence): ratios refresh once, and v2_financial_ratios is read ONCE total.
+    clock.today = day9
+    fake.ratio_calls.clear()
+    q9, l9 = _capture_sql(factory)
+    try:
+        assert service.run(mode="incremental", start=day0, as_of=day9).ok
+    finally:
+        event.remove(factory.kw["bind"], "before_cursor_execute", l9)
+    assert sorted(fake.ratio_calls) == ["FPT", "VCB"]
+    ratio_selects = [stmt for stmt, _ in q9 if "FROM v2_financial_ratios" in stmt]
+    assert len(ratio_selects) == 1, ratio_selects
+
+
+def test_batch_store_helpers_handle_empty_symbol_list(
+    factory: sessionmaker[Session],
+) -> None:
+    """Empty symbol sequences return empty dicts without emitting invalid SQL."""
+    with session_scope(factory) as session:
+        store = V2Store(session)
+        assert store.get_prices_batch([]) == {}
+        assert store.get_close_prices_batch([], START, AS_OF) == {}
+        assert store.list_all_corporate_actions([]) == {}
+
 
 
 

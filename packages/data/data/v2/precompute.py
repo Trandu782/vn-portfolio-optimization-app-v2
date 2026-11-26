@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -63,7 +64,13 @@ from data.db.repositories import SqlIndexRepository
 from data.errors import DataError, EmptyResultError
 from data.models import PriceBar
 from data.v2.adjustment import adjust_price_gaps
-from data.v2.adjustment_quality import adjustment_quality_flag, flag_source
+from data.v2.adjustment_quality import (
+    FLAGS_POLICY_VERSION,
+    adjustment_quality_flag,
+    find_adjustment_anomalies,
+    flag_source,
+    policy_from_source,
+)
 from data.v2.config import V2DataSettings, get_v2_settings
 from data.v2.context import V2DataContext
 from data.v2.fundamentals import aggregate_sector_statistics
@@ -129,6 +136,19 @@ class _PriceBackfillResult:
     step: StepResult
     updated: set[str]
     rebased: set[str]
+
+
+@dataclass(frozen=True)
+class _ProfileSyncResult:
+    """Outcome of the profile/corporate-action sync step."""
+
+    step: StepResult
+    updated: set[str]
+
+
+def _timed(step: StepResult, started: float) -> StepResult:
+    """Return ``step`` with ``elapsed_seconds`` populated from ``started``."""
+    return step.model_copy(update={"elapsed_seconds": round(time.perf_counter() - started, 3)})
 
 
 @dataclass(frozen=True)
@@ -215,28 +235,38 @@ def compute_adjustment_flags(
     else:
         with session_scope(session_factory) as session:
             master = V2Store(session).list_ticker_master()
-    records: list[AdjustmentFlagRecord] = []
-    for record in master:
-        with session_scope(session_factory) as session:
-            store = V2Store(session)
-            bars = store.get_prices(record.ticker)
-            actions = store.get_corporate_actions(record.ticker)
-        if not bars:
-            continue
-        flag = adjustment_quality_flag(record.ticker, bars, actions, rules=rules)
-        records.append(
-            AdjustmentFlagRecord(
-                ticker=record.ticker,
-                severity=flag.severity,
-                flagged=flag.flagged,
-                exclude_from_group_indices=flag.exclude_from_group_indices,
-                reasons=flag.reasons,
-                dates=flag.dates,
-                anomalies=flag.anomalies,
-                source=flag_source(bars[-1].source),
-                data_as_of=target,
-            )
+    if not master:
+        return StepResult(name="adjustment_flags", ok=True, processed=0)
+    with session_scope(session_factory) as session:
+        actions_by_ticker = V2Store(session).list_all_corporate_actions(
+            [record.ticker for record in master]
         )
+    records: list[AdjustmentFlagRecord] = []
+    for idx in range(0, len(master), 50):
+        chunk = master[idx : idx + 50]
+        with session_scope(session_factory) as session:
+            bars_by_ticker = V2Store(session).get_prices_batch(
+                [record.ticker for record in chunk]
+            )
+        for record in chunk:
+            bars = bars_by_ticker.get(record.ticker.upper(), [])
+            if not bars:
+                continue
+            actions = actions_by_ticker.get(record.ticker.upper(), [])
+            flag = adjustment_quality_flag(record.ticker, bars, actions, rules=rules)
+            records.append(
+                AdjustmentFlagRecord(
+                    ticker=record.ticker,
+                    severity=flag.severity,
+                    flagged=flag.flagged,
+                    exclude_from_group_indices=flag.exclude_from_group_indices,
+                    reasons=flag.reasons,
+                    dates=flag.dates,
+                    anomalies=flag.anomalies,
+                    source=flag_source(bars[-1].source),
+                    data_as_of=target,
+                )
+            )
     with session_scope(session_factory) as session:
         processed = V2Store(session).upsert_adjustment_flags(records)
     return StepResult(name="adjustment_flags", ok=True, processed=processed)
@@ -355,16 +385,19 @@ class V2PrecomputeService:
         force_profiles = profiles if profiles is not None else (mode == "full" and limit is None)
         report = PrecomputeReport(mode=mode, as_of=target, started_at=utcnow())
 
+        t0 = time.perf_counter()
         master_step, built = self._build_master(target)
-        report.steps.append(master_step)
+        report.steps.append(_timed(master_step, t0))
         if built is not None:
             report.coverage = CoverageSummary(
                 covered=len(built.sectors),
                 missing=len(built.missing_sector),
                 missing_tickers=built.missing_sector,
             )
-        report.steps.append(self._sync_membership(target))
-        report.steps.append(self._sync_benchmarks(target, mode=mode, start=fetch_start))
+        t0 = time.perf_counter()
+        report.steps.append(_timed(self._sync_membership(target), t0))
+        t0 = time.perf_counter()
+        report.steps.append(_timed(self._sync_benchmarks(target, mode=mode, start=fetch_start), t0))
         if as_of is None:
             # Upstream EOD bars settle after the close, so an automatic run whose
             # target session is not published yet retargets itself to the last
@@ -372,33 +405,98 @@ class V2PrecomputeService:
             target = self._settle_target(target)
             report.as_of = target
         universe = self._processing_universe(members)
-        report.steps.append(
-            self._backfill_prices(
-                target,
-                mode=mode,
-                start=fetch_start,
-                limit=limit,
-                universe=universe,
-                refresh_profiles=force_profiles,
-                only_unpriced=only_unpriced,
+
+        t0 = time.perf_counter()
+        price_result = self._run_price_backfill(
+            target,
+            mode=mode,
+            start=fetch_start,
+            limit=limit,
+            universe=universe,
+            refresh_profiles=force_profiles,
+            only_unpriced=only_unpriced,
+        )
+        report.steps.append(_timed(price_result.step, t0))
+
+        t0 = time.perf_counter()
+        profile_result = self._run_profile_sync(
+            target, limit=limit, force=force_profiles, start=fetch_start, universe=universe
+        )
+        report.steps.append(_timed(profile_result.step, t0))
+
+        t0 = time.perf_counter()
+        liq_step, tail_bars_by_ticker = self._run_liquidity(
+            target,
+            universe=universe,
+            updated_tickers=price_result.updated,
+            mode=mode,
+        )
+        report.steps.append(_timed(liq_step, t0))
+
+        t0 = time.perf_counter()
+        ratios_step = self._sync_ratios(target, mode=mode, limit=limit, universe=universe)
+        report.steps.append(_timed(ratios_step, t0))
+
+        skip_ratio_agg = False
+        if mode == "incremental" and ratios_step.processed == 0:
+            with session_scope(self._session_factory) as session:
+                skip_ratio_agg = V2Store(session).count_sector_statistics() > 0
+
+        if skip_ratio_agg:
+            report.steps.append(
+                StepResult(
+                    name="sector_statistics",
+                    ok=True,
+                    processed=0,
+                    message="skipped (no ratio changes)",
+                    elapsed_seconds=0.0,
+                )
             )
-        )
-        report.steps.append(
-            self._sync_profiles(
-                target, limit=limit, force=force_profiles, start=fetch_start, universe=universe
+            report.steps.append(
+                StepResult(
+                    name="ratio_quality",
+                    ok=True,
+                    processed=0,
+                    message="skipped (no ratio changes)",
+                    elapsed_seconds=0.0,
+                )
             )
-        )
-        report.steps.append(self._compute_liquidity(target, universe=universe))
-        report.steps.append(
-            self._sync_ratios(target, mode=mode, limit=limit, universe=universe)
-        )
-        report.steps.append(self._compute_sector_statistics(target))
-        report.steps.append(self._run_ratio_quality(target))
-        quality_step, quality_errors = self._run_quality(
-            target, universe=universe, only_unpriced=only_unpriced
+        else:
+            with session_scope(self._session_factory) as session:
+                store = V2Store(session)
+                loaded_ratios = store.list_ratios()
+                loaded_sectors = store.list_sectors()
+            t0 = time.perf_counter()
+            report.steps.append(
+                _timed(
+                    self._compute_sector_statistics(
+                        target, ratios=loaded_ratios, sectors=loaded_sectors
+                    ),
+                    t0,
+                )
+            )
+            t0 = time.perf_counter()
+            report.steps.append(
+                _timed(
+                    self._run_ratio_quality(
+                        target, ratios=loaded_ratios, sectors=loaded_sectors
+                    ),
+                    t0,
+                )
+            )
+
+        quality_step, quality_errors, flags_step = self._run_quality_and_flags(
+            target,
+            universe=universe,
+            mode=mode,
+            only_unpriced=only_unpriced,
+            updated_tickers=price_result.updated,
+            rebased_tickers=price_result.rebased,
+            profile_updated_tickers=profile_result.updated,
+            tail_bars_by_ticker=tail_bars_by_ticker,
         )
         report.steps.append(quality_step)
-        report.steps.append(self._compute_adjustment_flags(target, universe=universe))
+        report.steps.append(flags_step)
         report.quality_errors = quality_errors
         report.finished_at = utcnow()
         report.ok = all(step.ok for step in report.steps)
@@ -650,6 +748,7 @@ class V2PrecomputeService:
         with session_scope(self._session_factory) as session:
             store = V2Store(session)
             latest_by_ticker = store.latest_price_dates()
+            counts_by_ticker = store.count_prices_by_symbol()
             inc_tickers = [
                 ticker
                 for ticker in tickers
@@ -698,14 +797,21 @@ class V2PrecomputeService:
             committed: list[tuple[_PreparedPriceFetch, bool]] = []
             try:
                 with session_scope(self._session_factory) as session:
-                    self._commit_price_batch(V2Store(session), batch, target=target)
+                    self._commit_price_batch(
+                        V2Store(session), batch, target=target, counts_by_ticker=counts_by_ticker
+                    )
                 committed = [(item, item.state == "failed") for item in batch]
             except Exception as exc:
                 self._log.warning("prices batch commit failed (%s); falling back per ticker", exc)
                 for item in batch:
                     try:
                         with session_scope(self._session_factory) as session:
-                            self._commit_price_batch(V2Store(session), [item], target=target)
+                            self._commit_price_batch(
+                                V2Store(session),
+                                [item],
+                                target=target,
+                                counts_by_ticker=counts_by_ticker,
+                            )
                         committed.append((item, item.state == "failed"))
                     except Exception as item_exc:
                         self._log.error("prices %s upsert failed: %s", item.ticker, item_exc)
@@ -806,9 +912,11 @@ class V2PrecomputeService:
         batch: Sequence[_PreparedPriceFetch],
         *,
         target: date,
+        counts_by_ticker: dict[str, int] | None = None,
     ) -> None:
         """Persist a batch of prepared price fetches and checkpoints in one session."""
         progress_records: list[ProgressRecord] = []
+        counts = counts_by_ticker or {}
         for item in batch:
             if item.state == "write" and item.bars is not None and item.basis is not None:
                 store.upsert_prices(
@@ -817,13 +925,23 @@ class V2PrecomputeService:
                     price_adjustment_basis=item.basis,
                     data_as_of=target,
                 )
+                unique_dates = {bar.date for bar in item.bars}
+                max_bar_date = max(unique_dates)
+                if item.rebased or item.latest is None:
+                    last_date = max_bar_date
+                    rows = len(unique_dates)
+                else:
+                    last_date = max(item.latest, max_bar_date)
+                    rows = counts.get(item.ticker.upper(), 0) + len(
+                        {d for d in unique_dates if d > item.latest}
+                    )
                 progress_records.append(
                     ProgressRecord(
                         kind="prices",
                         symbol=item.ticker,
                         state="done",
-                        last_date=store.latest_price_date(item.ticker),
-                        rows=store.count_prices(item.ticker),
+                        last_date=last_date,
+                        rows=rows,
                     )
                 )
             elif item.state in {"done", "up_to_date", "failed"}:
@@ -1047,20 +1165,38 @@ class V2PrecomputeService:
         start: date,
         universe: Sequence[TickerRecord] | None = None,
     ) -> StepResult:
+        return self._run_profile_sync(
+            target, limit=limit, force=force, start=start, universe=universe
+        ).step
+
+    def _run_profile_sync(
+        self,
+        target: date,
+        *,
+        limit: int | None,
+        force: bool,
+        start: date,
+        universe: Sequence[TickerRecord] | None = None,
+    ) -> _ProfileSyncResult:
         master = self._master_or(universe)
+        with session_scope(self._session_factory) as session:
+            store = V2Store(session)
+            progress_by_symbol = {
+                record.symbol.upper(): record for record in store.list_progress("profile")
+            }
+            priced = set(store.latest_price_dates())
         processed = 0
         failures = 0
         partial = 0
+        updated: set[str] = set()
         for record in master:
             if limit is not None and processed >= limit:
                 break
             ticker = record.ticker
-            with session_scope(self._session_factory) as session:
-                store = V2Store(session)
-                progress = store.get_progress("profile", ticker)
-                has_prices = store.latest_price_date(ticker) is not None
-            if not has_prices:
+            code = ticker.upper()
+            if code not in priced:
                 continue
+            progress = progress_by_symbol.get(code)
             if not force and progress is not None and progress.state == "done":
                 continue
             profile: CompanyProfile | None
@@ -1114,6 +1250,7 @@ class V2PrecomputeService:
                             error=actions_error,
                         )
                     )
+            updated.add(code)
             if actions_error is not None:
                 partial += 1
             processed += 1
@@ -1124,40 +1261,89 @@ class V2PrecomputeService:
             message: str | None = "; ".join(parts)
         else:
             message = None
-        return StepResult(
-            name="profiles",
-            ok=failures == 0 and partial == 0,
-            processed=processed,
-            message=message,
+        return _ProfileSyncResult(
+            step=StepResult(
+                name="profiles",
+                ok=failures == 0 and partial == 0,
+                processed=processed,
+                message=message,
+            ),
+            updated=updated,
         )
 
     # -- step 6: rolling liquidity medians ---------------------------------
     def _compute_liquidity(
-        self, target: date, *, universe: Sequence[TickerRecord] | None = None
+        self,
+        target: date,
+        *,
+        universe: Sequence[TickerRecord] | None = None,
+        updated_tickers: set[str] | None = None,
+        mode: str = "full",
     ) -> StepResult:
+        return self._run_liquidity(
+            target, universe=universe, updated_tickers=updated_tickers, mode=mode
+        )[0]
+
+    def _run_liquidity(
+        self,
+        target: date,
+        *,
+        universe: Sequence[TickerRecord] | None = None,
+        updated_tickers: set[str] | None = None,
+        mode: str = "full",
+    ) -> tuple[StepResult, dict[str, list[AdjustedOHLCV]]]:
         master = self._master_or(universe)
-        processed = 0
-        for record in master:
+        with session_scope(self._session_factory) as session:
+            store = V2Store(session)
+            liquidity_symbols = {row.symbol.upper() for row in store.list_liquidity()}
+            priced = set(store.latest_price_dates())
+        master_codes = [record.ticker.upper() for record in master]
+        priced_in_master = [code for code in master_codes if code in priced]
+        if mode == "incremental" and updated_tickers is not None:
+            to_compute = [
+                code
+                for code in priced_in_master
+                if code in updated_tickers or code not in liquidity_symbols
+            ]
+        else:
+            to_compute = priced_in_master
+        if not to_compute:
+            msg = "skipped (no price changes)" if mode == "incremental" else None
+            return StepResult(name="liquidity", ok=True, processed=0, message=msg), {}
+
+        tail_start = target - timedelta(days=max(60, 3 * self.window))
+        tail_bars_by_ticker: dict[str, list[AdjustedOHLCV]] = {}
+        for idx in range(0, len(to_compute), 100):
+            chunk = to_compute[idx : idx + 100]
             with session_scope(self._session_factory) as session:
-                bars = V2Store(session).get_prices(record.ticker)
+                batch = V2Store(session).get_prices_batch(chunk, start=tail_start, end=target)
+                tail_bars_by_ticker.update(batch)
+
+        records: list[LiquidityRecord] = []
+        for code in to_compute:
+            bars = tail_bars_by_ticker.get(code, [])
+            if not bars:
+                # Long-suspended ticker with no bars in tail window: fall back once.
+                with session_scope(self._session_factory) as session:
+                    bars = V2Store(session).get_prices(code)
             if not bars:
                 continue
             stats = liquidity_stats(bars, window=self.window)
-            with session_scope(self._session_factory) as session:
-                V2Store(session).upsert_liquidity(
-                    LiquidityRecord(
-                        symbol=record.ticker,
-                        as_of=stats.as_of,
-                        adtv_median=stats.adtv_median,
-                        adv_median=stats.adv_median,
-                        window=stats.window,
-                        volume_basis=stats.volume_basis,  # type: ignore[arg-type]
-                        source=bars[-1].source,
-                        data_as_of=target,
-                    )
+            records.append(
+                LiquidityRecord(
+                    symbol=code,
+                    as_of=stats.as_of,
+                    adtv_median=stats.adtv_median,
+                    adv_median=stats.adv_median,
+                    window=stats.window,
+                    volume_basis=stats.volume_basis,  # type: ignore[arg-type]
+                    source=bars[-1].source,
+                    data_as_of=target,
                 )
-            processed += 1
-        return StepResult(name="liquidity", ok=True, processed=processed)
+            )
+        with session_scope(self._session_factory) as session:
+            V2Store(session).upsert_liquidity_many(records)
+        return StepResult(name="liquidity", ok=True, processed=len(records)), tail_bars_by_ticker
 
     # -- step 6b: per-ticker ratios (full backfill / 1-page incremental) ---
     def _sync_ratios(
@@ -1171,10 +1357,9 @@ class V2PrecomputeService:
         """Fetch and store per-ticker ratios.
 
         A full run pages every period; an incremental run fetches only the latest
-        ``finance-indicator`` page (about one request per ticker, the section-8
-        budget) and skips a ticker already refreshed on ``target``. Ratios are
-        trimmed to the ticker's group before they are stored. A progress line is
-        printed every :data:`PROGRESS_LOG_EVERY` tickers (and for the last one).
+        ``finance-indicator`` page (about one request per ticker) and skips a ticker
+        refreshed within ``precompute_ratios_refresh_days``. Ratios are trimmed to the
+        ticker's group before they are stored.
         """
         full_fetch = self._sources.ratios
         if full_fetch is None:
@@ -1190,15 +1375,38 @@ class V2PrecomputeService:
                 if row.icb_level2_name
             }
             priced = set(store.history_starts())
+            ratio_progress = {
+                record.symbol.upper(): record for record in store.list_progress("ratios")
+            }
         fetch = full_fetch
         incremental = False
         latest_fetch = self._sources.ratios_latest
         if mode == "incremental" and latest_fetch is not None:
             fetch = latest_fetch
             incremental = True
-        candidates = [record.ticker for record in master if record.ticker in priced]
-        if limit is not None:
-            candidates = self._pending_ratio_tickers(candidates, limit)
+        refresh_days = self._settings.precompute_ratios_refresh_days
+        candidates = [record.ticker for record in master if record.ticker.upper() in priced]
+        if mode == "incremental":
+            due: list[str] = []
+            for ticker in candidates:
+                prog = ratio_progress.get(ticker.upper())
+                if (
+                    prog is not None
+                    and prog.state == "done"
+                    and prog.last_date is not None
+                    and (target - prog.last_date).days < refresh_days
+                ):
+                    continue
+                due.append(ticker)
+            candidates = due
+            if limit is not None:
+                candidates = candidates[: max(0, limit)]
+        elif limit is not None:
+            candidates = [
+                ticker
+                for ticker in candidates
+                if (prog := ratio_progress.get(ticker.upper())) is None or prog.state != "done"
+            ][: max(0, limit)]
         total = len(candidates)
         processed = 0
         failures = 0
@@ -1206,8 +1414,15 @@ class V2PrecomputeService:
         for idx, ticker in enumerate(candidates, start=1):
             added = 0
             try:
-                if incremental and self._ratio_refreshed_today(ticker, target):
-                    continue
+                if incremental:
+                    prog = ratio_progress.get(ticker.upper())
+                    if (
+                        prog is not None
+                        and prog.state == "done"
+                        and prog.last_date is not None
+                        and (target - prog.last_date).days < refresh_days
+                    ):
+                        continue
                 try:
                     periods = fetch(ticker)
                 except EmptyResultError:
@@ -1218,12 +1433,8 @@ class V2PrecomputeService:
                     self._record_progress(ticker, "ratios", "failed", error=str(exc)[:1000])
                     self._log.warning("ratios %s failed: %s", ticker, exc)
                     continue
-                sector = sector_by_ticker.get(ticker)
+                sector = sector_by_ticker.get(ticker.upper())
                 group = ratio_group_for(sector)
-                # SSI's ``finance-indicator`` response can repeat a period inside one
-                # batch (seen on ``AAH``). Keep the last copy so the stored row and
-                # the progress count match, and so Postgres never sees a duplicate
-                # conflict key in one ``ON CONFLICT DO UPDATE`` statement.
                 unique_periods = {
                     (period.period, period.period_type): period for period in periods
                 }
@@ -1252,42 +1463,28 @@ class V2PrecomputeService:
         message = f"{written} ratio rows for {processed} tickers; {failures} failed"
         return StepResult(name="ratios", ok=failures == 0, processed=processed, message=message)
 
-    def _pending_ratio_tickers(self, tickers: list[str], limit: int) -> list[str]:
-        """Return the next ``limit`` tickers with no completed ratio backfill."""
-        pending: list[str] = []
-        if limit <= 0:
-            return pending
-        for ticker in tickers:
-            with session_scope(self._session_factory) as session:
-                progress = V2Store(session).get_progress("ratios", ticker)
-            if progress is not None and progress.state == "done":
-                continue
-            pending.append(ticker)
-            if len(pending) >= limit:
-                break
-        return pending
-
-    def _ratio_refreshed_today(self, ticker: str, target: date) -> bool:
-        """Return ``True`` when ``ticker``'s ratios were already refreshed on ``target``."""
-        with session_scope(self._session_factory) as session:
-            progress = V2Store(session).get_progress("ratios", ticker)
-        return (
-            progress is not None
-            and progress.state == "done"
-            and progress.last_date == target
-        )
-
     # -- step 6c: precomputed sector peer statistics -----------------------
-    def _compute_sector_statistics(self, target: date) -> StepResult:
+    def _compute_sector_statistics(
+        self,
+        target: date,
+        *,
+        ratios: Sequence[RatioRecord] | None = None,
+        sectors: Sequence[SectorMap] | None = None,
+    ) -> StepResult:
         """Aggregate the stored ratios into per-(sector, ratio, period) statistics."""
-        with session_scope(self._session_factory) as session:
-            store = V2Store(session)
-            records = store.list_ratios()
-            sector_by_ticker = {
-                row.ticker.strip().upper(): row.icb_level2_name
-                for row in store.list_sectors()
-                if row.icb_level2_name
-            }
+        if ratios is None or sectors is None:
+            with session_scope(self._session_factory) as session:
+                store = V2Store(session)
+                records = list(ratios) if ratios is not None else store.list_ratios()
+                sector_rows = list(sectors) if sectors is not None else store.list_sectors()
+        else:
+            records = list(ratios)
+            sector_rows = list(sectors)
+        sector_by_ticker = {
+            row.ticker.strip().upper(): row.icb_level2_name
+            for row in sector_rows
+            if row.icb_level2_name
+        }
         statistics = aggregate_sector_statistics(
             records, sector_by_ticker, source="ssi_statistics", data_as_of=target
         )
@@ -1296,7 +1493,13 @@ class V2PrecomputeService:
         return StepResult(name="sector_statistics", ok=True, processed=written)
 
     # -- step 6d: ratio quality checks (warning-only) ----------------------
-    def _run_ratio_quality(self, target: date) -> StepResult:
+    def _run_ratio_quality(
+        self,
+        target: date,
+        *,
+        ratios: Sequence[RatioRecord] | None = None,
+        sectors: Sequence[SectorMap] | None = None,
+    ) -> StepResult:
         """Run the ratio quality checks and log warnings; never fail the step.
 
         A ticker with no prices can never have ratios (the ``ratios`` step only
@@ -1309,12 +1512,12 @@ class V2PrecomputeService:
         with session_scope(self._session_factory) as session:
             store = V2Store(session)
             master = [record.ticker for record in store.list_ticker_master()]
-            records = store.list_ratios()
+            records = list(ratios) if ratios is not None else store.list_ratios()
             priced = set(store.history_starts())
-            sectors = {
-                row.ticker.strip().upper(): row.icb_level2_name
-                for row in store.list_sectors()
-            }
+            sector_rows = list(sectors) if sectors is not None else store.list_sectors()
+        sector_map = {
+            row.ticker.strip().upper(): row.icb_level2_name for row in sector_rows
+        }
         by_ticker: dict[str, list[FinancialRatios]] = {}
         for record in records:
             by_ticker.setdefault(record.symbol, []).append(
@@ -1337,7 +1540,7 @@ class V2PrecomputeService:
             for finding in run_ratio_quality_checks(
                 ticker,
                 by_ticker.get(ticker, []),
-                sector=sectors.get(ticker),
+                sector=sector_map.get(ticker),
                 as_of=target,
             ):
                 warnings += 1
@@ -1387,37 +1590,36 @@ class V2PrecomputeService:
             )
         )
 
-    def _run_quality(
+    def _run_quality_and_flags(
         self,
         target: date,
         *,
         universe: Sequence[TickerRecord] | None = None,
+        mode: str = "full",
         only_unpriced: bool = False,
-    ) -> tuple[StepResult, int]:
-        """Run the quality checks; only integrity errors fail the step.
-
-        Integrity errors are dataset-level and hard: an empty benchmark calendar
-        (missing benchmark), a benchmark or overall price series older than ``target``
-        by more than ``precompute_staleness_tolerance_sessions`` (stale latest date), a
-        universe member with no stored bars (no data), a duplicate date, and any
-        schema error surfaced by a check. Per-ticker data-quality findings (missing
-        days, zero-volume runs, suspicious moves, adjusted-vs-raw mismatch) are
-        warnings: they are logged and stored as adjustment flags but never fail the
-        step.
-
-        An ``only_unpriced`` backfill never refreshes the priced tickers, so it cannot
-        make the dataset-level series current: it reports that lag as a warning
-        instead of failing a run whose job is to add tickers. The scheduled
-        (non-backfill) runs keep the hard check.
-        """
+        updated_tickers: set[str] | None = None,
+        rebased_tickers: set[str] | None = None,
+        profile_updated_tickers: set[str] | None = None,
+        tail_bars_by_ticker: dict[str, list[AdjustedOHLCV]] | None = None,
+    ) -> tuple[StepResult, int, StepResult]:
+        """Run quality checks and adjustment-flag computation sharing batched reads."""
+        t_quality = time.perf_counter()
         with session_scope(self._session_factory) as session:
             store = V2Store(session)
             master = list(universe) if universe is not None else store.list_ticker_master()
-            # Real exchange calendar from the stored VN-Index bars (not the
-            # illustrative holiday set), shared by every ticker's missing-day check.
             trading_days = trading_days_from_dates(store.list_index_dates("VNINDEX"))
             benchmark_latest = SqlIndexRepository(session).latest_date("VNINDEX")
             overall_latest = store.overall_latest_price_date()
+            progress_by_symbol = {
+                record.symbol.upper(): record for record in store.list_progress("prices")
+            }
+            existing_flags = {
+                flag.ticker.upper(): flag for flag in store.list_adjustment_flags()
+            }
+            priced = set(store.latest_price_dates())
+            actions_by_ticker = store.list_all_corporate_actions(
+                [record.ticker for record in master]
+            )
         tolerance = max(0, self._settings.precompute_staleness_tolerance_sessions)
         errors = 0
         benchmark_lag = self._sessions_behind(benchmark_latest, target)
@@ -1448,8 +1650,6 @@ class V2PrecomputeService:
                 target.isoformat(),
             )
         elif master and dataset_lag:
-            # Name the cause: a price feed that publishes after the index is the usual
-            # reason, and a backfill run cannot fix it by design.
             cause = (
                 "the price source has not published that session yet (the VNINDEX "
                 "benchmark already has it)"
@@ -1470,18 +1670,76 @@ class V2PrecomputeService:
                 cause,
                 scope,
             )
-        checked = 0
-        for record in master:
+
+        updated_set = updated_tickers or set()
+        rebased_set = rebased_tickers or set()
+        profile_set = profile_updated_tickers or set()
+        tail_cache = dict(tail_bars_by_ticker or {})
+        active_records = [
+            record
+            for record in master
+            if (code := record.ticker.upper()) in priced
+            and (prog := progress_by_symbol.get(code)) is not None
+            and prog.state not in {"failed", "pre_screen_rejected"}
+        ]
+        full_needed: set[str] = set()
+        for record in active_records:
+            code = record.ticker.upper()
+            existing = existing_flags.get(code)
+            if (
+                mode == "full"
+                or (only_unpriced and code in updated_set)
+                or code in rebased_set
+                or existing is None
+                or policy_from_source(existing.source) != FLAGS_POLICY_VERSION
+                or code in profile_set
+            ):
+                full_needed.add(code)
+
+        tail_only: list[TickerRecord] = [
+            record
+            for record in active_records
+            if record.ticker.upper() in updated_set and record.ticker.upper() not in full_needed
+        ]
+        missing_tail = [
+            record.ticker for record in tail_only if record.ticker.upper() not in tail_cache
+        ]
+        if missing_tail:
+            tail_start = target - timedelta(days=max(60, 3 * self.window))
             with session_scope(self._session_factory) as session:
-                store = V2Store(session)
-                bars = store.get_prices(record.ticker)
-                actions = store.get_corporate_actions(record.ticker)
-                progress = store.get_progress("prices", record.ticker)
-            if progress is None or progress.state in {"failed", "pre_screen_rejected"}:
-                # Not attempted in this run (a chunked backfill or a pre-screened name)
-                # or the prices step already reported the failure; do not count it here.
+                tail_cache.update(
+                    V2Store(session).get_prices_batch(
+                        missing_tail, start=tail_start, end=target
+                    )
+                )
+
+        tail_checked: list[tuple[TickerRecord, list[AdjustedOHLCV]]] = []
+        for record in tail_only:
+            code = record.ticker.upper()
+            bars = tail_cache.get(code, [])
+            if not bars:
+                full_needed.add(code)
                 continue
+            actions = actions_by_ticker.get(code, [])
+            existing = existing_flags[code]
+            recorded_dates = set(existing.dates)
+            anomalies = find_adjustment_anomalies(
+                record.ticker, bars, actions, rules=self._rules
+            )
+            has_new_anomaly = any(
+                (anomaly.day is not None and anomaly.day not in recorded_dates)
+                or (anomaly.day is None and not existing.flagged)
+                for anomaly in anomalies
+            )
+            if has_new_anomaly:
+                full_needed.add(code)
+            else:
+                tail_checked.append((record, bars))
+
+        checked = 0
+        for record, bars in tail_checked:
             checked += 1
+            actions = actions_by_ticker.get(record.ticker.upper(), [])
             report = run_v2_quality_checks(
                 record.ticker,
                 bars,
@@ -1496,12 +1754,87 @@ class V2PrecomputeService:
                     self._log.error(
                         "%s %s: %s", record.ticker, finding.check, finding.message
                     )
-        return (
-            StepResult(
-                name="quality", ok=errors == 0, processed=checked, message=f"{errors} errors"
-            ),
-            errors,
+
+        full_records = [
+            record for record in active_records if record.ticker.upper() in full_needed
+        ]
+        flag_records: list[AdjustmentFlagRecord] = []
+        t_flags_extra = 0.0
+        for idx in range(0, len(full_records), 50):
+            chunk = full_records[idx : idx + 50]
+            with session_scope(self._session_factory) as session:
+                bars_by_ticker = V2Store(session).get_prices_batch(
+                    [record.ticker for record in chunk]
+                )
+            for record in chunk:
+                code = record.ticker.upper()
+                bars = bars_by_ticker.get(code, [])
+                if not bars:
+                    continue
+                checked += 1
+                actions = actions_by_ticker.get(code, [])
+                report = run_v2_quality_checks(
+                    record.ticker,
+                    bars,
+                    exchange=record.exchange,
+                    actions=actions,
+                    rules=self._rules,
+                    trading_days=trading_days,
+                )
+                for finding in report.findings:
+                    if finding.severity == "error":
+                        errors += 1
+                        self._log.error(
+                            "%s %s: %s", record.ticker, finding.check, finding.message
+                        )
+                t_f0 = time.perf_counter()
+                flag = adjustment_quality_flag(
+                    record.ticker, bars, actions, rules=self._rules
+                )
+                flag_records.append(
+                    AdjustmentFlagRecord(
+                        ticker=record.ticker,
+                        severity=flag.severity,
+                        flagged=flag.flagged,
+                        exclude_from_group_indices=flag.exclude_from_group_indices,
+                        reasons=flag.reasons,
+                        dates=flag.dates,
+                        anomalies=flag.anomalies,
+                        source=flag_source(bars[-1].source),
+                        data_as_of=target,
+                    )
+                )
+                t_flags_extra += time.perf_counter() - t_f0
+
+        t_upsert0 = time.perf_counter()
+        if flag_records:
+            with session_scope(self._session_factory) as session:
+                flags_processed = V2Store(session).upsert_adjustment_flags(flag_records)
+        else:
+            flags_processed = 0
+        t_flags_total = t_flags_extra + (time.perf_counter() - t_upsert0)
+
+        quality_elapsed = round(
+            max(0.0, (time.perf_counter() - t_quality) - t_flags_total), 3
         )
+        quality_step = StepResult(
+            name="quality",
+            ok=errors == 0,
+            processed=checked,
+            message=f"{errors} errors",
+            elapsed_seconds=quality_elapsed,
+        )
+        flags_msg = (
+            "skipped (no changes)" if flags_processed == 0 and mode == "incremental" else None
+        )
+        flags_step = StepResult(
+            name="adjustment_flags",
+            ok=True,
+            processed=flags_processed,
+            message=flags_msg,
+            elapsed_seconds=round(t_flags_total, 3),
+        )
+        return quality_step, errors, flags_step
 
     # -- step 8: persisted adjustment-quality flags ------------------------
     def _compute_adjustment_flags(

@@ -21,6 +21,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from data.db.models import (
+    IndexDaily,
     V2AdjustmentFlag,
     V2CorporateAction,
     V2DailyPrice,
@@ -34,7 +35,7 @@ from data.db.models import (
     V2TickerMaster,
     utcnow,
 )
-from data.db.repositories import SqlIndexRepository, _bulk_upsert
+from data.db.repositories import _bulk_upsert
 from data.v2.precompute_schemas import (
     AdjustmentAnomalyRecord,
     AdjustmentFlagRecord,
@@ -249,12 +250,12 @@ class V2Store:
         Pass the result to :func:`data.calendar.trading_days_from_dates` to derive the
         real exchange calendar from benchmark bars instead of a hardcoded holiday set.
         """
-        repository = SqlIndexRepository(self._session)
-        earliest = repository.earliest_date(index_code)
-        latest = repository.latest_date(index_code)
-        if earliest is None or latest is None:
-            return []
-        return [bar.date for bar in repository.get_range(index_code, earliest, latest)]
+        statement = (
+            select(IndexDaily.date)
+            .where(IndexDaily.index_code == index_code.upper())
+            .order_by(IndexDaily.date)
+        )
+        return list(self._session.scalars(statement))
 
     def upsert_sectors(self, records: Sequence[SectorMap]) -> int:
         """Upsert the ICB level-2 map for the universe."""
@@ -383,6 +384,31 @@ class V2Store:
         statement = statement.order_by(V2DailyPrice.date)
         return [_price_bar(row) for row in self._session.scalars(statement)]
 
+    def get_prices_batch(
+        self,
+        symbols: Sequence[str],
+        start: date | None = None,
+        end: date | None = None,
+        *,
+        chunk_size: int = 200,
+    ) -> dict[str, list[AdjustedOHLCV]]:
+        """Return stored bars per symbol in ``[start, end]``, sorted by date."""
+        unique = sorted({symbol.strip().upper() for symbol in symbols if symbol.strip()})
+        if not unique:
+            return {}
+        grouped: dict[str, list[AdjustedOHLCV]] = {}
+        for idx in range(0, len(unique), chunk_size):
+            chunk = unique[idx : idx + chunk_size]
+            statement = select(V2DailyPrice).where(V2DailyPrice.symbol_code.in_(chunk))
+            if start is not None:
+                statement = statement.where(V2DailyPrice.date >= start)
+            if end is not None:
+                statement = statement.where(V2DailyPrice.date <= end)
+            statement = statement.order_by(V2DailyPrice.symbol_code, V2DailyPrice.date)
+            for row in self._session.scalars(statement):
+                grouped.setdefault(row.symbol_code.upper(), []).append(_price_bar(row))
+        return grouped
+
     def get_close_prices_batch(
         self,
         symbols: Sequence[str],
@@ -456,6 +482,16 @@ class V2Store:
         )
         return int(total or 0)
 
+    def count_prices_by_symbol(self) -> dict[str, int]:
+        """Return the stored bar count per ticker in one GROUP BY query."""
+        statement = select(
+            V2DailyPrice.symbol_code, func.count()
+        ).group_by(V2DailyPrice.symbol_code)
+        return {
+            symbol.upper(): int(total)
+            for symbol, total in self._session.execute(statement)
+        }
+
     def latest_source(self) -> str | None:
         """Return the source of the newest stored bar across every ticker (or ``None``)."""
         return self._session.scalar(
@@ -480,23 +516,27 @@ class V2Store:
         return row.source, row.price_adjustment_basis, row.data_as_of
 
     # -- liquidity / market cap -------------------------------------------
-    def upsert_liquidity(self, record: LiquidityRecord) -> int:
-        """Upsert one ticker's rolling-median liquidity."""
+    def upsert_liquidity_many(self, records: Sequence[LiquidityRecord]) -> int:
+        """Upsert rolling-median liquidity records in bulk."""
+        if not records:
+            return 0
+        rows = [
+            {
+                "symbol_code": record.symbol.upper(),
+                "as_of": record.as_of,
+                "adtv_median": record.adtv_median,
+                "adv_median": record.adv_median,
+                "window": record.window,
+                "volume_basis": record.volume_basis,
+                "source": record.source,
+                "data_as_of": record.data_as_of,
+            }
+            for record in records
+        ]
         return _bulk_upsert(
             self._session,
             V2Liquidity,
-            [
-                {
-                    "symbol_code": record.symbol.upper(),
-                    "as_of": record.as_of,
-                    "adtv_median": record.adtv_median,
-                    "adv_median": record.adv_median,
-                    "window": record.window,
-                    "volume_basis": record.volume_basis,
-                    "source": record.source,
-                    "data_as_of": record.data_as_of,
-                }
-            ],
+            rows,
             key_columns=["symbol_code"],
             update_columns=[
                 "as_of",
@@ -508,6 +548,10 @@ class V2Store:
                 "data_as_of",
             ],
         )
+
+    def upsert_liquidity(self, record: LiquidityRecord) -> int:
+        """Upsert one ticker's rolling-median liquidity."""
+        return self.upsert_liquidity_many([record])
 
     def get_liquidity(self, symbol: str) -> LiquidityRecord | None:
         """Return one ticker's stored liquidity, or ``None``."""
@@ -581,6 +625,32 @@ class V2Store:
             .order_by(V2CorporateAction.exright_date)
         )
         return [_action_record(row) for row in self._session.scalars(statement)]
+
+    def list_all_corporate_actions(
+        self, symbols: Sequence[str] | None = None, *, chunk_size: int = 200
+    ) -> dict[str, list[CorporateAction]]:
+        """Return stored corporate actions grouped by ticker, ordered by ex-date."""
+        grouped: dict[str, list[CorporateAction]] = {}
+        if symbols is not None:
+            unique = sorted({symbol.strip().upper() for symbol in symbols if symbol.strip()})
+            if not unique:
+                return {}
+            for idx in range(0, len(unique), chunk_size):
+                chunk = unique[idx : idx + chunk_size]
+                statement = (
+                    select(V2CorporateAction)
+                    .where(V2CorporateAction.ticker.in_(chunk))
+                    .order_by(V2CorporateAction.ticker, V2CorporateAction.exright_date)
+                )
+                for row in self._session.scalars(statement):
+                    grouped.setdefault(row.ticker.upper(), []).append(_action_record(row))
+            return grouped
+        statement = select(V2CorporateAction).order_by(
+            V2CorporateAction.ticker, V2CorporateAction.exright_date
+        )
+        for row in self._session.scalars(statement):
+            grouped.setdefault(row.ticker.upper(), []).append(_action_record(row))
+        return grouped
 
     # -- progress / checkpoints -------------------------------------------
     def get_progress(self, kind: str, symbol: str) -> ProgressRecord | None:
@@ -853,6 +923,11 @@ class V2Store:
         return [
             _sector_statistic_record(row) for row in self._session.scalars(statement)
         ]
+
+    def count_sector_statistics(self) -> int:
+        """Return the number of precomputed sector-statistic rows."""
+        total = self._session.scalar(select(func.count()).select_from(V2SectorStatistic))
+        return int(total or 0)
 
 
 __all__ = ["V2Store"]
