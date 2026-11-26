@@ -14,34 +14,28 @@ name: Precompute V2 datasets
 #      unpriced=true spends every slot on a ticker that still has no bars instead
 #      of re-fetching the ones that are already stored.
 #
-# Two schedules run the same job, so a missed or partial trading-day run is
-# repaired the same night:
+# A single weekday end-of-day schedule runs the job once per trading day to save
+# GitHub Actions minutes and Supabase egress:
 #
-#   1. `7 13 * * 1-5`  -> 13:07 UTC = 20:07 ICT, weekdays. Deliberately not right
-#      after the 15:00 ICT close: `ssi_statistics` publishes the stock EOD bars
-#      hours later (on 2026-11-25 it still had no bar for that session at 18:40
-#      ICT while VCI and KBS already did), so a run at 16:37 only re-fetched an
-#      unchanged tail. The nightly pass remains the guaranteed repair.
-#   2. `13 19 * * 1-5` -> 19:13 UTC = 02:13 ICT (Tue–Sat mornings), Mon–Fri
-#      nights after trading days, which picks up late provider corrections plus
-#      any weekday run that failed while skipping pointless Sat/Sun night runs
-#      when the Vietnam market is closed. Because the scheduled mode is
-#      `incremental`, a no-op repair pass completes in ~15–30s and a weekday
-#      +1-bar update completes in ~3–6 min.
+#   - `47 12 * * 1-5` -> 12:47 UTC = 19:47 ICT, Mon–Fri. Deliberately near the
+#     end of the 19:00–20:00 ICT window and off :00/:30 (where GitHub's
+#     scheduler queue is busiest), and late enough after the 15:00 ICT close
+#     for `ssi_statistics` EOD bars to be published (on 2026-11-25 SSI still had
+#     no bar for that session at 18:40 ICT while VCI and KBS already did).
+#   - No overnight repair pass: because scheduled runs use `incremental` mode
+#     with most-stale-first ordering and `LIMIT=1000`, any failed or
+#     late-published session is picked up automatically by the next weekday's
+#     19:47 ICT run or immediately via manual `workflow_dispatch`.
 #
-# Both minutes are deliberately off :00/:30, where GitHub's scheduler queue is
-# busiest and a cron can be delayed by many minutes. GitHub delivers a scheduled
-# run in UTC and may delay it; the "Report trigger" step prints the event, the
-# cron expression that fired and both clocks, so a run that lands outside the
-# expected window can be identified from the job log instead of guessed at. The
-# job itself targets the last *completed* session, so a late or pre-close run
-# still processes settled data.
+# GitHub evaluates `schedule` crons in UTC and may delay them; the
+# "Report trigger" step prints the event, the cron expression that fired and
+# both clocks, so a run that lands outside the expected window can be identified
+# from the job log instead of guessed at. The job itself targets the last
+# *completed* session, so a late or pre-close run still processes settled data.
 on:
   schedule:
-    # Weekdays 13:07 UTC = 20:07 ICT, after SSI actually publishes the EOD bars.
-    - cron: "7 13 * * 1-5"
-    # Post-trading-day nightly repair 19:13 UTC = 02:13 AM ICT (Tue–Sat).
-    - cron: "13 19 * * 1-5"
+    # Weekdays 12:47 UTC = 19:47 ICT (single EOD run to save Actions minutes & Supabase egress).
+    - cron: "47 12 * * 1-5"
   workflow_dispatch:
     inputs:
       mode:
@@ -76,8 +70,8 @@ permissions:
   contents: read
 
 # One run at a time, ever. With `cancel-in-progress: false` a second trigger
-# (the nightly cron landing while the post-close run is still backfilling, or a
-# manual dispatch during a scheduled run) queues behind the active job instead
+# (a manual dispatch during a scheduled run, or a delayed scheduled run
+# overlapping an active manual backfill) queues behind the active job instead
 # of cancelling it or writing the same tickers concurrently. GitHub keeps at
 # most one pending run per group and drops newer pending ones, which is safe
 # here: scheduled runs are `incremental`, so the surviving run resumes from the
