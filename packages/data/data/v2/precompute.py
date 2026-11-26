@@ -42,6 +42,7 @@ from __future__ import annotations
 import logging
 import sys
 from collections.abc import Callable, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from statistics import median
@@ -116,6 +117,31 @@ PROGRESS_LOG_EVERY = 10
 #: Cap on the number of pre-screen rejections the price step logs per run; the rest
 #: are summarised in one count, so a 1,000-name universe cannot flood the log.
 PRE_SCREEN_LOG_LIMIT = 30
+
+#: Number of tickers committed per SQLAlchemy session in price backfill.
+_PRICE_COMMIT_BATCH_SIZE = 25
+
+
+@dataclass(frozen=True)
+class _PriceBackfillResult:
+    """Outcome of the price backfill step, including updated and rebased tickers."""
+
+    step: StepResult
+    updated: set[str]
+    rebased: set[str]
+
+
+@dataclass(frozen=True)
+class _PreparedPriceFetch:
+    """Pure HTTP fetch outcome for one ticker before main-thread DB commit."""
+
+    ticker: str
+    latest: date | None
+    state: str
+    bars: list[AdjustedOHLCV] | None = None
+    basis: str | None = None
+    rebased: bool = False
+    error: str | None = None
 
 
 def _utc_now() -> datetime:
@@ -565,37 +591,43 @@ class V2PrecomputeService:
         refresh_profiles: bool = False,
         only_unpriced: bool = False,
     ) -> StepResult:
-        """Fetch and store adjusted daily bars, resumably and incrementally.
+        """Fetch and store adjusted daily bars, resumably and incrementally."""
+        return self._run_price_backfill(
+            target,
+            mode=mode,
+            start=start,
+            limit=limit,
+            universe=universe,
+            refresh_profiles=refresh_profiles,
+            only_unpriced=only_unpriced,
+        ).step
 
-        ``refresh_profiles`` mirrors the forced ``--profiles`` refresh: it keeps the
-        known-empty tickers in the candidate set, so a periodic full refresh can
-        re-check a symbol that stopped trading. ``only_unpriced`` additionally drops
-        every ticker that already has a bar, so a chunked backfill can finish the
-        unpriced tail without re-fetching the priced names (combine it with
-        ``--profiles`` to re-check the known-empty ones as well).
-
-        Candidates are ordered tracked-first, then unpriced index members, then the
-        remaining unpriced names, and ``limit`` is spent only on tickers that pass
-        the pre-screen, so a limited run always makes real backfill progress. A
-        progress line is printed every :data:`PROGRESS_LOG_EVERY` tickers (and for
-        the last one) because the Actions log would otherwise stay silent until
-        ``ratio_quality``.
-        """
+    def _run_price_backfill(
+        self,
+        target: date,
+        *,
+        mode: str,
+        start: date,
+        limit: int | None,
+        universe: Sequence[TickerRecord] | None = None,
+        refresh_profiles: bool = False,
+        only_unpriced: bool = False,
+    ) -> _PriceBackfillResult:
+        """Fetch and store adjusted daily bars concurrently, returning updated/rebased sets."""
         master = self._master_or(universe)
         if not master:
-            return StepResult(name="prices", ok=False, message="empty universe")
+            return _PriceBackfillResult(
+                step=StepResult(name="prices", ok=False, message="empty universe"),
+                updated=set(),
+                rebased=set(),
+            )
         exchange_by_ticker = {record.ticker: record.exchange for record in master}
         all_tickers = [record.ticker for record in master]
-        # Tracked names first, then unpriced index members, and (on an incremental
-        # run without --profiles) the known-empty names dropped; see the helper.
         ordered = self._order_price_candidates(
             all_tickers,
             skip_known_empty=mode == "incremental" and not refresh_profiles,
             target=target,
         )
-        # The pre-screen runs while the limit is spent, so a rejected symbol never
-        # consumes a slot; an incremental (or chunked full) run keeps only the
-        # tickers whose stored prices are not current.
         tickers = self._select_candidates(
             ordered,
             target=target,
@@ -604,142 +636,222 @@ class V2PrecomputeService:
             only_unpriced=only_unpriced,
         )
         total = len(tickers)
-        processed = 0
-        fetched = 0
-        failures = 0
-        for idx, ticker in enumerate(tickers, start=1):
-            added, failed = self._backfill_ticker(
+        if total == 0:
+            return _PriceBackfillResult(
+                step=StepResult(
+                    name="prices",
+                    ok=True,
+                    processed=0,
+                    message="0 bars for 0 tickers; 0 failed",
+                ),
+                updated=set(),
+                rebased=set(),
+            )
+        with session_scope(self._session_factory) as session:
+            store = V2Store(session)
+            latest_by_ticker = store.latest_price_dates()
+            inc_tickers = [
+                ticker
+                for ticker in tickers
+                if mode != "full"
+                and (latest := latest_by_ticker.get(ticker.upper())) is not None
+                and latest < target
+            ]
+            tail_closes_by_ticker: dict[str, list[tuple[date, float]]] = {}
+            if inc_tickers:
+                min_latest = min(latest_by_ticker[t.upper()] for t in inc_tickers)
+                min_overlap_start = max(
+                    start,
+                    min_latest
+                    - timedelta(days=2 * self._settings.precompute_rebase_overlap_sessions),
+                )
+                tail_closes_by_ticker = store.get_close_prices_batch(
+                    inc_tickers, min_overlap_start, target
+                )
+
+        def _fetch(ticker: str) -> _PreparedPriceFetch:
+            return self._fetch_ticker_prices(
                 ticker,
                 target=target,
                 mode=mode,
                 start=start,
                 exchange=exchange_by_ticker.get(ticker, "HOSE"),
+                latest=latest_by_ticker.get(ticker.upper()),
+                tail_closes=tail_closes_by_ticker.get(ticker.upper(), []),
             )
-            if failed:
-                failures += 1
-            if added:
-                processed += 1
-                fetched += added
-            if idx % PROGRESS_LOG_EVERY == 0 or idx == total:
-                print(f"[prices] {idx}/{total} {ticker} (+{added} bars)", flush=True)
+
+        concurrency = max(1, self._settings.precompute_concurrency)
+        if concurrency > 1 and total > 1:
+            with ThreadPoolExecutor(max_workers=concurrency) as executor:
+                futures = [executor.submit(_fetch, ticker) for ticker in tickers]
+                fetched_items = [future.result() for future in futures]
+        else:
+            fetched_items = [_fetch(ticker) for ticker in tickers]
+
+        processed = 0
+        fetched = 0
+        failures = 0
+        updated: set[str] = set()
+        rebased: set[str] = set()
+        for batch_start in range(0, total, _PRICE_COMMIT_BATCH_SIZE):
+            batch = fetched_items[batch_start : batch_start + _PRICE_COMMIT_BATCH_SIZE]
+            committed: list[tuple[_PreparedPriceFetch, bool]] = []
+            try:
+                with session_scope(self._session_factory) as session:
+                    self._commit_price_batch(V2Store(session), batch, target=target)
+                committed = [(item, item.state == "failed") for item in batch]
+            except Exception as exc:
+                self._log.warning("prices batch commit failed (%s); falling back per ticker", exc)
+                for item in batch:
+                    try:
+                        with session_scope(self._session_factory) as session:
+                            self._commit_price_batch(V2Store(session), [item], target=target)
+                        committed.append((item, item.state == "failed"))
+                    except Exception as item_exc:
+                        self._log.error("prices %s upsert failed: %s", item.ticker, item_exc)
+                        self._record_progress(
+                            item.ticker,
+                            "prices",
+                            "failed",
+                            last_date=item.latest,
+                            error=str(item_exc)[:1000],
+                        )
+                        committed.append((item, True))
+
+            for idx_offset, (item, item_failed) in enumerate(
+                committed, start=batch_start + 1
+            ):
+                added = len(item.bars) if (item.bars and not item_failed) else 0
+                if item_failed:
+                    failures += 1
+                elif added:
+                    processed += 1
+                    fetched += added
+                    updated.add(item.ticker.upper())
+                    if item.rebased:
+                        rebased.add(item.ticker.upper())
+                if idx_offset % PROGRESS_LOG_EVERY == 0 or idx_offset == total:
+                    print(
+                        f"[prices] {idx_offset}/{total} {item.ticker} (+{added} bars)",
+                        flush=True,
+                    )
+
         message = f"{fetched} bars for {processed} tickers; {failures} failed"
-        return StepResult(name="prices", ok=failures == 0, processed=processed, message=message)
+        step = StepResult(name="prices", ok=failures == 0, processed=processed, message=message)
+        return _PriceBackfillResult(step=step, updated=updated, rebased=rebased)
 
-    def _backfill_ticker(
-        self, ticker: str, *, target: date, mode: str, start: date, exchange: str
-    ) -> tuple[int, bool]:
-        """Backfill one ticker and return ``(stored bars, failed)``.
-
-        An up-to-date or empty ticker returns ``(0, False)``; a provider failure is
-        recorded in ``v2_progress`` and reported as ``(0, True)`` so the caller can
-        fail the step without losing the other tickers. Every request ends at
-        ``target`` (the last settled session), so a provisional intraday bar is never
-        stored as a finished session.
-        """
-        with session_scope(self._session_factory) as session:
-            latest = V2Store(session).latest_price_date(ticker)
+    def _fetch_ticker_prices(
+        self,
+        ticker: str,
+        *,
+        target: date,
+        mode: str,
+        start: date,
+        exchange: str,
+        latest: date | None,
+        tail_closes: Sequence[tuple[date, float]],
+    ) -> _PreparedPriceFetch:
+        """Fetch and prepare one ticker's bars without touching the database."""
         if mode == "incremental" and latest is not None and latest >= target:
-            self._record_progress(ticker, "prices", "up_to_date", last_date=latest)
-            return 0, False
+            return _PreparedPriceFetch(ticker=ticker, latest=latest, state="up_to_date")
         if mode == "full" or latest is None:
-            # Full backfill (or first fetch): store everything fetched.
             fetch_start = start
             overlap_end: date | None = None
         else:
-            # Incremental: refetch a tail overlap together with the new dates so a
-            # retroactive re-base (SSI re-adjusts the whole series when a new
-            # ex-date lands) is detected and refreshed in place, in this run.
             fetch_start = max(
                 start,
                 latest - timedelta(days=2 * self._settings.precompute_rebase_overlap_sessions),
             )
             overlap_end = latest
         if fetch_start > target:
-            return 0, False
+            return _PreparedPriceFetch(ticker=ticker, latest=latest, state="unchanged")
         try:
             bars = self._sources.stock_bars(ticker, fetch_start, target)
         except EmptyResultError:
-            self._record_progress(ticker, "prices", "done", last_date=latest)
-            return 0, False
+            return _PreparedPriceFetch(ticker=ticker, latest=latest, state="done")
         except DataError as exc:
-            self._record_progress(
-                ticker, "prices", "failed", last_date=latest, error=str(exc)[:1000]
-            )
             self._log.warning("prices %s failed: %s", ticker, exc)
-            return 0, True
+            return _PreparedPriceFetch(
+                ticker=ticker, latest=latest, state="failed", error=str(exc)[:1000]
+            )
+        rebased = False
         if overlap_end is not None:
-            if self._needs_rebase(ticker, fetch_start, overlap_end, bars):
-                # The stored tail disagrees with the fresh adjusted closes: SSI
-                # re-based history, so replace the whole series in this run.
+            if self._closes_need_rebase(tail_closes, fetch_start, overlap_end, bars):
                 try:
                     bars = self._sources.stock_bars(ticker, start, target)
                 except DataError as exc:
-                    self._record_progress(
-                        ticker,
-                        "prices",
-                        "failed",
-                        last_date=latest,
-                        error=str(exc)[:1000],
-                    )
                     self._log.warning("prices %s re-base refetch failed: %s", ticker, exc)
-                    return 0, True
+                    return _PreparedPriceFetch(
+                        ticker=ticker, latest=latest, state="failed", error=str(exc)[:1000]
+                    )
+                rebased = True
                 self._log.info("prices %s re-based; full history refreshed", ticker)
             else:
-                # No re-base: only the genuinely new dates are stored; the unchanged
-                # overlap rows are left untouched.
                 bars = [bar for bar in bars if bar.date > overlap_end]
         if not bars:
-            self._record_progress(ticker, "prices", "done", last_date=latest)
-            return 0, False
+            return _PreparedPriceFetch(ticker=ticker, latest=latest, state="done")
         prepared, basis = self._prepare_bars(exchange, bars)
-        # Persist in this ticker's own session. A duplicate-key batch (Postgres
-        # ``CardinalityViolation`` on ``ON CONFLICT DO UPDATE``) or any other
-        # database error is contained here and recorded as a failed checkpoint, so
-        # one ticker can never abort the whole run and leave every later ticker
-        # un-updated. ``_bulk_upsert`` already collapses duplicate ``(symbol, date)``
-        # rows before the statement, so this is the last-resort guard.
-        try:
-            with session_scope(self._session_factory) as session:
-                store = V2Store(session)
+        return _PreparedPriceFetch(
+            ticker=ticker,
+            latest=latest,
+            state="write",
+            bars=prepared,
+            basis=basis,
+            rebased=rebased,
+        )
+
+    def _commit_price_batch(
+        self,
+        store: V2Store,
+        batch: Sequence[_PreparedPriceFetch],
+        *,
+        target: date,
+    ) -> None:
+        """Persist a batch of prepared price fetches and checkpoints in one session."""
+        progress_records: list[ProgressRecord] = []
+        for item in batch:
+            if item.state == "write" and item.bars is not None and item.basis is not None:
                 store.upsert_prices(
-                    ticker, prepared, price_adjustment_basis=basis, data_as_of=target
+                    item.ticker,
+                    item.bars,
+                    price_adjustment_basis=item.basis,
+                    data_as_of=target,
                 )
-                store.set_progress(
+                progress_records.append(
                     ProgressRecord(
                         kind="prices",
-                        symbol=ticker,
+                        symbol=item.ticker,
                         state="done",
-                        last_date=store.latest_price_date(ticker),
-                        # The cumulative stored bar count, so an incremental run that
-                        # adds a session or two keeps the historical count.
-                        rows=store.count_prices(ticker),
+                        last_date=store.latest_price_date(item.ticker),
+                        rows=store.count_prices(item.ticker),
                     )
                 )
-        except Exception as exc:
-            self._log.error("prices %s upsert failed: %s", ticker, exc)
-            self._record_progress(
-                ticker, "prices", "failed", last_date=latest, error=str(exc)[:1000]
-            )
-            return 0, True
-        return len(prepared), False
+            elif item.state in {"done", "up_to_date", "failed"}:
+                progress_records.append(
+                    ProgressRecord(
+                        kind="prices",
+                        symbol=item.ticker,
+                        state=item.state,
+                        last_date=item.latest,
+                        error=item.error,
+                    )
+                )
+        if progress_records:
+            store.set_progress_many(progress_records)
 
-    def _needs_rebase(
-        self, ticker: str, overlap_start: date, overlap_end: date, bars: list[AdjustedOHLCV]
+    def _closes_need_rebase(
+        self,
+        tail_closes: Sequence[tuple[date, float]],
+        overlap_start: date,
+        overlap_end: date,
+        bars: list[AdjustedOHLCV],
     ) -> bool:
-        """Return ``True`` when the fresh tail disagrees with the stored tail.
-
-        SSI's adjusted closes change retroactively when a new corporate action's
-        ex-date lands. The incremental fetch overlaps the stored tail, so a
-        difference beyond ``precompute_rebase_tolerance`` between the freshly
-        fetched and stored adjusted closes means the stored history is stale. This
-        reads prices only, never the corporate-actions feed (which omits some
-        bonus issues, e.g. HPG).
-        """
-        with session_scope(self._session_factory) as session:
-            stored = {
-                bar.date: bar.close
-                for bar in V2Store(session).get_prices(ticker, overlap_start, overlap_end)
-            }
+        """Return ``True`` when the fresh tail disagrees with pre-loaded stored closes."""
+        stored = {
+            bar_date: close
+            for bar_date, close in tail_closes
+            if overlap_start <= bar_date <= overlap_end
+        }
         if not stored:
             return False
         tolerance = self._settings.precompute_rebase_tolerance

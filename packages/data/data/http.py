@@ -12,6 +12,7 @@ Only ``GET`` is exposed: the data layer never mutates an upstream.
 
 from __future__ import annotations
 
+import threading
 import time
 from collections import deque
 from collections.abc import Callable, Mapping
@@ -77,7 +78,7 @@ class HttpClient(Protocol):
 
 
 class HttpxHttpClient:
-    """Production ``HttpClient`` backed by ``httpx``."""
+    """Production ``HttpClient`` backed by ``httpx`` with connection pooling."""
 
     def __init__(
         self,
@@ -93,6 +94,7 @@ class HttpxHttpClient:
         cooldown_seconds: float = 900.0,
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         self._user_agent = user_agent
         self._timeout = timeout_seconds
@@ -105,45 +107,71 @@ class HttpxHttpClient:
         self._cooldown_seconds = cooldown_seconds
         self._sleep = sleep
         self._clock = clock
-        self._recent: deque[float] = deque()
-        self._last_request_at: float | None = None
+        self._lock = threading.Lock()
+        self._recent_by_host: dict[str, deque[float]] = {}
+        self._last_request_by_host: dict[str, float] = {}
         self._host_cooldowns: dict[str, float] = {}
+        self._client = httpx.Client(
+            timeout=self._timeout,
+            follow_redirects=True,
+            limits=httpx.Limits(max_connections=16, max_keepalive_connections=10),
+            transport=transport,
+        )
 
-    def _respect_rate_limit(self) -> None:
-        """Block until a slot is free in the rolling minute window and the rps cap."""
-        now = self._clock()
-        while self._recent and now - self._recent[0] >= 60.0:
-            self._recent.popleft()
-        if len(self._recent) >= self._limit:
-            wait = 60.0 - (now - self._recent[0])
-            if wait > 0:
-                self._sleep(wait)
+    def close(self) -> None:
+        """Close the underlying pooled ``httpx.Client``."""
+        self._client.close()
+
+    def __enter__(self) -> HttpxHttpClient:
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        self.close()
+
+    def _respect_rate_limit(self, host: str) -> None:
+        """Reserve the next per-host rate-limit slot and sleep outside the lock."""
+        with self._lock:
             now = self._clock()
-            while self._recent and now - self._recent[0] >= 60.0:
-                self._recent.popleft()
-        if self._requests_per_second > 0 and self._last_request_at is not None:
-            wait = (1.0 / self._requests_per_second) - (now - self._last_request_at)
-            if wait > 0:
-                self._sleep(wait)
-                now = self._clock()
-        self._last_request_at = now
-        self._recent.append(now)
+            recent = self._recent_by_host.setdefault(host, deque())
+            while recent and now - recent[0] >= 60.0:
+                recent.popleft()
+            minute_slot = recent[0] + 60.0 if len(recent) >= self._limit else now
+            rps_slot = now
+            if self._requests_per_second > 0:
+                last = self._last_request_by_host.get(host)
+                if last is not None:
+                    rps_slot = last + (1.0 / self._requests_per_second)
+            scheduled_at = max(now, minute_slot, rps_slot)
+            self._last_request_by_host[host] = scheduled_at
+            recent.append(scheduled_at)
+            while recent and scheduled_at - recent[0] >= 60.0:
+                recent.popleft()
+            wait = scheduled_at - now
+        if wait > 0:
+            self._sleep(wait)
 
     def _await_cooldown(self, url: str) -> None:
         """Wait out a per-host 403 cooldown before sending the next request."""
         host = urlparse(url).netloc
-        until = self._host_cooldowns.get(host)
-        if until is None:
-            return
-        wait = until - self._clock()
-        if wait > 0:
-            self._sleep(wait)
-        self._host_cooldowns.pop(host, None)
+        with self._lock:
+            until = self._host_cooldowns.get(host)
+            if until is None:
+                return
+            wait = until - self._clock()
+            if wait <= 0:
+                self._host_cooldowns.pop(host, None)
+                return
+        self._sleep(wait)
+        with self._lock:
+            if self._host_cooldowns.get(host) == until:
+                self._host_cooldowns.pop(host, None)
 
     def _set_cooldown(self, url: str) -> None:
         """Start a per-host cooldown after a 403 block."""
         if self._cooldown_seconds > 0:
-            self._host_cooldowns[urlparse(url).netloc] = self._clock() + self._cooldown_seconds
+            host = urlparse(url).netloc
+            with self._lock:
+                self._host_cooldowns[host] = self._clock() + self._cooldown_seconds
 
     def get(
         self,
@@ -186,20 +214,19 @@ class HttpxHttpClient:
             "Accept": DEFAULT_ACCEPT,
             **dict(headers or {}),
         }
+        host = urlparse(url).netloc
         self._await_cooldown(url)
         general = 0
         rate_limited = 0
         while True:
-            self._respect_rate_limit()
+            self._respect_rate_limit(host)
             try:
-                response = httpx.request(
+                response = self._client.request(
                     method,
                     url,
                     params=dict(params) if params else None,
                     json=json_body,
                     headers=request_headers,
-                    timeout=self._timeout,
-                    follow_redirects=True,
                 )
             except httpx.TimeoutException as exc:  # pragma: no cover - network only
                 general += 1

@@ -383,6 +383,40 @@ class V2Store:
         statement = statement.order_by(V2DailyPrice.date)
         return [_price_bar(row) for row in self._session.scalars(statement)]
 
+    def get_close_prices_batch(
+        self,
+        symbols: Sequence[str],
+        start: date,
+        end: date,
+        *,
+        chunk_size: int = 200,
+    ) -> dict[str, list[tuple[date, float]]]:
+        """Return ``(date, close_adj)`` pairs per ticker in ``[start, end]``."""
+        unique = sorted({symbol.strip().upper() for symbol in symbols if symbol.strip()})
+        if not unique:
+            return {}
+        grouped: dict[str, list[tuple[date, float]]] = {}
+        for idx in range(0, len(unique), chunk_size):
+            chunk = unique[idx : idx + chunk_size]
+            statement = (
+                select(
+                    V2DailyPrice.symbol_code,
+                    V2DailyPrice.date,
+                    V2DailyPrice.close_adj,
+                )
+                .where(
+                    V2DailyPrice.symbol_code.in_(chunk),
+                    V2DailyPrice.date >= start,
+                    V2DailyPrice.date <= end,
+                )
+                .order_by(V2DailyPrice.symbol_code, V2DailyPrice.date)
+            )
+            for symbol_code, bar_date, close_adj in self._session.execute(statement):
+                grouped.setdefault(symbol_code.upper(), []).append(
+                    (bar_date, float(close_adj))
+                )
+        return grouped
+
     def latest_price_date(self, symbol: str) -> date | None:
         """Return the newest stored bar date for ``symbol`` (or ``None``)."""
         return self._session.scalar(

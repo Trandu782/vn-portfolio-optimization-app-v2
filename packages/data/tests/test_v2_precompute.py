@@ -1390,3 +1390,47 @@ def test_set_progress_many_preserves_nonzero_rows_and_upserts_in_bulk(
     assert aaa is not None and aaa.state == "pre_screen_rejected" and aaa.last_date == AS_OF
 
 
+def test_concurrent_price_backfill_commits_all_tickers_and_isolates_failures(
+    factory: sessionmaker[Session],
+) -> None:
+    """With precompute_concurrency=3, successful tickers commit cleanly when one fails."""
+    symbols = ["AAA", "BBB", "CCC", "DDD", "EEE"]
+    fake = FakeSources(
+        bars_by_ticker={sym: _bars(START, AS_OF) for sym in symbols},
+        vn30=["AAA"],
+        vn100=["AAA", "BBB"],
+        symbols=symbols,
+    )
+    fake.fail_on.add("CCC")
+    service = V2PrecomputeService(
+        session_factory=factory,
+        sources=fake.to_sources(),
+        settings=V2DataSettings(
+            precompute_pre_screen_enabled=False,
+            precompute_concurrency=3,
+        ),
+        now_provider=_Clock(AS_OF),
+    )
+    universe = [
+        TickerRecord(ticker=sym, exchange="HOSE", source="test", data_as_of=AS_OF)
+        for sym in symbols
+    ]
+    step = service._backfill_prices(
+        AS_OF, mode="full", start=START, limit=None, universe=universe
+    )
+
+    assert step.ok is False
+    assert "1 failed" in (step.message or "")
+    assert step.processed == 4
+    with session_scope(factory) as session:
+        store = V2Store(session)
+        for ok_sym in ("AAA", "BBB", "DDD", "EEE"):
+            assert store.latest_price_date(ok_sym) == AS_OF
+            prog = store.get_progress("prices", ok_sym)
+            assert prog is not None and prog.state == "done"
+        assert store.latest_price_date("CCC") is None
+        fail_prog = store.get_progress("prices", "CCC")
+        assert fail_prog is not None and fail_prog.state == "failed"
+
+
+

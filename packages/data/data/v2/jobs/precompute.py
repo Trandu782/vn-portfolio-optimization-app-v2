@@ -170,6 +170,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     settings = get_settings()
     engine = create_engine_for(settings.database_url)
+    context: V2DataContext | None = None
     try:
         if args.create_schema:
             create_all(engine)
@@ -198,6 +199,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 only_unpriced=args.unpriced,
             )
     finally:
+        if context is not None and hasattr(context.http, "close"):
+            context.http.close()
         engine.dispose()
 
     _print_report(report)
