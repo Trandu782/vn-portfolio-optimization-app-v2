@@ -384,12 +384,15 @@ after the job), so use the same Supabase database as the API.
    (~25k requests). The 496-name priced universe already covers VN100 (100/100) and
    leaves 13 sectors with ≥3 Standard-Retail constituents, i.e. Optimize and the
    Sector tab are fully served without it. Then let the schedule
-   run `--incremental`: weekdays at `7 13 * * 1-5` (13:07 UTC = 20:07 ICT, late
-   enough for SSI to publish) and Tue–Sat mornings at `13 19 * * 1-5` (19:13 UTC = 02:13 ICT), which repairs a
-   failed weekday run while skipping Sat/Sun nights when the market is closed. Both share the `precompute-v2` concurrency group with
-   `cancel-in-progress: false`, so they queue instead of overlapping (a queued run
-   starts later than it was created, never earlier). The odd minutes keep the crons
-   out of GitHub's busiest scheduler slots, which otherwise delay a run by many
+   run `--incremental`: once per weekday at `47 12 * * 1-5` (12:47 UTC = 19:47 ICT,
+   late enough for SSI to publish). Removing the overnight repair pass and weekend
+   runs cuts scheduled GitHub Actions minutes and Supabase egress in half (5 runs/week);
+   any failed or late-published session is recovered by the next weekday run via
+   most-stale-first ordering or an on-demand `workflow_dispatch`. Scheduled and manual
+   runs share the `precompute-v2` concurrency group with `cancel-in-progress: false`,
+   so they queue instead of overlapping (a queued run starts later than it was
+   created, never earlier). The odd minute (`:47`) keeps the cron out of GitHub's
+   busiest scheduler slots (`:00`/`:30`), which otherwise delay a run by many
    minutes.
 6. **Read the progress lines** — each per-ticker loop prints a
    `[prices] 37/150 FPT (+968 bars)` style line every 10 tickers, so the job log
@@ -405,7 +408,7 @@ after the job), so use the same Supabase database as the API.
    `--as-of`) to force a date and keep those errors strict. Note that
    `ssi_statistics` publishes the stock EOD bars hours after the close (on
    2026-11-25 it had nothing for the 11-25 session at 18:40 ICT, while VCI and KBS
-   already did), so the post-close cron runs at 20:07 ICT (`7 13 * * 1-5`) and
+   already did), so the single EOD cron runs at 19:47 ICT (`47 12 * * 1-5`) and
    `VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS=1` logs a remaining lag as a
    warning instead of failing. `VNOPT_LOG_LEVEL` (default `INFO`) controls the diagnostics
    that now reach the job log (excluded securities, pre-screen rejections, re-bases).
@@ -415,8 +418,9 @@ after the job), so use the same Supabase database as the API.
    (~8 s with pooled keep-alive HTTP at `3.0` req/s and `concurrency=3`). A full
    ~1,500-name backfill must still be chunked (`limit=150`), while a steady-state
    incremental day takes only one SSI page per priced ticker (10-session rebase
-   overlap, ~3–6 min) and a no-op repair pass completes in ~15–30 s because
-   pre-screen rejections are cached for 30 days and unchanged liquidity, ratios,
+   overlap, ~3–6 min), and an optional manual re-run when already up to date
+   completes in ~15–30 s because pre-screen rejections are cached for 30 days and
+   unchanged liquidity, ratios,
    sector statistics, and flags are skipped or evaluated tail-only. Until the
    chunked backfill finishes, a scheduled `--incremental` will keep working through
    the unpriced names (outside their cooldown) instead of only fetching the new

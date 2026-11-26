@@ -61,9 +61,9 @@ Only simple returns are used (CFA Level 1/2), matching the rest of the app.
 ## D-004 — Scheduler: GitHub Actions primary, manual CLI for local use
 
 **Decision.** Run the pipeline in `.github/workflows/precompute_v2.yml` (a runner,
-not a short serverless function), scheduled at `7 13 * * 1-5` UTC = 20:07 ICT on
-weekdays (late enough for `ssi_statistics` to publish the session) and nightly at
-`13 19 * * *` UTC = 02:13 ICT,
+not a short serverless function), scheduled once per weekday at `47 12 * * 1-5`
+UTC = 19:47 ICT (single daily end-of-day run, late enough for `ssi_statistics`
+to publish the session),
 with `workflow_dispatch` for manual and heavy-backfill runs. Provide the manual
 equivalent `python -m data.v2.jobs.precompute`. The Vercel cron keeps the V1
 `/api/v1/data/refresh` only; heavy backfill must never run in the 120-second
@@ -76,18 +76,21 @@ job. The pipeline is resumable and chunked, so repeated `mode=full` runs with a
 per ticker. This satisfies "host heavy backfill on a runner".
 
 **Off-peak minutes.** GitHub's scheduler queue is busiest on `:00` and `:30`, where
-a cron can be delayed by many minutes, so both schedules use an odd minute
-(`:37`, `:13`); the market-relative timing (a few minutes earlier or later than
-the original 16:30/02:00 ICT) is irrelevant because a run processes whatever the
-providers have published when it starts.
+a cron can be delayed by many minutes, so the schedule uses an odd minute
+(`:47`, 19:47 ICT); this sits near the end of the 19:00–20:00 ICT window after
+EOD bars settle, while a run still processes whatever the providers have
+published when it starts.
 
 **Concurrency.** The job joins the `precompute-v2` concurrency group with
-`cancel-in-progress: false`, so the two crons and manual dispatches never overlap:
+`cancel-in-progress: false`, so scheduled runs and manual dispatches never overlap:
 a second trigger queues behind the active run instead of cancelling it or writing
 the same tickers in parallel. Losing a *pending* run is harmless because
 scheduled runs are `incremental` and resume from the committed `v2_progress`.
-The nightly pass exists for the same reason — it repairs a weekday run that
-failed or was truncated by the timeout, and catches late provider corrections.
+The former overnight repair cron was retired to cut scheduled GitHub Actions
+runtime and Supabase egress in half (5 runs/week instead of 10); because
+`incremental` runs order pending tickers most-stale-first (`LIMIT=1000`), any
+failed or late-published session is recovered by the next weekday run or an
+on-demand `workflow_dispatch`.
 
 ## D-005 — Pre-screen, resumable chunks and incremental runs
 

@@ -309,14 +309,17 @@ financial ratios.
   tolerance: set it to `1` while an upstream feed is known to publish one session
   late, and the lag is logged as a warning instead of failing the gate. That is the
   normal situation for `ssi_statistics`: on 2026-11-25 it still had no bar for the
-  11-25 session at 18:40 ICT while VCI and KBS already did, so a post-close run
-  targets a session the price feed cannot serve yet and the nightly pass completes it.
+  11-25 session at 18:40 ICT while VCI and KBS already did, so the single scheduled
+  run sits at 19:47 ICT (`47 12 * * 1-5`) rather than immediately after the 15:00 ICT
+  close, and any late-published session is caught up on the next weekday run or via
+  manual `workflow_dispatch`.
   An `--unpriced` backfill reports that dataset-level lag as a warning (it refreshes
   no priced ticker, so it cannot fix it); the scheduled runs keep the hard check.
 - **Daily jobs** — the scheduled GitHub Actions workflow (`precompute_v2.yml`)
-  runs `--incremental` after the close (weekdays `7 13 * * 1-5` = 20:07 ICT) and
-  Tue–Sat mornings (`13 19 * * 1-5` = 02:13 ICT); the off-`:00`/`:30` minutes avoid GitHub's
-  busiest scheduler slots and skip weekend no-op runs. Overlapping triggers queue in the `precompute-v2`
+  runs `--incremental` once per weekday at the end of the day (`47 12 * * 1-5` =
+  12:47 UTC = 19:47 ICT, Mon–Fri); the off-`:00`/`:30` minute avoids GitHub's
+  busiest scheduler slots, and skipping overnight and weekend runs saves GitHub
+  Actions time and Supabase egress. Overlapping triggers queue in the `precompute-v2`
   concurrency group. A scheduled run passes `--limit 1000`, so a single incremental
   pass covers the whole priced universe (an incremental refresh is about one page
   per ticker) and stays inside the 350-minute job timeout; the pending tickers are

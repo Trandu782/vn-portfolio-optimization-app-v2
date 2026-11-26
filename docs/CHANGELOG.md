@@ -6,6 +6,8 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- Consolidated `.github/workflows/precompute_v2.yml` to a single weekday end-of-day cron (`47 12 * * 1-5`, 12:47 UTC = 19:47 ICT, Mon–Fri) and removed the `13 19 * * 1-5` (02:13 ICT) nightly repair cron to cut scheduled GitHub Actions runs and Supabase egress in half (5 runs/week instead of 10). Updated `docs/DATA.md`, `docs/DEPLOYMENT.md`, and `docs/DECISIONS.md`.
+
 ### Performance & Supabase egress (v2.0.2)
 
 - **Precompute egress and runtime optimization (`packages/data`):**
