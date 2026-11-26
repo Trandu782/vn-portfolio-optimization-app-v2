@@ -266,17 +266,31 @@ class AnalyticsService:
         if not kept:
             warnings.append("no tickers pass the selected filters")
 
-        # 4. Load per-ticker bars/actions and the benchmark bars in the window.
+        # 4. Load per-ticker closes (3 columns in one batched query) and benchmark bars.
         price_from = window.start - timedelta(days=14)
         with session_scope(self._session_factory) as session:
             store = V2Store(session)
-            bars_by_ticker: dict[str, list[AdjustedOHLCV]] = {
-                row.ticker: store.get_prices(row.ticker, price_from, window.end)
-                for row in kept
-            }
+            close_pairs = store.get_close_prices_batch(
+                [row.ticker for row in kept], price_from, window.end
+            )
             benchmark_bars = SqlIndexRepository(session).get_range(
                 benchmark_code, price_from, window.end
             )
+        bars_by_ticker: dict[str, list[AdjustedOHLCV]] = {
+            row.ticker: [
+                AdjustedOHLCV(
+                    date=bar_date,
+                    open=close_val,
+                    high=close_val,
+                    low=close_val,
+                    close=close_val,
+                    volume=0,
+                    source="",
+                )
+                for bar_date, close_val in close_pairs.get(row.ticker.upper(), [])
+            ]
+            for row in kept
+        }
 
         returns_by_ticker: dict[str, dict[date, float]] = {}
         stored_flags, flags_available, flags_policy_current = load_adjustment_flags(

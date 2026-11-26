@@ -78,10 +78,42 @@ def join_labels(values: Sequence[str]) -> str | None:
     return "+".join(unique) if unique else None
 
 
-def load_universe_snapshot(session_factory: sessionmaker[Session]) -> UniverseSnapshot:
-    """Load the bulk V2 inputs once and score every candidate into a row."""
+_snapshot_cache: dict[
+    tuple[int, str, bool], tuple[date | None, UniverseSnapshot]
+] = {}
+_flags_cache: dict[
+    tuple[int, str],
+    tuple[
+        tuple[date | None, int, date | None],
+        tuple[dict[str, AdjustmentQualityFlag], bool, bool],
+    ],
+] = {}
+
+
+def _factory_key(session_factory: sessionmaker[Session]) -> tuple[int, str]:
+    bind = session_factory.kw.get("bind")
+    url = str(getattr(bind, "url", "")) if bind is not None else ""
+    return id(session_factory), url
+
+
+def clear_universe_cache() -> None:
+    """Drop cached universe snapshots and adjustment flags (used by tests)."""
+    _snapshot_cache.clear()
+    _flags_cache.clear()
+
+
+def load_universe_snapshot(
+    session_factory: sessionmaker[Session], *, include_price_bases: bool = True
+) -> UniverseSnapshot:
+    """Load the bulk V2 inputs once (cached by ``overall_latest_price_date``)."""
+    fid, furl = _factory_key(session_factory)
+    cache_key = (fid, furl, include_price_bases)
     with session_scope(session_factory) as session:
         store = V2Store(session)
+        latest_price = store.overall_latest_price_date()
+        cached = _snapshot_cache.get(cache_key)
+        if cached is not None and latest_price is not None and cached[0] == latest_price:
+            return cached[1]
         master = store.list_ticker_master()
         sector_by_ticker = {
             sector.ticker.strip().upper(): sector.icb_level2_name
@@ -98,8 +130,7 @@ def load_universe_snapshot(session_factory: sessionmaker[Session]) -> UniverseSn
         market_caps = {
             record.symbol.strip().upper(): record for record in store.list_market_cap()
         }
-        bases = store.price_adjustment_bases()
-        latest_price = store.overall_latest_price_date()
+        bases = store.price_adjustment_bases() if include_price_bases else {}
         flags_available = store.adjustment_flags_available()
 
     rows = [
@@ -111,7 +142,7 @@ def load_universe_snapshot(session_factory: sessionmaker[Session]) -> UniverseSn
         for record in master
         if record.ticker.strip().upper() not in sector_by_ticker
     )
-    return UniverseSnapshot(
+    snapshot = UniverseSnapshot(
         master=master,
         rows=rows,
         sector_by_ticker=sector_by_ticker,
@@ -122,6 +153,9 @@ def load_universe_snapshot(session_factory: sessionmaker[Session]) -> UniverseSn
         sector_gaps=sector_gaps,
         flags_available=flags_available,
     )
+    if latest_price is not None:
+        _snapshot_cache[cache_key] = (latest_price, snapshot)
+    return snapshot
 
 
 def _to_flag(record: AdjustmentFlagRecord) -> AdjustmentQualityFlag:
@@ -154,18 +188,30 @@ def load_adjustment_flags(
     session_factory: sessionmaker[Session],
 ) -> tuple[dict[str, AdjustmentQualityFlag], bool, bool]:
     """Return the stored flags, whether they were computed, and whether they are current."""
+    cache_key = _factory_key(session_factory)
     with session_scope(session_factory) as session:
-        records = V2Store(session).list_adjustment_flags()
-    return (
+        store = V2Store(session)
+        latest_price = store.overall_latest_price_date()
+        flag_count, max_flag_date = store.adjustment_flags_stamp()
+        stamp = (latest_price, flag_count, max_flag_date)
+        cached = _flags_cache.get(cache_key)
+        if cached is not None and flag_count > 0 and cached[0] == stamp:
+            return cached[1]
+        records = store.list_adjustment_flags()
+    result = (
         {record.ticker: _to_flag(record) for record in records},
         bool(records),
         flags_policy_current(records),
     )
+    if records:
+        _flags_cache[cache_key] = (stamp, result)
+    return result
 
 
 __all__ = [
     "UniverseSnapshot",
     "build_universe_row",
+    "clear_universe_cache",
     "flags_policy_current",
     "join_labels",
     "load_adjustment_flags",

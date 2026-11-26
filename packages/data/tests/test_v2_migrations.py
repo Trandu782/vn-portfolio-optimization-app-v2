@@ -132,3 +132,32 @@ def test_round_trip_upgrade_downgrade_upgrade_is_stable(
     command.upgrade(alembic_config, "head")
     tables = _table_names(url)
     assert tables >= EXPECTED_TABLES
+
+
+def test_0006_v2_query_indexes_upgrade_and_downgrade(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    """Migration 0006 creates and cleanly drops query-performance indexes."""
+    url = f"sqlite:///{(tmp_path / 'migrate.db').as_posix()}"
+    command.upgrade(alembic_config, "head")
+    engine = create_engine(url)
+    try:
+        insp = inspect(engine)
+        price_indexes = {idx["name"] for idx in insp.get_indexes("v2_daily_prices")}
+        ratio_indexes = {idx["name"] for idx in insp.get_indexes("v2_financial_ratios")}
+    finally:
+        engine.dispose()
+    assert "ix_v2_daily_prices_date" in price_indexes
+    assert "ix_v2_financial_ratios_period" in ratio_indexes
+
+    command.downgrade(alembic_config, "-1")
+    engine = create_engine(url)
+    try:
+        insp = inspect(engine)
+        price_indexes_after = {idx["name"] for idx in insp.get_indexes("v2_daily_prices")}
+        ratio_indexes_after = {idx["name"] for idx in insp.get_indexes("v2_financial_ratios")}
+    finally:
+        engine.dispose()
+    assert "ix_v2_daily_prices_date" not in price_indexes_after
+    assert "ix_v2_financial_ratios_period" not in ratio_indexes_after
+

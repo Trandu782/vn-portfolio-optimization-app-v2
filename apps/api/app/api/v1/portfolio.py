@@ -94,10 +94,10 @@ def evaluate_portfolio(
     as stale in its ``Notes``.
     """
     today = service.today
-    series_by_symbol = {
-        holding.symbol: service.get_prices_preferring_v2_spot(holding.symbol)
-        for holding in request.holdings
-    }
+    series_by_symbol = service.get_prices_preferring_v2_spot_batch(
+        [holding.symbol for holding in request.holdings],
+        recent_days=45,
+    )
     latest_prices = {
         symbol: series.rows[-1].close
         for symbol, series in series_by_symbol.items()

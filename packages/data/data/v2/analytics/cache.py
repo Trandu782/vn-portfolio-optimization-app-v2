@@ -19,6 +19,7 @@ from datetime import date
 from time import perf_counter
 
 from data.v2.analytics.schemas import AnalyticsPayload
+from data.v2.analytics.universe_reader import clear_universe_cache
 
 
 @dataclass(frozen=True)
@@ -54,8 +55,9 @@ for a miss it is the wall-clock build time in milliseconds.
 
 
 def clear_analytics_cache() -> None:
-    """Drop every cached payload (used by tests)."""
+    """Drop every cached payload and universe snapshot (used by tests)."""
     _cache.clear()
+    clear_universe_cache()
 
 
 __all__ = ["cached_build", "clear_analytics_cache"]

@@ -240,10 +240,7 @@ class FundamentalsService:
     def periods(self, symbol: str) -> list[tuple[date, str]]:
         """Return the stored ``(period, period_type)`` pairs for ``symbol``, newest first."""
         with session_scope(self._session_factory) as session:
-            return [
-                (record.period, record.period_type)
-                for record in V2Store(session).get_ratios(symbol)
-            ]
+            return V2Store(session).list_ratio_periods(symbol)
 
     def compare(
         self,
@@ -261,7 +258,9 @@ class FundamentalsService:
                 is impossible without a peer group), or the variant is unknown.
         """
         code = symbol.strip().upper()
-        snapshot = load_universe_snapshot(self._session_factory)
+        snapshot = load_universe_snapshot(
+            self._session_factory, include_price_bases=False
+        )
         with session_scope(self._session_factory) as session:
             store = V2Store(session)
             sector_record = store.get_sector(code)
@@ -275,13 +274,12 @@ class FundamentalsService:
         peer_tickers = select_peer_tickers(
             snapshot, sector, variant=variant, preset_id=preset_id
         )
-        peer_set = set(peer_tickers)
         with session_scope(self._session_factory) as session:
-            records = V2Store(session).list_ratios(period=period, period_type=period_type)
+            records = V2Store(session).list_ratios_for_symbols(
+                peer_tickers, period=period, period_type=period_type
+            )
         values_by_ratio: dict[str, dict[str, float | None]] = {}
         for record in records:
-            if record.symbol not in peer_set:
-                continue
             for ratio, value in record.ratios.items():
                 values_by_ratio.setdefault(ratio, {})[record.symbol] = value
         target_ratios = target.ratios if target is not None else {}

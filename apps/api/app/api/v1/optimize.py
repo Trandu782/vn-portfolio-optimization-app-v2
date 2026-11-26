@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, ValidationError
 
 from app.api.v1.data import get_data_service
-from app.api.v1.universe import _load_symbol_series, _stale_warnings
+from app.api.v1.universe import _load_symbol_series_batch, _stale_warnings
 from core.market_rules import DEFAULT_MARKET_RULES
 from core.optimize import (
     DEFAULT_COVARIANCE_ESTIMATOR,
@@ -358,9 +358,9 @@ def run_optimize(
         raise HTTPException(status_code=422, detail="provide at least one symbol")
     sectors = _normalize_sectors(request.sectors, codes)
 
-    series = [
-        _load_symbol_series(service, code, request.start, request.end) for code in codes
-    ]
+    series, sources_by_code = _load_symbol_series_batch(
+        service, codes, request.start, request.end
+    )
     universe = build_universe(series, [], request.start, request.end)
     if not universe.symbols:
         raise HTTPException(
@@ -369,6 +369,9 @@ def run_optimize(
         )
     exchanges = {item.code: item.exchange for item in series}
     settings = request.settings or UserSettings()
+    data_sources = sorted(
+        {sources_by_code[code] for code in universe.symbols if code in sources_by_code}
+    )
 
     try:
         risk_free_rate = resolve_risk_free_rate(request.risk_free_rate_provider, settings)
@@ -388,9 +391,7 @@ def run_optimize(
             start=request.start,
             end=request.end,
             risk_free_rate_provider=request.risk_free_rate_provider,
-            data_sources=_data_sources(
-                service, universe.symbols, request.start, request.end
-            ),
+            data_sources=data_sources,
             prices_adjusted=False,
             sectors=sectors,
         )
@@ -465,18 +466,6 @@ def _latest_prices(universe: UniverseBuildResult) -> dict[str, float]:
         if finite.size:
             prices[code] = float(finite[-1])
     return prices
-
-
-def _data_sources(
-    service: DataService, symbols: tuple[str, ...], start: date, end: date
-) -> list[str]:
-    """Return the V2 provider ids that served the cached series (no extra fetch)."""
-    sources: set[str] = set()
-    for code in symbols:
-        series = service.get_prices_v2(code, start=start, end=end)
-        if series.source:
-            sources.add(series.source)
-    return sorted(sources)
 
 
 def _to_response(result: OptimizeResult, warnings: list[str]) -> OptimizeResponse:
@@ -573,9 +562,9 @@ def run_frontier(
         raise HTTPException(status_code=422, detail="provide at least one symbol")
     sectors = _normalize_sectors(request.sectors, codes)
 
-    series = [
-        _load_symbol_series(service, code, request.start, request.end) for code in codes
-    ]
+    series, sources_by_code = _load_symbol_series_batch(
+        service, codes, request.start, request.end
+    )
     universe = build_universe(series, [], request.start, request.end)
     if not universe.symbols:
         raise HTTPException(
@@ -583,6 +572,9 @@ def run_frontier(
         )
     exchanges = {item.code: item.exchange for item in series}
     settings = request.settings or UserSettings()
+    data_sources = sorted(
+        {sources_by_code[code] for code in universe.symbols if code in sources_by_code}
+    )
 
     try:
         risk_free_rate = resolve_risk_free_rate(request.risk_free_rate_provider, settings)
@@ -614,7 +606,7 @@ def run_frontier(
         result,
         universe,
         exchanges,
-        service,
+        data_sources,
         request.start,
         request.end,
         request.capital,
@@ -626,7 +618,7 @@ def _frontier_to_response(
     result: FrontierResult,
     universe: UniverseBuildResult,
     exchanges: dict[str, str],
-    service: DataService,
+    data_sources: list[str],
     start: date,
     end: date,
     capital: int,
@@ -679,7 +671,7 @@ def _frontier_to_response(
         equal_weight=_round_point(result.equal_weight, prices, lot_sizes, capital),
         current=current,
         assumptions=FrontierAssumptionsResponse(
-            data_sources=_data_sources(service, universe.symbols, start, end),
+            data_sources=data_sources,
             start=start,
             end=end,
             prices_adjusted=False,

@@ -7,13 +7,16 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
+from sqlalchemy import event
 from sqlalchemy.orm import Session, sessionmaker
 
 from data.db.base import create_all, create_engine_for, create_session_factory, session_scope
 from data.db.repositories import SqlIndexRepository
 from data.models import PriceBar
 from data.v2.adjustment_quality import adjustment_quality_flag
+from data.v2.analytics.cache import clear_analytics_cache
 from data.v2.analytics.service import AnalyticsRequest, AnalyticsService
+from data.v2.analytics.universe_reader import load_universe_snapshot
 from data.v2.precompute_schemas import (
     AdjustmentFlagRecord,
     LiquidityRecord,
@@ -264,4 +267,87 @@ def test_a_short_history_window_is_clamped_with_a_warning(tmp_path: Path) -> Non
     payload = service.build(AnalyticsRequest(timeframe="3Y"))
     assert payload.window.start == date(2024, 1, 2)
     assert any("stored history begins" in warning for warning in payload.warnings)
+
+
+def test_analytics_build_uses_single_batched_close_query(tmp_path: Path) -> None:
+    """AnalyticsService.build loads closes in one batched query without OHLC/volume columns."""
+    clear_analytics_cache()
+    factory = _seed(tmp_path)
+    queries: list[str] = []
+
+    def _before(conn, cursor, statement, parameters, context, executemany):  # type: ignore[no-untyped-def]
+        queries.append(statement)
+
+    engine = factory.kw["bind"]
+    event.listen(engine, "before_cursor_execute", _before)
+    try:
+        payload = AnalyticsService(factory).build(AnalyticsRequest(timeframe="YTD"))
+    finally:
+        event.remove(engine, "before_cursor_execute", _before)
+
+    assert payload.groups
+    price_bar_selects = [
+        stmt
+        for stmt in queries
+        if "FROM v2_daily_prices" in stmt
+        and "max(" not in stmt.lower()
+        and "min(" not in stmt.lower()
+        and "distinct" not in stmt.lower()
+    ]
+    assert len(price_bar_selects) == 1, price_bar_selects
+    stmt_lower = price_bar_selects[0].lower()
+    for unwanted in ("open", "high", "low", "matched_volume"):
+        assert unwanted not in stmt_lower, stmt_lower
+
+
+def test_universe_snapshot_cache_hits_and_invalidates_when_data_date_advances(
+    tmp_path: Path,
+) -> None:
+    """load_universe_snapshot caches by overall_latest_price_date and invalidates on advance."""
+    clear_analytics_cache()
+    factory = _seed(tmp_path)
+    first = load_universe_snapshot(factory)
+    assert first.latest_price_date is not None
+
+    queries: list[str] = []
+
+    def _before(conn, cursor, statement, parameters, context, executemany):  # type: ignore[no-untyped-def]
+        queries.append(statement)
+
+    engine = factory.kw["bind"]
+    event.listen(engine, "before_cursor_execute", _before)
+    try:
+        second = load_universe_snapshot(factory)
+    finally:
+        event.remove(engine, "before_cursor_execute", _before)
+
+    assert second is first
+    assert len(queries) == 1, queries
+
+    newer_day = first.latest_price_date + timedelta(days=1)
+    with session_scope(factory) as session:
+        V2Store(session).upsert_prices(
+            "BANK1",
+            [
+                AdjustedOHLCV(
+                    date=newer_day,
+                    open=105.0,
+                    high=105.0,
+                    low=105.0,
+                    close=105.0,
+                    close_raw=105.0,
+                    volume=1_000_000,
+                    matched_volume=900_000,
+                    matched_value=105.0 * 900_000,
+                    source="test",
+                )
+            ],
+            price_adjustment_basis="ssi_adjusted",
+            data_as_of=newer_day,
+        )
+
+    refreshed = load_universe_snapshot(factory)
+    assert refreshed is not first
+    assert refreshed.latest_price_date == newer_day
+
 

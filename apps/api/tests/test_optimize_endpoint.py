@@ -320,3 +320,44 @@ def test_frontier_over_the_portfolio_cap_is_422(client: TestClient) -> None:
     assert response.status_code == 422
     assert "at most" in response.json()["detail"].lower()
 
+
+def test_frontier_loads_prices_once_without_double_fetching_data_sources(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """POST /optimize and /optimize/frontier load V2 prices once per request."""
+    from data.service import DataService
+
+    fetched_symbols: list[str] = []
+    orig_single = DataService.get_prices_v2
+    orig_batch = getattr(DataService, "get_prices_v2_batch", None)
+
+    def spy_single(self: DataService, symbol: str, **kwargs):  # type: ignore[no-untyped-def]
+        fetched_symbols.append(symbol.upper())
+        return orig_single(self, symbol, **kwargs)
+
+    monkeypatch.setattr(DataService, "get_prices_v2", spy_single)
+    if orig_batch is not None:
+
+        def spy_batch(self: DataService, symbols, **kwargs):  # type: ignore[no-untyped-def]
+            fetched_symbols.extend(s.upper() for s in symbols)
+            return orig_batch(self, symbols, **kwargs)
+
+        monkeypatch.setattr(DataService, "get_prices_v2_batch", spy_batch)
+
+    opt_resp = client.post(
+        "/api/v1/optimize",
+        json=_payload(symbols=["AAA", "BBB", "CCC"]),
+    )
+    assert opt_resp.status_code == 200, opt_resp.text
+    assert opt_resp.json()["assumptions"]["data_sources"] == ["test"]
+    assert sorted(fetched_symbols) == ["AAA", "BBB", "CCC"]
+
+    fetched_symbols.clear()
+    front_resp = client.post(
+        "/api/v1/optimize/frontier", json=_frontier_payload(num_portfolios=100)
+    )
+    assert front_resp.status_code == 200, front_resp.text
+    assert front_resp.json()["assumptions"]["data_sources"] == ["test"]
+    assert sorted(fetched_symbols) == ["AAA", "BBB", "CCC"]
+
+

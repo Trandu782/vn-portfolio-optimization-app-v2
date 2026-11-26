@@ -8,7 +8,7 @@ failover chain already own that - so the API layer stays thin.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -227,6 +227,7 @@ class DataService:
         *,
         start: date | None = None,
         end: date | None = None,
+        recent_days: int | None = None,
     ) -> PriceSeries:
         """Return prices preferring the V2 **spot** (raw) closes, else the V1 path.
 
@@ -236,18 +237,66 @@ class DataService:
         series for ``symbol`` this serves the raw close (``PriceBar.close``) and reports
         the true V2 source and date. A symbol with no V2 bars yet falls back to the V1
         series (still backfilling on demand), so an unknown ticker still gets a price.
+        When ``recent_days`` is set (and ``start`` is ``None``), the V2 query reads
+        only that trailing window without triggering a bogus V1 ``_covers_since``
+        backfill on fallback.
         """
         code = symbol.upper()
         today = self._today()
         range_end = end or today
-        range_start = start or (range_end - timedelta(days=self._settings.on_demand_history_days))
+        lookback = recent_days if recent_days is not None else self._settings.on_demand_history_days
+        range_start = start or (range_end - timedelta(days=lookback))
         with session_scope(self._session_factory) as session:
             store = V2Store(session)
             bars = store.get_prices(code, range_start, range_end)
+            if not bars and recent_days is not None and start is None:
+                latest = store.latest_price_date(code)
+                if latest is not None:
+                    bars = store.get_prices(
+                        code, latest - timedelta(days=recent_days), latest
+                    )
         if not bars:
             # No V2 data for this ticker; use the normal (V1) path.
             return self.get_prices(symbol, start=start, end=end, ensure=True)
         return self._price_series_from_v2(code, bars, today)
+
+    def get_prices_preferring_v2_spot_batch(
+        self,
+        symbols: Sequence[str],
+        *,
+        start: date | None = None,
+        end: date | None = None,
+        recent_days: int | None = None,
+    ) -> dict[str, PriceSeries]:
+        """Batch variant of :meth:`get_prices_preferring_v2_spot`."""
+        codes = list(
+            dict.fromkeys(symbol.strip().upper() for symbol in symbols if symbol.strip())
+        )
+        if not codes:
+            return {}
+        today = self._today()
+        range_end = end or today
+        lookback = recent_days if recent_days is not None else self._settings.on_demand_history_days
+        range_start = start or (range_end - timedelta(days=lookback))
+        with session_scope(self._session_factory) as session:
+            store = V2Store(session)
+            bars_by_code = store.get_prices_batch(codes, range_start, range_end)
+            if recent_days is not None and start is None:
+                for code in codes:
+                    if code not in bars_by_code:
+                        latest = store.latest_price_date(code)
+                        if latest is not None:
+                            bars_by_code[code] = store.get_prices(
+                                code, latest - timedelta(days=recent_days), latest
+                            )
+        result: dict[str, PriceSeries] = {}
+        for code in codes:
+            bars = bars_by_code.get(code)
+            if bars:
+                result[code] = self._price_series_from_v2(code, bars, today)
+            else:
+                result[code] = self.get_prices(code, start=start, end=end, ensure=True)
+        return result
 
     def get_prices_v2(
         self,
@@ -284,6 +333,47 @@ class DataService:
                 rows=[],
             )
         return self._price_series_from_v2(code, bars, today)
+
+    def get_prices_v2_batch(
+        self,
+        symbols: Sequence[str],
+        *,
+        start: date | None = None,
+        end: date | None = None,
+    ) -> dict[str, PriceSeries]:
+        """Return V2-only :class:`PriceSeries` keyed by upper-cased ticker in one query."""
+        codes = list(
+            dict.fromkeys(
+                symbol.strip().upper() for symbol in symbols if symbol.strip()
+            )
+        )
+        if not codes:
+            return {}
+        today = self._today()
+        range_end = end or today
+        range_start = start or (
+            range_end - timedelta(days=self._settings.on_demand_history_days)
+        )
+        with session_scope(self._session_factory) as session:
+            bars_by_code = V2Store(session).get_prices_batch(codes, range_start, range_end)
+        result: dict[str, PriceSeries] = {}
+        for code in codes:
+            bars = bars_by_code.get(code)
+            if not bars:
+                result[code] = PriceSeries(
+                    symbol=code,
+                    source=None,
+                    stale=False,
+                    status="missing",
+                    warnings=[
+                        f"no V2 price data for {code}; run the V2 precompute/backfill "
+                        "(V1 prices are not used for this calculation)"
+                    ],
+                    rows=[],
+                )
+            else:
+                result[code] = self._price_series_from_v2(code, bars, today)
+        return result
 
     def _price_series_from_v2(
         self, code: str, bars: list[AdjustedOHLCV], today: date, *, status: str = "ok"

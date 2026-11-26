@@ -808,6 +808,13 @@ class V2Store:
         count = self._session.scalar(select(func.count()).select_from(V2AdjustmentFlag))
         return bool(count)
 
+    def adjustment_flags_stamp(self) -> tuple[int, date | None]:
+        """Return ``(row_count, max_data_as_of)`` for cache invalidation."""
+        row = self._session.execute(
+            select(func.count(), func.max(V2AdjustmentFlag.data_as_of))
+        ).one()
+        return int(row[0] or 0), row[1]
+
 
     # -- financial ratios (V2b) -------------------------------------------
     def upsert_ratios(self, records: Sequence[RatioRecord]) -> int:
@@ -846,6 +853,45 @@ class V2Store:
             .order_by(V2FinancialRatio.period.desc(), V2FinancialRatio.period_type)
         )
         return [_ratio_record(row) for row in self._session.scalars(statement)]
+
+    def list_ratio_periods(self, symbol: str) -> list[tuple[date, str]]:
+        """Return ``(period, period_type)`` pairs for ``symbol``, newest first."""
+        statement = (
+            select(V2FinancialRatio.period, V2FinancialRatio.period_type)
+            .where(V2FinancialRatio.symbol_code == symbol.upper())
+            .order_by(V2FinancialRatio.period.desc(), V2FinancialRatio.period_type)
+        )
+        return [
+            (period, period_type)
+            for period, period_type in self._session.execute(statement)
+        ]
+
+    def list_ratios_for_symbols(
+        self,
+        symbols: Sequence[str],
+        *,
+        period: date,
+        period_type: str,
+        chunk_size: int = 200,
+    ) -> list[RatioRecord]:
+        """Return ratios for ``symbols`` at ``(period, period_type)``."""
+        unique = sorted({symbol.strip().upper() for symbol in symbols if symbol.strip()})
+        if not unique:
+            return []
+        rows: list[RatioRecord] = []
+        for idx in range(0, len(unique), chunk_size):
+            chunk = unique[idx : idx + chunk_size]
+            statement = (
+                select(V2FinancialRatio)
+                .where(
+                    V2FinancialRatio.symbol_code.in_(chunk),
+                    V2FinancialRatio.period == period,
+                    V2FinancialRatio.period_type == period_type,
+                )
+                .order_by(V2FinancialRatio.symbol_code, V2FinancialRatio.period)
+            )
+            rows.extend(_ratio_record(row) for row in self._session.scalars(statement))
+        return rows
 
     def get_ratio(
         self, symbol: str, period: date, period_type: str

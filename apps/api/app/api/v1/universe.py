@@ -9,6 +9,7 @@ come from the core registry, so the UI renders options it never hardcodes.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from datetime import date, timedelta
 from typing import Annotated, Any
 
@@ -196,9 +197,9 @@ def build_universe_endpoint(
             status_code=422, detail=f"invalid filter parameters: {exc}"
         ) from exc
 
-    series = [
-        _load_symbol_series(service, code, request.start, request.end) for code in codes
-    ]
+    series, _sources = _load_symbol_series_batch(
+        service, codes, request.start, request.end
+    )
     result = build_universe(
         series, filters, request.start, request.end, adv_sessions=request.adv_sessions
     )
@@ -225,19 +226,50 @@ def _resolve_symbols(request: UniverseBuildRequest, service: DataService) -> lis
     return codes
 
 
+def _load_symbol_series_batch(
+    service: DataService, codes: Sequence[str], start: date, end: date
+) -> tuple[list[SymbolSeries], dict[str, str]]:
+    """Load V2 series for ``codes`` in one batched query and return ``(series, sources)``."""
+    price_by_code = service.get_prices_v2_batch(codes, start=start, end=end)
+    series: list[SymbolSeries] = []
+    sources: dict[str, str] = {}
+    for code in codes:
+        key = code.upper()
+        info = service.get_symbol(code)
+        exchange = normalize_exchange(info.exchange) if info and info.exchange else "HOSE"
+        price_series = price_by_code.get(key)
+        rows = price_series.rows if price_series is not None else []
+        if price_series is not None and price_series.source:
+            sources[key] = price_series.source
+        bars = tuple(
+            DailyBar(
+                date=row.date,
+                close=row.close,
+                adj_close=row.adj_close,
+                volume=row.volume,
+                value=row.value,
+            )
+            for row in rows
+            if start <= row.date <= end
+        )
+        security_type = (info.type or "").strip().lower() if info is not None else ""
+        series.append(
+            SymbolSeries(
+                code=code,
+                exchange=exchange,
+                bars=bars,
+                suspended=security_type in _SUSPENDED_TYPES,
+                delisted=security_type in _DELISTED_TYPES,
+                stale=_has_stale_bars(rows, end),
+            )
+        )
+    return series, sources
+
+
 def _load_symbol_series(
     service: DataService, code: str, start: date, end: date
 ) -> SymbolSeries:
-    """Load one symbol's V2 series and derive its authoritative/staleness flags.
-
-    Prices always come from the V2 store (``v2_daily_prices``) through
-    :meth:`DataService.get_prices_v2`; there is no silent V1 fallback, so an
-    incomplete V2 backfill surfaces as ``missing_price_history`` / ``stale_price_data``
-    instead of a stale V1 series being used. ``suspended`` and ``delisted`` are set
-    from authoritative ticker metadata only — a trailing bar is ``stale``, never
-    ``suspended`` — so an actively traded name with an incomplete backfill is never
-    mislabelled.
-    """
+    """Load one symbol's V2 series and derive its authoritative/staleness flags."""
     info = service.get_symbol(code)
     exchange = normalize_exchange(info.exchange) if info and info.exchange else "HOSE"
     price_series = service.get_prices_v2(code, start=start, end=end)

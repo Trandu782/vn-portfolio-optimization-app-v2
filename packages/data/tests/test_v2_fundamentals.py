@@ -6,6 +6,7 @@ from collections.abc import Iterator
 from datetime import date
 
 import pytest
+from sqlalchemy import event
 from sqlalchemy.orm import Session, sessionmaker
 
 from data.db.base import (
@@ -14,6 +15,7 @@ from data.db.base import (
     create_session_factory,
     session_scope,
 )
+from data.v2.analytics.cache import clear_analytics_cache
 from data.v2.analytics.schemas import UniverseRow
 from data.v2.analytics.universe_reader import UniverseSnapshot
 from data.v2.fundamentals import (
@@ -351,3 +353,35 @@ def test_service_without_sector_raises(factory: sessionmaker[Session]) -> None:
     _seed(factory)
     with pytest.raises(ValueError):
         FundamentalsService(factory).compare("XYZ", period=PERIOD, period_type="ttm")
+
+
+def test_fundamentals_compare_only_queries_sector_peers(
+    factory: sessionmaker[Session],
+) -> None:
+    """FundamentalsService.compare filters ratios by peer symbols and skips price bases."""
+    clear_analytics_cache()
+    _seed(factory)
+    queries: list[tuple[str, object]] = []
+
+    def _before(conn, cursor, statement, parameters, context, executemany):  # type: ignore[no-untyped-def]
+        queries.append((statement, parameters))
+
+    engine = factory.kw["bind"]
+    event.listen(engine, "before_cursor_execute", _before)
+    try:
+        comparison = FundamentalsService(factory).compare(
+            "VCB", period=PERIOD, period_type="ttm", variant="all"
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", _before)
+
+    assert comparison.sector == "Banks"
+    ratio_list_queries = [
+        (stmt, params)
+        for stmt, params in queries
+        if "FROM v2_financial_ratios" in stmt and "symbol_code IN" in stmt
+    ]
+    assert len(ratio_list_queries) == 1, queries
+    assert "FPT" not in str(ratio_list_queries[0][1])
+    assert not any("price_adjustment_basis" in stmt for stmt, _ in queries)
+

@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.api.v1.data import get_data_service
 from app.api.v1.schemas import Assumptions, assumptions_from
-from app.api.v1.universe import _load_symbol_series, _stale_warnings
+from app.api.v1.universe import _load_symbol_series_batch, _stale_warnings
 from core.registry import Registry
 from core.risk import (
     DEFAULT_CONFIDENCE,
@@ -280,9 +280,7 @@ def analyse_risk(
     if benchmark not in BENCHMARK_BY_CODE:
         raise HTTPException(status_code=422, detail=f"unknown benchmark {benchmark!r}")
 
-    series = [
-        _load_symbol_series(service, code, request.start, request.end) for code in codes
-    ]
+    series, _ = _load_symbol_series_batch(service, codes, request.start, request.end)
     universe = build_universe(series, [], request.start, request.end)
     if not universe.symbols:
         raise HTTPException(
@@ -367,9 +365,7 @@ def compare_risk(
         raise HTTPException(status_code=422, detail=f"unknown benchmark {benchmark!r}")
     settings = request.settings or UserSettings()
 
-    series = [
-        _load_symbol_series(service, code, request.start, request.end) for code in codes
-    ]
+    series, _ = _load_symbol_series_batch(service, codes, request.start, request.end)
     universe = build_universe(series, [], request.start, request.end)
     if not universe.symbols:
         raise HTTPException(

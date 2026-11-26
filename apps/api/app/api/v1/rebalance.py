@@ -36,7 +36,6 @@ from core.rebalance import rebalance as run_rebalance_engine
 from core.registry import Registry
 from core.settings import UserSettings
 from core.universe import normalize_exchange
-from data.models import PriceSeries
 from data.service import DataService
 
 router = APIRouter(tags=["rebalance"])
@@ -295,8 +294,11 @@ def _market_data(
     warnings: list[str] = []
     sources: set[str] = set()
     latest_date: date | None = None
+    series_by_symbol = service.get_prices_preferring_v2_spot_batch(
+        symbols, recent_days=45
+    )
     for symbol in symbols:
-        series: PriceSeries = service.get_prices(symbol, ensure=True)
+        series = series_by_symbol[symbol.upper()]
         warnings.extend(series.warnings)
         if series.source:
             sources.add(series.source)
