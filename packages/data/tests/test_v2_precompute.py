@@ -1595,5 +1595,51 @@ def test_batch_store_helpers_handle_empty_symbol_list(
         assert store.list_all_corporate_actions([]) == {}
 
 
+def test_stale_halted_ticker_does_not_expand_overlap_window_for_active_tickers(
+    factory: sessionmaker[Session],
+) -> None:
+    """A long-halted ticker must not drag active tickers' overlap close query back."""
+    early = date(2025, 6, 2)
+    halt_date = date(2025, 7, 1)
+    fake = FakeSources(
+        bars_by_ticker={
+            "VCB": _bars(early, AS_OF),
+            "HALT": _bars(early, halt_date),
+        },
+        vn30=["VCB"],
+        vn100=["VCB", "HALT"],
+        symbols=["VCB", "HALT"],
+    )
+    clock = _Clock(AS_OF)
+    service = _service(factory, fake.to_sources(), clock)
+    assert service.run(mode="full", start=early).ok
+
+    newer = date(2026, 1, 2)
+    fake.bars_by_ticker["VCB"].extend(
+        _bars(date(2026, 1, 1), newer, base=fake.bars_by_ticker["VCB"][-1].close + 1.0)
+    )
+    clock.today = newer
+
+    queries, listener = _capture_sql(factory)
+    try:
+        assert service.run(mode="incremental", start=early).ok
+    finally:
+        event.remove(factory.kw["bind"], "before_cursor_execute", listener)
+
+    # Check the overlap close query for VCB: its start parameter must stay near AS_OF,
+    # never dragged back to halt_date (2025-07-01).
+    vcb_overlap_params = [
+        params
+        for stmt, params in queries
+        if "v2_daily_prices.close_adj" in stmt
+        and "v2_daily_prices.symbol_code IN" in stmt
+        and "VCB" in str(params)
+    ]
+    assert vcb_overlap_params, queries
+    # Bound date parameter should be >= 2025-12-01 (not 2025-06-xx).
+    assert any("2025-12-" in str(p) for p in vcb_overlap_params), vcb_overlap_params
+
+
+
 
 

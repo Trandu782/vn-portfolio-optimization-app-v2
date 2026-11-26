@@ -236,7 +236,7 @@ class V2Progress(Base):
 
     kind: Mapped[str] = mapped_column(String(32), primary_key=True)
     symbol: Mapped[str] = mapped_column(String(16), primary_key=True)
-    state: Mapped[str] = mapped_column(String(16), default="pending")
+    state: Mapped[str] = mapped_column(String(32), default="pending")
     last_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     rows: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(String(1024), nullable=True)

@@ -79,7 +79,8 @@ def join_labels(values: Sequence[str]) -> str | None:
 
 
 _snapshot_cache: dict[
-    tuple[int, str, bool], tuple[date | None, UniverseSnapshot]
+    tuple[int, str, bool],
+    tuple[tuple[date | None, int, int, int, int], UniverseSnapshot],
 ] = {}
 _flags_cache: dict[
     tuple[int, str],
@@ -105,14 +106,15 @@ def clear_universe_cache() -> None:
 def load_universe_snapshot(
     session_factory: sessionmaker[Session], *, include_price_bases: bool = True
 ) -> UniverseSnapshot:
-    """Load the bulk V2 inputs once (cached by ``overall_latest_price_date``)."""
+    """Load the bulk V2 inputs once (cached by DB snapshot stamp)."""
     fid, furl = _factory_key(session_factory)
     cache_key = (fid, furl, include_price_bases)
     with session_scope(session_factory) as session:
         store = V2Store(session)
-        latest_price = store.overall_latest_price_date()
+        stamp = store.universe_snapshot_stamp()
+        latest_price = stamp[0]
         cached = _snapshot_cache.get(cache_key)
-        if cached is not None and latest_price is not None and cached[0] == latest_price:
+        if cached is not None and latest_price is not None and cached[0] == stamp:
             return cached[1]
         master = store.list_ticker_master()
         sector_by_ticker = {
@@ -131,7 +133,7 @@ def load_universe_snapshot(
             record.symbol.strip().upper(): record for record in store.list_market_cap()
         }
         bases = store.price_adjustment_bases() if include_price_bases else {}
-        flags_available = store.adjustment_flags_available()
+        flags_available = stamp[4] > 0
 
     rows = [
         build_universe_row(record, sector_by_ticker, membership, liquidity, market_caps)
@@ -154,7 +156,7 @@ def load_universe_snapshot(
         flags_available=flags_available,
     )
     if latest_price is not None:
-        _snapshot_cache[cache_key] = (latest_price, snapshot)
+        _snapshot_cache[cache_key] = (stamp, snapshot)
     return snapshot
 
 

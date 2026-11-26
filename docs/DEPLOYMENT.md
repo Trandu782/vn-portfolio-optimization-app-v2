@@ -325,8 +325,8 @@ after the job), so use the same Supabase database as the API.
    transaction-pooler URL (port `6543`) and session-pooler URL (port `5432`).
 2. **Migrate** — run Alembic `0001`…`0006` against the database. From a shell
    with `DATABASE_URL` set to the **session** URL (DML/DDL over a transaction
-   pooler is unreliable; `0006_v2_query_indexes` adds `ix_v2_daily_prices_date`
-   and `ix_v2_financial_ratios_period`):
+   pooler is unreliable; `0006_v2_query_indexes` adds `ix_v2_daily_prices_date`,
+   `ix_v2_financial_ratios_period`, and widens `v2_progress.state` to `VARCHAR(32)`):
    ```sh
    cd packages/data && python -m alembic upgrade head
    ```

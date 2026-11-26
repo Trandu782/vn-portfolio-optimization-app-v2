@@ -758,15 +758,29 @@ class V2PrecomputeService:
             ]
             tail_closes_by_ticker: dict[str, list[tuple[date, float]]] = {}
             if inc_tickers:
-                min_latest = min(latest_by_ticker[t.upper()] for t in inc_tickers)
-                min_overlap_start = max(
-                    start,
-                    min_latest
-                    - timedelta(days=2 * self._settings.precompute_rebase_overlap_sessions),
-                )
-                tail_closes_by_ticker = store.get_close_prices_batch(
-                    inc_tickers, min_overlap_start, target
-                )
+                overlap_days = 2 * self._settings.precompute_rebase_overlap_sessions
+                max_latest = max(latest_by_ticker[t.upper()] for t in inc_tickers)
+                recent_cutoff = max_latest - timedelta(days=30)
+                recent_inc = [
+                    t for t in inc_tickers if latest_by_ticker[t.upper()] >= recent_cutoff
+                ]
+                stale_inc = [
+                    t for t in inc_tickers if latest_by_ticker[t.upper()] < recent_cutoff
+                ]
+                if recent_inc:
+                    recent_min = min(latest_by_ticker[t.upper()] for t in recent_inc)
+                    recent_overlap_start = max(start, recent_min - timedelta(days=overlap_days))
+                    tail_closes_by_ticker.update(
+                        store.get_close_prices_batch(
+                            recent_inc, recent_overlap_start, max_latest
+                        )
+                    )
+                for stale_ticker in stale_inc:
+                    t_latest = latest_by_ticker[stale_ticker.upper()]
+                    t_start = max(start, t_latest - timedelta(days=overlap_days))
+                    tail_closes_by_ticker.update(
+                        store.get_close_prices_batch([stale_ticker], t_start, t_latest)
+                    )
 
         def _fetch(ticker: str) -> _PreparedPriceFetch:
             return self._fetch_ticker_prices(

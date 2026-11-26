@@ -135,7 +135,9 @@ class HttpxHttpClient:
             recent = self._recent_by_host.setdefault(host, deque())
             while recent and now - recent[0] >= 60.0:
                 recent.popleft()
-            minute_slot = recent[0] + 60.0 if len(recent) >= self._limit else now
+            minute_slot = (
+                recent[-self._limit] + 60.0 if len(recent) >= self._limit else now
+            )
             rps_slot = now
             if self._requests_per_second > 0:
                 last = self._last_request_by_host.get(host)
@@ -144,8 +146,6 @@ class HttpxHttpClient:
             scheduled_at = max(now, minute_slot, rps_slot)
             self._last_request_by_host[host] = scheduled_at
             recent.append(scheduled_at)
-            while recent and scheduled_at - recent[0] >= 60.0:
-                recent.popleft()
             wait = scheduled_at - now
         if wait > 0:
             self._sleep(wait)

@@ -815,6 +815,25 @@ class V2Store:
         ).one()
         return int(row[0] or 0), row[1]
 
+    def universe_snapshot_stamp(self) -> tuple[date | None, int, int, int, int]:
+        """Return ``(latest_price, master_n, liq_n, cap_n, flag_n)`` in one SQL query."""
+        row = self._session.execute(
+            select(
+                select(func.max(V2DailyPrice.date)).scalar_subquery(),
+                select(func.count()).select_from(V2TickerMaster).scalar_subquery(),
+                select(func.count()).select_from(V2Liquidity).scalar_subquery(),
+                select(func.count()).select_from(V2MarketCap).scalar_subquery(),
+                select(func.count()).select_from(V2AdjustmentFlag).scalar_subquery(),
+            )
+        ).one()
+        return (
+            row[0],
+            int(row[1] or 0),
+            int(row[2] or 0),
+            int(row[3] or 0),
+            int(row[4] or 0),
+        )
+
 
     # -- financial ratios (V2b) -------------------------------------------
     def upsert_ratios(self, records: Sequence[RatioRecord]) -> int:

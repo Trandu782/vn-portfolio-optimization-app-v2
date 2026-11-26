@@ -99,3 +99,33 @@ def test_httpx_client_rate_limiter_is_thread_safe_under_concurrent_requests() ->
     assert all(resp.status_code == 200 for resp in responses)
     assert all(duration >= 0.0 for duration in sleeps)
     assert len(sleeps) >= 5
+
+
+def test_httpx_client_enforces_rate_limit_per_minute_without_rps_cap() -> None:
+    """Rolling-minute cap must hold across consecutive calls even when rps=0 and now=0."""
+    now = 0.0
+    sleeps: list[float] = []
+
+    def fake_clock() -> float:
+        return now
+
+    def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    client = HttpxHttpClient(
+        user_agent="test-agent/1.0",
+        rate_limit_per_minute=2,
+        requests_per_second=0.0,
+        sleep=fake_sleep,
+        clock=fake_clock,
+        transport=httpx.MockTransport(lambda _req: httpx.Response(200, text="ok")),
+    )
+    try:
+        for idx in range(5):
+            assert client.get(f"https://example.com/{idx}").status_code == 200
+    finally:
+        client.close()
+
+    # Calls 1 & 2 -> 0s wait; Calls 3 & 4 -> 60s wait; Call 5 -> 120s wait.
+    assert sleeps == [60.0, 60.0, 120.0]
+

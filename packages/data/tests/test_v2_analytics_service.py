@@ -351,3 +351,31 @@ def test_universe_snapshot_cache_hits_and_invalidates_when_data_date_advances(
     assert refreshed.latest_price_date == newer_day
 
 
+def test_universe_snapshot_cache_invalidates_when_non_price_tables_change(
+    tmp_path: Path,
+) -> None:
+    """load_universe_snapshot invalidates when market cap / liquidity / flags change."""
+    clear_analytics_cache()
+    factory = _seed(tmp_path)
+    first = load_universe_snapshot(factory)
+    assert first.market_caps["BANK1"].market_cap == pytest.approx(2_000e9)
+
+    with session_scope(factory) as session:
+        V2Store(session).upsert_market_cap(
+            MarketCapRecord(
+                symbol="EXTRA1",
+                as_of=first.latest_price_date or date(2024, 6, 1),
+                shares_outstanding=1_000,
+                market_cap=500e9,
+                basis="full",
+                source="test",
+                data_as_of=first.latest_price_date or date(2024, 6, 1),
+            )
+        )
+
+    second = load_universe_snapshot(factory)
+    assert second is not first
+    assert "EXTRA1" in second.market_caps
+
+
+

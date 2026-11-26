@@ -161,3 +161,21 @@ def test_0006_v2_query_indexes_upgrade_and_downgrade(
     assert "ix_v2_daily_prices_date" not in price_indexes_after
     assert "ix_v2_financial_ratios_period" not in ratio_indexes_after
 
+
+def test_v2_progress_state_column_supports_pre_screen_rejected(
+    alembic_config: Config, tmp_path: Path
+) -> None:
+    """v2_progress.state must be at least 32 chars for 'pre_screen_rejected' (19 chars)."""
+    from data.db.models import V2Progress
+
+    assert V2Progress.__table__.c.state.type.length >= 32  # type: ignore[attr-defined]
+    url = f"sqlite:///{(tmp_path / 'migrate.db').as_posix()}"
+    command.upgrade(alembic_config, "head")
+    engine = create_engine(url)
+    try:
+        cols = {col["name"]: col for col in inspect(engine).get_columns("v2_progress")}
+        assert cols["state"]["type"].length >= 32
+    finally:
+        engine.dispose()
+
+

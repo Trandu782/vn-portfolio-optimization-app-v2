@@ -35,7 +35,9 @@ project follows [Semantic Versioning](https://semver.org/).
 - **API read-path batching, caching, and DB indexes (`packages/data`, `apps/api`):**
   - Added Alembic migration `0006_v2_query_indexes` creating
     `ix_v2_daily_prices_date` on `v2_daily_prices (date)` and
-    `ix_v2_financial_ratios_period` on `v2_financial_ratios (period, period_type)`.
+    `ix_v2_financial_ratios_period` on `v2_financial_ratios (period, period_type)`,
+    and widening `v2_progress.state` from `VARCHAR(16)` to `VARCHAR(32)` for
+    `pre_screen_rejected`.
   - Added `data_as_of`-keyed caching for `load_universe_snapshot` and
     `load_adjustment_flags` (cleared by `clear_analytics_cache`), column-projected
     `AnalyticsService.build` via `get_close_prices_batch`, targeted peer queries in
