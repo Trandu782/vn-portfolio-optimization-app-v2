@@ -6,6 +6,54 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Performance & Supabase egress (v2.0.2)
+
+- **Precompute egress and runtime optimization (`packages/data`):**
+  - Already-priced tickers now bypass the KBS pre-screen (`_select_candidates`),
+    and unpriced pre-screen rejections persist `state="pre_screen_rejected"` in
+    `v2_progress` with a configurable 30-day cooldown
+    (`VNOPT_V2_PRECOMPUTE_PRE_SCREEN_COOLDOWN_DAYS`), eliminating ~1,519 wasted
+    daily pre-screen calls. `scripts/verify_v2_db.py` treats `pre_screen_rejected`
+    alongside `done` so skipped illiquid names are not reported as unfinished.
+  - Reduced `precompute_rebase_overlap_sessions` from `40` to `10`
+    (`VNOPT_V2_PRECOMPUTE_REBASE_OVERLAP_SESSIONS`), fitting the incremental
+    overlap window inside a single 40-row SSI page.
+  - Pooled HTTP connections inside `HttpxHttpClient` using a persistent
+    `httpx.Client` (supporting `close()` and context management) with mutex-protected
+    per-host rate limiting and 403 cooldowns, and parallelized price fetching in
+    `V2PrecomputeService` (`VNOPT_V2_PRECOMPUTE_CONCURRENCY`, default `3`) with
+    batched 25-ticker commits and per-ticker failure fallback.
+  - Eliminated repeated full-table scans and ~19,000 N+1 DB round-trips in
+    precompute via `V2Store` batch helpers (`get_prices_batch`,
+    `get_close_prices_batch`, `upsert_liquidity_many`, `set_progress_many`,
+    `list_all_corporate_actions`, `count_prices_by_symbol`, `count_sector_statistics`,
+    projected `list_index_dates`), incremental tail-only liquidity/quality/flag
+    checks (with automatic full-history recompute on rebase or new tail anomaly),
+    `precompute_ratios_refresh_days` (default `7`) cadence with single-load
+    sharing across `sector_statistics` and `ratio_quality`, and `StepResult.elapsed_seconds`
+    step timing output.
+- **API read-path batching, caching, and DB indexes (`packages/data`, `apps/api`):**
+  - Added Alembic migration `0006_v2_query_indexes` creating
+    `ix_v2_daily_prices_date` on `v2_daily_prices (date)` and
+    `ix_v2_financial_ratios_period` on `v2_financial_ratios (period, period_type)`.
+  - Added `data_as_of`-keyed caching for `load_universe_snapshot` and
+    `load_adjustment_flags` (cleared by `clear_analytics_cache`), column-projected
+    `AnalyticsService.build` via `get_close_prices_batch`, targeted peer queries in
+    `FundamentalsService` (`list_ratio_periods`, `list_ratios_for_symbols`,
+    `include_price_bases=False`), batched `DataService.get_prices_v2_batch` /
+    `get_prices_preferring_v2_spot_batch` (eliminating `optimize.py`'s double-fetch
+    of `_data_sources`), and 45-day `recent_days` bounds on `portfolio.py` and
+    `rebalance.py` (which now reads V2 spot closes).
+- **HTTP Edge/Browser caching & frontend hygiene (`apps/api`, `apps/web`, `.github`):**
+  - Added `public, s-maxage=...` `Cache-Control` headers on read-only V2,
+    `/data/freshness`, `/symbols`, and `/*/options` GET routes; dropped
+    `cache: "no-store"` on frontend `GET` requests in `apps/web/lib/api.ts`; and
+    added a 200 ms debounce on `UniverseFilterPanel.tsx` filter changes.
+  - Updated `.github/workflows/precompute_v2.yml` nightly repair cron from
+    `13 19 * * *` to `13 19 * * 1-5` (skipping Sat/Sun night no-op runs) and set
+    default `VNOPT_V2_CLIENT_REQUESTS_PER_SECOND=3.0` and `VNOPT_V2_PRECOMPUTE_*`
+    variables.
+
 ### Data quality and V2 price routing
 
 - **A limited precompute run can no longer leave a ticker stuck on an old session.**

@@ -22,9 +22,12 @@ name: Precompute V2 datasets
 #      hours later (on 2026-11-25 it still had no bar for that session at 18:40
 #      ICT while VCI and KBS already did), so a run at 16:37 only re-fetched an
 #      unchanged tail. The nightly pass remains the guaranteed repair.
-#   2. `13 19 * * *`  -> 19:13 UTC = 02:13 ICT (UTC+7), nightly, which picks up
-#      late provider corrections plus any weekday run that failed. Because the
-#      scheduled mode is `incremental`, a second pass only fetches new dates.
+#   2. `13 19 * * 1-5` -> 19:13 UTC = 02:13 ICT (Tue–Sat mornings), Mon–Fri
+#      nights after trading days, which picks up late provider corrections plus
+#      any weekday run that failed while skipping pointless Sat/Sun night runs
+#      when the Vietnam market is closed. Because the scheduled mode is
+#      `incremental`, a no-op repair pass completes in ~15–30s and a weekday
+#      +1-bar update completes in ~3–6 min.
 #
 # Both minutes are deliberately off :00/:30, where GitHub's scheduler queue is
 # busiest and a cron can be delayed by many minutes. GitHub delivers a scheduled
@@ -37,8 +40,8 @@ on:
   schedule:
     # Weekdays 13:07 UTC = 20:07 ICT, after SSI actually publishes the EOD bars.
     - cron: "7 13 * * 1-5"
-    # Nightly 19:13 UTC = 02:13 AM Vietnam time (UTC+7).
-    - cron: "13 19 * * *"
+    # Post-trading-day nightly repair 19:13 UTC = 02:13 AM ICT (Tue–Sat).
+    - cron: "13 19 * * 1-5"
   workflow_dispatch:
     inputs:
       mode:
@@ -119,9 +122,13 @@ jobs:
       # data/v2/precompute.py (sources_from_context) and throttles through the
       # shared client, so those two families only configure the API's runner.
       VNOPT_V2_BACKFILL_START_DATE: ${{ vars.VNOPT_V2_BACKFILL_START_DATE || '2023-01-01' }}
-      VNOPT_V2_CLIENT_REQUESTS_PER_SECOND: ${{ vars.VNOPT_V2_CLIENT_REQUESTS_PER_SECOND || '1.5' }}
+      VNOPT_V2_CLIENT_REQUESTS_PER_SECOND: ${{ vars.VNOPT_V2_CLIENT_REQUESTS_PER_SECOND || '3.0' }}
+      VNOPT_V2_PRECOMPUTE_CONCURRENCY: ${{ vars.VNOPT_V2_PRECOMPUTE_CONCURRENCY || '3' }}
       VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED: ${{ vars.VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED || 'true' }}
       VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME: ${{ vars.VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME || '10000' }}
+      VNOPT_V2_PRECOMPUTE_PRE_SCREEN_COOLDOWN_DAYS: ${{ vars.VNOPT_V2_PRECOMPUTE_PRE_SCREEN_COOLDOWN_DAYS || '30' }}
+      VNOPT_V2_PRECOMPUTE_REBASE_OVERLAP_SESSIONS: ${{ vars.VNOPT_V2_PRECOMPUTE_REBASE_OVERLAP_SESSIONS || '10' }}
+      VNOPT_V2_PRECOMPUTE_RATIOS_REFRESH_DAYS: ${{ vars.VNOPT_V2_PRECOMPUTE_RATIOS_REFRESH_DAYS || '7' }}
       # 0 = strict: any session the benchmark or the price dataset lags the last
       # completed session is an error. Set the variable to 1 only while an
       # upstream feed is known to publish a session late (an unknown exchange

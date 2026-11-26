@@ -163,7 +163,10 @@ The cron schedule lives in the root `vercel.json`
 (`30 8 * * 1-5` = 15:30 Asia/Ho_Chi_Minh, after the 15:00 close, Monday–Friday).
 Vercel sends `Authorization: Bearer ${CRON_SECRET}`; the endpoint is idempotent
 and returns `cursor`/`remaining` so an external scheduler can loop it when a
-single batch is not enough.
+single batch is not enough. As of v2.0.2, every page (including Rebalance via
+`get_prices_preferring_v2_spot_batch`) reads V2 prices first, so the legacy V1
+Vercel cron in `vercel.json` (`/api/v1/data/refresh`) can optionally be removed
+once you confirm no V1-only tickers are used.
 
 ### 2. Web project
 
@@ -320,9 +323,10 @@ after the job), so use the same Supabase database as the API.
 
 1. **Provision a persistent Postgres** (e.g. Supabase) and note its
    transaction-pooler URL (port `6543`) and session-pooler URL (port `5432`).
-2. **Migrate** — run Alembic `0001`…`0005` against the database. From a shell
+2. **Migrate** — run Alembic `0001`…`0006` against the database. From a shell
    with `DATABASE_URL` set to the **session** URL (DML/DDL over a transaction
-   pooler is unreliable):
+   pooler is unreliable; `0006_v2_query_indexes` adds `ix_v2_daily_prices_date`
+   and `ix_v2_financial_ratios_period`):
    ```sh
    cd packages/data && python -m alembic upgrade head
    ```
@@ -343,7 +347,11 @@ after the job), so use the same Supabase database as the API.
 
    Optional repo **variables** are forwarded to the job explicitly:
    `VNOPT_V2_BACKFILL_START_DATE`, `VNOPT_V2_CLIENT_REQUESTS_PER_SECOND`,
-   `VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS` and the pre-screen knobs
+   `VNOPT_V2_PRECOMPUTE_CONCURRENCY`,
+   `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_COOLDOWN_DAYS`,
+   `VNOPT_V2_PRECOMPUTE_REBASE_OVERLAP_SESSIONS`,
+   `VNOPT_V2_PRECOMPUTE_RATIOS_REFRESH_DAYS`,
+   `VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS`, and the pre-screen knobs
    `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED` /
    `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_MIN_MEDIAN_VOLUME`. `VNOPT_V2_*_ORDER` and
    `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE` are **not** read by the precompute job —
@@ -377,8 +385,8 @@ after the job), so use the same Supabase database as the API.
    leaves 13 sectors with ≥3 Standard-Retail constituents, i.e. Optimize and the
    Sector tab are fully served without it. Then let the schedule
    run `--incremental`: weekdays at `7 13 * * 1-5` (13:07 UTC = 20:07 ICT, late
-   enough for SSI to publish) and nightly at `13 19 * * *` (19:13 UTC = 02:13 ICT), which repairs a
-   failed weekday run. Both share the `precompute-v2` concurrency group with
+   enough for SSI to publish) and Tue–Sat mornings at `13 19 * * 1-5` (19:13 UTC = 02:13 ICT), which repairs a
+   failed weekday run while skipping Sat/Sun nights when the market is closed. Both share the `precompute-v2` concurrency group with
    `cancel-in-progress: false`, so they queue instead of overlapping (a queued run
    starts later than it was created, never earlier). The odd minutes keep the crons
    out of GitHub's busiest scheduler slots, which otherwise delay a run by many
@@ -404,13 +412,16 @@ after the job), so use the same Supabase database as the API.
 
    Budget: SSI `stock-info` pages 40 rows and the adapter walks 366-day windows,
    so a first history from `2023-01-01` costs roughly 25 requests per ticker
-   (~50 s at the default `0.5` req/s throttle). A full ~1,500-name backfill is
-   therefore ~20 h and must be chunked (`limit=150` ≈ 2 h, inside the
-   350-minute job timeout), while a steady-state incremental day is about three
-   requests per ticker (~2.5 h, one run). Until the chunked backfill finishes,
-   a scheduled `--incremental` will keep working through the unpriced names
-   instead of only fetching the new session; the `v2_progress` rows and the
-   `verify_report.txt` `unfinished progress rows` count show how far it got.
+   (~8 s with pooled keep-alive HTTP at `3.0` req/s and `concurrency=3`). A full
+   ~1,500-name backfill must still be chunked (`limit=150`), while a steady-state
+   incremental day takes only one SSI page per priced ticker (10-session rebase
+   overlap, ~3–6 min) and a no-op repair pass completes in ~15–30 s because
+   pre-screen rejections are cached for 30 days and unchanged liquidity, ratios,
+   sector statistics, and flags are skipped or evaluated tail-only. Until the
+   chunked backfill finishes, a scheduled `--incremental` will keep working through
+   the unpriced names (outside their cooldown) instead of only fetching the new
+   session; the `v2_progress` rows and the `verify_report.txt` `unfinished progress rows`
+   count show how far it got.
 7. **Deploy the API and web** as before (`vercel --prod` from the repo root and
    `apps/web`). The API reads the same `DATABASE_URL` (transaction-pooler URL is
    fine for its read path) and needs the `VNOPT_V2_*_ORDER` vars only if you
@@ -429,8 +440,12 @@ after the job), so use the same Supabase database as the API.
 | `VNOPT_V2_SECTOR_MAP_ORDER` | API | no | Sector map chain, default `ssi_statistics`. |
 | `VNOPT_V2_RATIOS_ORDER` | API | no | Ratios chain, default `ssi_statistics`. |
 | `VNOPT_V2_BACKFILL_START_DATE` | precompute job (repo variable) | no | Backfill start (`2023-01-01`); also `--start`. |
-| `VNOPT_V2_CLIENT_REQUESTS_PER_SECOND` | precompute job (repo variable) | no | Shared-client throttle, default `0.5` (30/min). |
-| `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED` / `..._MIN_MEDIAN_VOLUME` | precompute job (repo variables) | no | Backfill pre-screen, defaults `true` / `10000`. Set the floor to `0` to backfill the illiquid tail. |
+| `VNOPT_V2_CLIENT_REQUESTS_PER_SECOND` | precompute job (repo variable) | no | Per-host client throttle, workflow default `3.0` (in-code default `0.5`). |
+| `VNOPT_V2_PRECOMPUTE_CONCURRENCY` | precompute job (repo variable) | no | Worker threads for per-ticker HTTP fetches, default `3`. |
+| `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_ENABLED` / `..._MIN_MEDIAN_VOLUME` | precompute job (repo variables) | no | Backfill pre-screen, defaults `true` / `10000`. Already-priced tickers bypass it; set the floor to `0` to backfill the illiquid tail. |
+| `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_COOLDOWN_DAYS` | precompute job (repo variable) | no | Days an unpriced `pre_screen_rejected` ticker is skipped on incremental runs, default `30`. |
+| `VNOPT_V2_PRECOMPUTE_REBASE_OVERLAP_SESSIONS` | precompute job (repo variable) | no | Trailing sessions re-fetched on incremental runs to detect SSI rebases, default `10`. |
+| `VNOPT_V2_PRECOMPUTE_RATIOS_REFRESH_DAYS` | precompute job (repo variable) | no | Days between incremental ratio refreshes per ticker, default `7`. |
 | `VNOPT_V2_PRECOMPUTE_STALENESS_TOLERANCE_SESSIONS` | precompute job (repo variable) | no | Trading sessions the benchmark/dataset may lag the target before the quality gate fails, default `0` (strict); `1` logs a warning only. |
 | `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE` | API | no | Per-data-type request budget for the failover runner (defaults 10-20/min); the precompute job throttles through the shared client instead. |
 

@@ -262,10 +262,18 @@ financial ratios.
   actions; KBS and VCI back up constituents and OHLCV. The active defaults include
   only providers verified from recorded fixtures; unverified providers stay out of
   the chain until the cloud-IP probe (`scripts/probe_v2.py`) confirms them.
-- **Incremental vs full/backfill** — `--incremental` fetches only new dates (about
-  one page per ticker per day) and skips the tickers a previous run recorded as
-  `done` with no stored bar, so a symbol that never trades is not polled daily; a
-  `--full` run or `--profiles` re-checks them. `--full` re-fetches the configured
+- **Incremental vs full/backfill** — `--incremental` fetches only new dates
+  (10-session rebase overlap via `VNOPT_V2_PRECOMPUTE_REBASE_OVERLAP_SESSIONS`,
+  fitting inside one SSI page per ticker) using pooled HTTP connections and
+  `VNOPT_V2_PRECOMPUTE_CONCURRENCY` (default `3`) workers. It skips tickers a
+  previous run recorded as `done` with no stored bar and unpriced tickers recorded
+  as `pre_screen_rejected` within `VNOPT_V2_PRECOMPUTE_PRE_SCREEN_COOLDOWN_DAYS`
+  (default `30`); already-priced tickers always bypass the pre-screen, and a
+  `--full` run or `--profiles` re-checks skipped names. Incremental runs also skip
+  unchanged liquidity/ratios (`VNOPT_V2_PRECOMPUTE_RATIOS_REFRESH_DAYS`, default
+  `7`), skip `sector_statistics`/`ratio_quality` when no ratios changed, and run
+  tail-only quality/flag checks unless a ticker was rebased or surfaced a new tail
+  anomaly. `--full` re-fetches the configured
   window (`VNOPT_V2_BACKFILL_START_DATE`, default `2023-01-01`). Heavy backfills are
   chunked with `--limit N`, and the candidates are ordered tracked tickers first,
   then unpriced `VN100`/`VN30` members, then the remaining unpriced names, so the
@@ -307,8 +315,8 @@ financial ratios.
   no priced ticker, so it cannot fix it); the scheduled runs keep the hard check.
 - **Daily jobs** — the scheduled GitHub Actions workflow (`precompute_v2.yml`)
   runs `--incremental` after the close (weekdays `7 13 * * 1-5` = 20:07 ICT) and
-  nightly (`13 19 * * *` = 02:13 ICT); the off-`:00`/`:30` minutes avoid GitHub's
-  busiest scheduler slots. Overlapping triggers queue in the `precompute-v2`
+  Tue–Sat mornings (`13 19 * * 1-5` = 02:13 ICT); the off-`:00`/`:30` minutes avoid GitHub's
+  busiest scheduler slots and skip weekend no-op runs. Overlapping triggers queue in the `precompute-v2`
   concurrency group. A scheduled run passes `--limit 1000`, so a single incremental
   pass covers the whole priced universe (an incremental refresh is about one page
   per ticker) and stays inside the 350-minute job timeout; the pending tickers are
