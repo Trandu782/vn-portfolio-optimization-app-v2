@@ -1,39 +1,37 @@
 /**
  * Shared Recharts theme and formatters.
- *
- * Every chart imports its colours, axis styling and number/date formatting from
- * here so a future chart looks consistent without copying values around. The
- * colours are fixed rather than theme tokens because Recharts renders SVG, where
- * Tailwind's `dark:` classes do not apply; the chosen greys read on both the
- * white and gray-950 backgrounds of the app.
  */
 
-/** Fixed colours for the known series and markers. */
+/** Fixed colours for the known series and markers, harmonized with the Graphite palette. */
 export const CHART_COLORS = {
-  frontier: "#2563eb",
-  cloud: "#9ca3af",
-  capitalLine: "#0284c7",
-  minVariance: "#16a34a",
-  tangency: "#ea580c",
-  equalWeight: "#6b7280",
-  current: "#7c3aed",
-  selected: "#1d4ed8",
-  drawdown: "#dc2626",
-  benchmark: "#6b7280",
+  frontier: "#3b82f6",
+  cloud: "#71717a",
+  capitalLine: "#0ea5e9",
+  minVariance: "#4cc38a",
+  tangency: "#e0a243",
+  equalWeight: "#71717a",
+  current: "#8b5cf6",
+  selected: "#2563eb",
+  drawdown: "#e5484d",
+  benchmark: "#71717a",
 } as const;
 
 /** Tick text colour that is legible on both light and dark backgrounds. */
-export const AXIS_TEXT = "#6b7280";
+export const AXIS_TEXT = "#85858b";
 
-/** Subtle gridline colour that works over white and gray-950. */
-export const GRID_STROKE = "rgba(107, 114, 128, 0.22)";
+/** Subtle gridline colour that works over light and dark surfaces. */
+export const GRID_STROKE = "rgba(133, 133, 139, 0.16)";
 
 /** Shared tick props for both axes. */
-export const AXIS_TICK = { fontSize: 11, fill: AXIS_TEXT } as const;
+export const AXIS_TICK = {
+  fontSize: 11,
+  fill: AXIS_TEXT,
+  fontFamily: "var(--font-mono)",
+} as const;
 
-/** Tailwind classes for the HTML tooltip body (dark mode follows the app). */
+/** Tailwind classes for the HTML tooltip body. */
 export const TOOLTIP_CLASS =
-  "rounded-md border border-gray-200 bg-white/95 px-2 py-1 text-xs text-gray-900 shadow-md dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-100";
+  "rounded-lg border border-strong bg-surface/95 px-3 py-2 text-xs text-fg shadow-lg backdrop-blur-sm";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 

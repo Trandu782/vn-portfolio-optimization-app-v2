@@ -3,23 +3,24 @@
 /**
  * Rebalance page: turn current holdings plus target weights into a placeable
  * order list.
- *
- * Holdings and cash are pre-filled from the shared portfolio store and stay
- * editable here. Target weights start from the optimized mix saved on the
- * Optimize page (the store's chosen portfolio) or, when there is none, from the
- * current weights; they stay editable. Holdings and target weights can also be
- * imported from CSV, and the resulting order list is exportable to CSV. Cost
- * models and policies (with their parameters) are rendered from
- * `GET /api/v1/rebalance/options`, so a new core policy appears here without a
- * UI change.
- *
- * Prices are the latest close; sells are planned before buys, orders round down
- * to whole lots and T+2 settlement is not modeled in V1.
  */
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import {
+  inputClass,
+  inputCompactClass,
+  selectClass,
+  tableBodyCellClass,
+  tableHeaderCellClass,
+  tableHeaderRowClass,
+  tableRowHoverClass,
+} from "@/components/ui/Field";
+import { DownloadIcon, UploadIcon, XIcon } from "@/components/ui/Icons";
 import {
   fetchRebalanceOptions,
   fetchSymbols,
@@ -153,7 +154,6 @@ export function RebalanceCalculator() {
     };
   }, []);
 
-  // Pre-fill holdings and cash once from the shared portfolio.
   useEffect(() => {
     if (holdingsPrefilled.current) return;
     if (portfolioHoldings.length === 0 && portfolioCash === 0) return;
@@ -162,8 +162,6 @@ export function RebalanceCalculator() {
     holdingsPrefilled.current = true;
   }, [portfolioHoldings, portfolioCash]);
 
-  // Pre-fill target weights once: the optimized mix saved on the Optimize page
-  // wins, otherwise the current portfolio weights are a sensible starting point.
   useEffect(() => {
     if (targetsPrefilled.current) return;
     if (chosenWeights !== null && Object.keys(chosenWeights).length > 0) {
@@ -240,7 +238,7 @@ export function RebalanceCalculator() {
     }
     setTargets(targetRowsFromHoldings(evaluation.holdings));
     setTargetsFrom("current");
-    setNotice("Target weights set to your current weights.");
+    setNotice("Target weights set to your current weights");
   }, [evaluation]);
 
   const useOptimizedWeights = useCallback(() => {
@@ -250,7 +248,7 @@ export function RebalanceCalculator() {
     }
     setTargets(targetRowsFromWeights(chosenWeights));
     setTargetsFrom("optimized");
-    setNotice("Target weights set to your optimized mix.");
+    setNotice("Target weights set to your optimized mix");
   }, [chosenWeights]);
 
   const handlePolicyChange = useCallback(
@@ -269,7 +267,7 @@ export function RebalanceCalculator() {
     }
     setHoldings(parsed.holdings);
     setError(null);
-    setNotice(`Imported ${parsed.holdings.length} holdings.`);
+    setNotice(`Imported ${parsed.holdings.length} holdings`);
   }, []);
 
   const importTargetsCsv = useCallback((text: string) => {
@@ -281,7 +279,7 @@ export function RebalanceCalculator() {
     setTargets(parsed.rows);
     setTargetsFrom("manual");
     setError(null);
-    setNotice(`Imported ${parsed.rows.length} target weights.`);
+    setNotice(`Imported ${parsed.rows.length} target weights`);
   }, []);
 
   const handleRun = useCallback(async () => {
@@ -332,18 +330,17 @@ export function RebalanceCalculator() {
   }, [cash, costModel, holdings, minNotional, options, policy, policyParams, targets, targetSum]);
 
   return (
-    <section className="space-y-4">
-      <p className="text-sm text-gray-600 dark:text-gray-300">
+    <section className="space-y-6">
+      <p className="max-w-3xl text-sm leading-6 text-fg-secondary">
         Holdings are pre-filled from your{" "}
-        <Link href="/portfolio" className="text-blue-600 hover:underline dark:text-blue-400">
+        <Link href="/portfolio" className="text-accent-ink hover:underline">
           Portfolio
         </Link>{" "}
         and stay editable here. Target weights start from the mix you saved with{" "}
-        <Link href="/optimize" className="text-blue-600 hover:underline dark:text-blue-400">
+        <Link href="/optimize" className="text-accent-ink hover:underline">
           Optimize
         </Link>{" "}
-        and stay editable too; enter them as a percent of total value, and the remainder
-        is cash.
+        and stay editable too; enter them as a percent of total value, and the remainder is cash.
       </p>
 
       <HoldingsEditor
@@ -388,32 +385,31 @@ export function RebalanceCalculator() {
           onMinNotionalChange={setMinNotional}
         />
       ) : (
-        <p className="text-sm text-gray-500 dark:text-gray-400">Loading options&hellip;</p>
+        <p className="text-sm text-fg-muted">Loading options&hellip;</p>
       )}
 
-      <div className="rounded-md bg-gray-50 p-3 text-xs text-gray-600 dark:bg-gray-900 dark:text-gray-300">
+      <p className="rounded-lg border border-hairline bg-raised/50 px-3 py-2.5 text-xs text-fg-secondary">
         Prices are the latest close. Sells are planned before buys, orders round down to
         whole lots, orders below the minimum notional are skipped, and T+2 settlement is
         not modeled in V1 &mdash; check the list against your broker before placing it.
-      </div>
+      </p>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={handleRun}
+        <Button
+          variant="primary"
+          onClick={() => void handleRun()}
           disabled={running || !options || !ready}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
         >
           {running ? "Planning\u2026" : "Plan rebalance"}
-        </button>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
+        </Button>
+        <span className="font-mono text-xs tabular-nums text-fg-muted">
           {holdings.length} holdings &middot; {formatVnd(cash)} cash &middot; {targets.length}{" "}
           targets
         </span>
       </div>
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-      {notice && <p className="text-sm text-green-600 dark:text-green-400">{notice}</p>}
+      {error && <p className="text-sm text-negative">{error}</p>}
+      {notice && <p className="text-sm text-positive">{notice}</p>}
       {result && <RebalanceResults result={result} />}
     </section>
   );
@@ -461,21 +457,19 @@ function SymbolSearch({
           }
         }}
         placeholder={placeholder}
-        className="w-56 rounded-md border border-gray-300 px-3 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-900"
+        className={`${inputCompactClass} w-48`}
       />
       {suggestions.length > 0 && (
-        <ul className="absolute z-10 mt-1 max-h-56 w-56 overflow-auto rounded-md border border-gray-200 bg-white text-sm shadow dark:border-gray-700 dark:bg-gray-900">
+        <ul className="absolute z-20 mt-1 max-h-56 w-56 overflow-auto rounded-lg border border-strong bg-surface text-sm shadow-lg transition-opacity duration-150 ease-unslop">
           {suggestions.map((symbol) => (
             <li key={symbol.code}>
               <button
                 type="button"
                 onClick={() => pick(symbol.code)}
-                className="flex w-full items-center justify-between px-3 py-1 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="flex min-h-[40px] w-full items-center justify-between px-3 py-2 text-left transition-colors duration-150 ease-unslop hover:bg-raised"
               >
-                <span className="font-medium">{symbol.code}</span>
-                <span className="ml-2 truncate text-xs text-gray-500 dark:text-gray-400">
-                  {symbol.exchange}
-                </span>
+                <span className="font-mono font-medium text-fg">{symbol.code}</span>
+                <span className="ml-2 truncate text-xs text-fg-muted">{symbol.exchange}</span>
               </button>
             </li>
           ))}
@@ -495,8 +489,9 @@ function UploadLabel({
   onError: (message: string) => void;
 }) {
   return (
-    <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-600 hover:border-blue-400 dark:border-gray-700 dark:text-gray-300 dark:hover:border-blue-400">
-      {label}
+    <label className="inline-flex h-10 md:h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-strong bg-raised px-3 text-xs font-medium text-fg transition-colors duration-150 ease-unslop hover:bg-surface">
+      <UploadIcon size={14} />
+      <span>{label}</span>
       <input
         type="file"
         accept=".csv,text/csv"
@@ -530,9 +525,9 @@ function HoldingsEditor({
 }) {
   const existing = useMemo(() => new Set(holdings.map((holding) => holding.symbol)), [holdings]);
   return (
-    <div className="space-y-2 rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+    <Card className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">Current holdings</h2>
+        <h2 className="text-base font-medium text-fg">Current holdings</h2>
         <div className="flex flex-wrap items-center gap-2">
           <SymbolSearch
             onPick={onAdd}
@@ -547,9 +542,13 @@ function HoldingsEditor({
           />
         </div>
       </div>
-      <label className="block text-xs">
-        <span className="text-gray-600 dark:text-gray-300">Cash (VND)</span>
+
+      <div className="space-y-1.5">
+        <label htmlFor="rebalance-cash" className="block text-sm font-medium text-fg">
+          Cash (VND)
+        </label>
         <input
+          id="rebalance-cash"
           type="number"
           inputMode="numeric"
           min={0}
@@ -557,29 +556,34 @@ function HoldingsEditor({
           value={cash === 0 ? "" : String(cash)}
           placeholder="0"
           onChange={(event) => onCashChange(parseWhole(event.target.value))}
-          className="mt-1 w-48 rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+          className={`${inputClass} w-48 font-mono tabular-nums`}
         />
-      </label>
+      </div>
+
       {holdings.length === 0 ? (
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          No holdings yet; add a ticker above.
-        </p>
+        <p className="text-xs text-fg-muted">No holdings yet; add a ticker above.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-            <thead className="bg-gray-50 text-left text-xs dark:bg-gray-900">
-              <tr>
-                <th className="px-2 py-1 font-medium">Ticker</th>
-                <th className="px-2 py-1 font-medium">Shares</th>
-                <th className="px-2 py-1 font-medium">Avg cost (VND)</th>
-                <th className="px-2 py-1" />
+        <div className="overflow-x-auto rounded-xl border border-hairline">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className={tableHeaderRowClass}>
+                <th className={`${tableHeaderCellClass} sticky left-0 z-10 bg-raised`}>
+                  Ticker
+                </th>
+                <th className={tableHeaderCellClass}>Shares</th>
+                <th className={tableHeaderCellClass}>Avg cost (VND)</th>
+                <th className={tableHeaderCellClass} />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            <tbody>
               {holdings.map((holding) => (
-                <tr key={holding.symbol}>
-                  <td className="px-2 py-1 font-medium">{holding.symbol}</td>
-                  <td className="px-2 py-1">
+                <tr key={holding.symbol} className={tableRowHoverClass}>
+                  <td
+                    className={`${tableBodyCellClass} sticky left-0 z-10 bg-surface font-mono font-medium text-fg`}
+                  >
+                    {holding.symbol}
+                  </td>
+                  <td className={tableBodyCellClass}>
                     <input
                       type="number"
                       inputMode="numeric"
@@ -590,10 +594,10 @@ function HoldingsEditor({
                       onChange={(event) =>
                         onUpdate(holding.symbol, { shares: parseWhole(event.target.value) })
                       }
-                      className="w-24 rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+                      className={`${inputCompactClass} w-28 font-mono tabular-nums`}
                     />
                   </td>
-                  <td className="px-2 py-1">
+                  <td className={tableBodyCellClass}>
                     <input
                       type="number"
                       inputMode="numeric"
@@ -607,17 +611,17 @@ function HoldingsEditor({
                             event.target.value === "" ? null : parseWhole(event.target.value),
                         })
                       }
-                      className="w-28 rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+                      className={`${inputCompactClass} w-32 font-mono tabular-nums`}
                     />
                   </td>
-                  <td className="px-2 py-1 text-right">
+                  <td className={`${tableBodyCellClass} text-right`}>
                     <button
                       type="button"
                       onClick={() => onRemove(holding.symbol)}
                       aria-label={`Remove ${holding.symbol}`}
-                      className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+                      className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md text-fg-muted transition-colors duration-150 ease-unslop hover:bg-raised hover:text-negative md:min-h-[28px] md:min-w-[28px]"
                     >
-                      &times;
+                      <XIcon size={15} />
                     </button>
                   </td>
                 </tr>
@@ -626,7 +630,7 @@ function HoldingsEditor({
           </table>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -659,9 +663,9 @@ function TargetEditor({
 }) {
   const existing = useMemo(() => new Set(targets.map((row) => row.symbol)), [targets]);
   return (
-    <div className="space-y-2 rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+    <Card className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">Target weights</h2>
+        <h2 className="text-base font-medium text-fg">Target weights</h2>
         <div className="flex flex-wrap items-center gap-2">
           <SymbolSearch
             onPick={onAdd}
@@ -669,8 +673,8 @@ function TargetEditor({
             universe={universe}
             placeholder="Add target"
           />
-          <button
-            type="button"
+          <Button
+            size="sm"
             onClick={onUseOptimized}
             disabled={!hasOptimizedWeights}
             title={
@@ -678,17 +682,12 @@ function TargetEditor({
                 ? undefined
                 : "Run Optimize and press \u201cUse this portfolio\u201d first."
             }
-            className="rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-600 hover:border-blue-400 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:border-blue-400"
           >
             Use optimized weights
-          </button>
-          <button
-            type="button"
-            onClick={onMatchCurrent}
-            className="rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-600 hover:border-blue-400 dark:border-gray-700 dark:text-gray-300 dark:hover:border-blue-400"
-          >
+          </Button>
+          <Button size="sm" onClick={onMatchCurrent}>
             Use current weights
-          </button>
+          </Button>
           <UploadLabel
             label="Upload target CSV"
             onText={onImportCsv}
@@ -696,37 +695,43 @@ function TargetEditor({
           />
         </div>
       </div>
+
       {targetsFrom === "optimized" && (
-        <p className="text-xs text-green-700 dark:text-green-400">
+        <p className="text-xs text-positive">
           Started from the optimized mix saved on the Optimize page; edit any value.
         </p>
       )}
       {targetsFrom === "current" && targets.length > 0 && (
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Started from your current portfolio weights; edit any value or use the
-          optimized mix.
+        <p className="text-xs text-fg-muted">
+          Started from your current portfolio weights; edit any value or use the optimized mix.
         </p>
       )}
+
       {targets.length === 0 ? (
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          No targets yet; add a ticker, use your current weights or the optimized
-          mix.
+        <p className="text-xs text-fg-muted">
+          No targets yet; add a ticker, use your current weights or the optimized mix.
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-            <thead className="bg-gray-50 text-left text-xs dark:bg-gray-900">
-              <tr>
-                <th className="px-2 py-1 font-medium">Ticker</th>
-                <th className="px-2 py-1 font-medium">Target weight (%)</th>
-                <th className="px-2 py-1" />
+        <div className="overflow-x-auto rounded-xl border border-hairline">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className={tableHeaderRowClass}>
+                <th className={`${tableHeaderCellClass} sticky left-0 z-10 bg-raised`}>
+                  Ticker
+                </th>
+                <th className={tableHeaderCellClass}>Target weight (%)</th>
+                <th className={tableHeaderCellClass} />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            <tbody>
               {targets.map((row) => (
-                <tr key={row.symbol}>
-                  <td className="px-2 py-1 font-medium">{row.symbol}</td>
-                  <td className="px-2 py-1">
+                <tr key={row.symbol} className={tableRowHoverClass}>
+                  <td
+                    className={`${tableBodyCellClass} sticky left-0 z-10 bg-surface font-mono font-medium text-fg`}
+                  >
+                    {row.symbol}
+                  </td>
+                  <td className={tableBodyCellClass}>
                     <input
                       type="number"
                       inputMode="decimal"
@@ -738,17 +743,17 @@ function TargetEditor({
                       onChange={(event) =>
                         onUpdate(row.symbol, Number(event.target.value))
                       }
-                      className="w-24 rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+                      className={`${inputCompactClass} w-28 font-mono tabular-nums`}
                     />
                   </td>
-                  <td className="px-2 py-1 text-right">
+                  <td className={`${tableBodyCellClass} text-right`}>
                     <button
                       type="button"
                       onClick={() => onRemove(row.symbol)}
                       aria-label={`Remove ${row.symbol}`}
-                      className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+                      className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md text-fg-muted transition-colors duration-150 ease-unslop hover:bg-raised hover:text-negative md:min-h-[28px] md:min-w-[28px]"
                     >
-                      &times;
+                      <XIcon size={15} />
                     </button>
                   </td>
                 </tr>
@@ -757,10 +762,11 @@ function TargetEditor({
           </table>
         </div>
       )}
-      <p className="text-xs text-gray-500 dark:text-gray-400">
+
+      <p className="font-mono text-xs tabular-nums text-fg-secondary">
         Total {targetSum.toFixed(1)}% &middot; cash {Math.max(0, 100 - targetSum).toFixed(1)}%
       </p>
-    </div>
+    </Card>
   );
 }
 
@@ -787,13 +793,13 @@ function PolicyControls({
 }) {
   const selected = options.policies.find((item) => item.id === policy);
   return (
-    <div className="grid gap-3 rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-800 sm:grid-cols-2">
-      <label className="block text-xs">
-        <span className="text-gray-600 dark:text-gray-300">Cost model</span>
+    <Card className="grid gap-4 sm:grid-cols-2">
+      <label className="block space-y-1.5 text-sm">
+        <span className="block font-medium text-fg">Cost model</span>
         <select
           value={costModel}
           onChange={(event) => onCostModelChange(event.target.value)}
-          className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+          className={`${selectClass} w-full`}
         >
           {options.cost_models.map((item) => (
             <option key={item.id} value={item.id}>
@@ -802,12 +808,12 @@ function PolicyControls({
           ))}
         </select>
       </label>
-      <label className="block text-xs">
-        <span className="text-gray-600 dark:text-gray-300">Policy</span>
+      <label className="block space-y-1.5 text-sm">
+        <span className="block font-medium text-fg">Policy</span>
         <select
           value={policy}
           onChange={(event) => onPolicyChange(event.target.value)}
-          className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+          className={`${selectClass} w-full`}
         >
           {options.policies.map((item) => (
             <option key={item.id} value={item.id}>
@@ -817,15 +823,13 @@ function PolicyControls({
         </select>
       </label>
       {selected && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 sm:col-span-2">
-          {selected.description}
-        </p>
+        <p className="text-xs text-fg-muted sm:col-span-2">{selected.description}</p>
       )}
       {selected && (
         <PolicyParamFields option={selected} values={policyParams} onChange={onParamChange} />
       )}
-      <label className="block text-xs">
-        <span className="text-gray-600 dark:text-gray-300">Minimum notional (VND)</span>
+      <label className="block space-y-1.5 text-sm">
+        <span className="block font-medium text-fg">Minimum notional (VND)</span>
         <input
           type="number"
           inputMode="numeric"
@@ -836,10 +840,10 @@ function PolicyControls({
             const value = Number(event.target.value);
             onMinNotionalChange(Number.isFinite(value) && value > 0 ? Math.trunc(value) : 0);
           }}
-          className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+          className={`${inputClass} w-full font-mono tabular-nums`}
         />
       </label>
-    </div>
+    </Card>
   );
 }
 
@@ -865,14 +869,14 @@ function PolicyParamFields({
         const label = property.title ?? name;
         const value = values[name];
         return (
-          <label key={name} className="block text-xs">
-            <span className="text-gray-600 dark:text-gray-300">{label}</span>
+          <label key={name} className="block space-y-1.5 text-sm">
+            <span className="block font-medium text-fg">{label}</span>
             {type === "boolean" ? (
               <input
                 type="checkbox"
                 checked={Boolean(value)}
                 onChange={(event) => onChange(name, event.target.checked)}
-                className="mt-1"
+                className="h-4 w-4 accent-accent"
               />
             ) : (
               <input
@@ -893,13 +897,11 @@ function PolicyParamFields({
                   }
                   onChange(name, Number(raw));
                 }}
-                className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+                className={`${inputClass} w-full font-mono tabular-nums`}
               />
             )}
             {property.description && (
-              <span className="mt-0.5 block text-[10px] text-gray-400">
-                {property.description}
-              </span>
+              <span className="block text-xs text-fg-muted">{property.description}</span>
             )}
           </label>
         );
@@ -916,18 +918,18 @@ function RebalanceResults({ result }: { result: RebalanceResult }) {
     result.target_cash_weight,
   );
   return (
-    <div className="space-y-4 rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+    <Card className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold">Order list</h2>
-        <button
-          type="button"
+        <h2 className="text-base font-medium text-fg">Order list</h2>
+        <Button
+          size="sm"
           onClick={() =>
             downloadTextFile("rebalance-orders.csv", ordersToCsv(result.orders), "text/csv")
           }
-          className="rounded-md border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:border-blue-400 dark:border-gray-700 dark:text-gray-300 dark:hover:border-blue-400"
         >
+          <DownloadIcon size={14} />
           Export orders CSV
-        </button>
+        </Button>
       </div>
 
       <CurrentVsTargetChart
@@ -937,48 +939,75 @@ function RebalanceResults({ result }: { result: RebalanceResult }) {
         heaviest={heaviest}
       />
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
-        <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-          <thead className="bg-gray-50 text-left text-xs dark:bg-gray-900">
-            <tr>
-              <th className="px-2 py-1 font-medium">Ticker</th>
-              <th className="px-2 py-1 font-medium">Side</th>
-              <th className="px-2 py-1 font-medium">Lots</th>
-              <th className="px-2 py-1 font-medium">Shares</th>
-              <th className="px-2 py-1 font-medium">Ref price</th>
-              <th className="px-2 py-1 font-medium">Value</th>
-              <th className="px-2 py-1 font-medium">Fee</th>
-              <th className="px-2 py-1 font-medium">Tax</th>
+      <div className="overflow-x-auto rounded-xl border border-hairline bg-surface">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className={tableHeaderRowClass}>
+              <th className={`${tableHeaderCellClass} sticky left-0 z-10 bg-raised`}>
+                Ticker
+              </th>
+              <th className={tableHeaderCellClass}>Side</th>
+              <th className={`${tableHeaderCellClass} text-right`}>Lots</th>
+              <th className={`${tableHeaderCellClass} text-right`}>Shares</th>
+              <th className={`${tableHeaderCellClass} text-right`}>Ref price</th>
+              <th className={`${tableHeaderCellClass} text-right`}>Value</th>
+              <th className={`${tableHeaderCellClass} text-right`}>Fee</th>
+              <th className={`${tableHeaderCellClass} text-right`}>Tax</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          <tbody>
             {result.orders.length === 0 ? (
               <tr>
-                <td className="px-2 py-2 text-gray-500 dark:text-gray-400" colSpan={8}>
+                <td className="px-4 py-4 text-fg-muted" colSpan={8}>
                   No orders: the portfolio is already within the policy&apos;s tolerance.
                 </td>
               </tr>
             ) : (
               result.orders.map((order, index) => (
-                <tr key={`${order.symbol}-${order.side}-${index}`}>
-                  <td className="px-2 py-1 font-medium">{order.symbol}</td>
-                  <td className="px-2 py-1">
-                    <span
-                      className={
-                        order.side === "sell"
-                          ? "rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                          : "rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
-                      }
-                    >
-                      {order.side}
-                    </span>
+                <tr
+                  key={`${order.symbol}-${order.side}-${index}`}
+                  className={tableRowHoverClass}
+                >
+                  <td
+                    className={`${tableBodyCellClass} sticky left-0 z-10 bg-surface font-mono font-medium text-fg`}
+                  >
+                    {order.symbol}
                   </td>
-                  <td className="px-2 py-1">{order.lots}</td>
-                  <td className="px-2 py-1">{order.shares}</td>
-                  <td className="px-2 py-1">{formatVnd(order.reference_price)}</td>
-                  <td className="px-2 py-1">{formatVnd(order.value)}</td>
-                  <td className="px-2 py-1">{formatVnd(order.fee)}</td>
-                  <td className="px-2 py-1">{formatVnd(order.tax)}</td>
+                  <td className={tableBodyCellClass}>
+                    <Badge tone={order.side === "sell" ? "warn" : "positive"}>
+                      {order.side}
+                    </Badge>
+                  </td>
+                  <td
+                    className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg`}
+                  >
+                    {order.lots}
+                  </td>
+                  <td
+                    className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg`}
+                  >
+                    {order.shares.toLocaleString("en-US")}
+                  </td>
+                  <td
+                    className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg`}
+                  >
+                    {formatVnd(order.reference_price)}
+                  </td>
+                  <td
+                    className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg`}
+                  >
+                    {formatVnd(order.value)}
+                  </td>
+                  <td
+                    className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg-secondary`}
+                  >
+                    {formatVnd(order.fee)}
+                  </td>
+                  <td
+                    className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg-secondary`}
+                  >
+                    {formatVnd(order.tax)}
+                  </td>
                 </tr>
               ))
             )}
@@ -986,7 +1015,7 @@ function RebalanceResults({ result }: { result: RebalanceResult }) {
         </table>
       </div>
 
-      <div className="grid gap-2 text-sm sm:grid-cols-3">
+      <div className="grid gap-3 text-sm sm:grid-cols-3">
         <Stat label="Total cost" value={formatVnd(result.total_cost)} />
         <Stat
           label="Fees + tax"
@@ -1001,24 +1030,24 @@ function RebalanceResults({ result }: { result: RebalanceResult }) {
       <RebalanceAssumptionsBlock result={result} />
 
       {result.warnings.length > 0 && (
-        <div className="rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          <ul className="list-disc pl-4">
+        <div className="rounded-lg border border-warn-border bg-warn-subtle px-3 py-2 text-xs text-warn">
+          <ul className="list-disc space-y-1 pl-4">
             {result.warnings.map((warning) => (
               <li key={warning}>{warning}</li>
             ))}
           </ul>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
 function RebalanceAssumptionsBlock({ result }: { result: RebalanceResult }) {
   const { assumptions } = result;
   return (
-    <details className="rounded-md bg-gray-50 p-3 text-xs dark:bg-gray-900">
-      <summary className="cursor-pointer font-medium">Assumptions used</summary>
-      <dl className="mt-2 grid gap-1 sm:grid-cols-2">
+    <details className="rounded-lg border border-hairline bg-raised/50 p-3 text-xs">
+      <summary className="cursor-pointer font-medium text-fg-secondary">Assumptions used</summary>
+      <dl className="mt-2.5 grid gap-2 sm:grid-cols-2">
         <Row label="Cost model" value={assumptions.cost_model} />
         <Row label="Policy" value={assumptions.policy} />
         <Row
@@ -1040,9 +1069,9 @@ function RebalanceAssumptionsBlock({ result }: { result: RebalanceResult }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-gray-50 p-2 text-sm dark:bg-gray-900">
-      <div className="text-xs text-gray-500 dark:text-gray-400">{label}</div>
-      <div className="font-medium">{value}</div>
+    <div className="rounded-lg border border-hairline bg-raised/50 p-3">
+      <div className="text-xs text-fg-muted">{label}</div>
+      <div className="mt-1 font-mono font-medium tabular-nums text-fg">{value}</div>
     </div>
   );
 }
@@ -1050,8 +1079,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-2">
-      <dt className="text-gray-500 dark:text-gray-400">{label}</dt>
-      <dd className="text-right font-medium">{value}</dd>
+      <dt className="text-fg-muted">{label}</dt>
+      <dd className="text-right font-mono font-medium tabular-nums text-fg">{value}</dd>
     </div>
   );
 }

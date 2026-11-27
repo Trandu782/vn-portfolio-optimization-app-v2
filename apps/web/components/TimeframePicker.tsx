@@ -8,6 +8,7 @@
  * a bad range never reaches the API.
  */
 
+import { inputCompactClass } from "@/components/ui/Field";
 import {
   TIMEFRAME_PRESETS,
   describeWindow,
@@ -52,11 +53,11 @@ export function TimeframePicker({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium">{label}</span>
+        <span className="text-sm font-medium text-fg">{label}</span>
         <div
           role="group"
           aria-label="Timeframe preset"
-          className="inline-flex flex-wrap overflow-hidden rounded-md border border-gray-300 dark:border-gray-700"
+          className="inline-flex flex-wrap overflow-hidden rounded-lg border border-strong bg-raised"
         >
           {TIMEFRAME_PRESETS.map((preset) => {
             const active = selection.preset === preset;
@@ -66,11 +67,11 @@ export function TimeframePicker({
                 type="button"
                 onClick={() => choosePreset(preset)}
                 aria-pressed={active}
-                className={
+                className={`min-h-[40px] md:min-h-0 px-3 py-1.5 text-xs font-medium transition-colors duration-150 ease-unslop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ${
                   active
-                    ? "bg-blue-600 px-2.5 py-1 text-xs font-medium text-white"
-                    : "px-2.5 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
-                }
+                    ? "bg-accent text-white"
+                    : "text-fg-secondary hover:bg-surface hover:text-fg"
+                }`}
               >
                 {preset}
               </button>
@@ -81,7 +82,7 @@ export function TimeframePicker({
           <button
             type="button"
             onClick={onCopyOther}
-            className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400"
+            className="text-xs text-accent-ink transition-colors duration-150 ease-unslop hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
           >
             Use same as {copyLabel}
           </button>
@@ -89,9 +90,9 @@ export function TimeframePicker({
       </div>
 
       {selection.preset === "Custom" && (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <label className="flex items-center gap-1">
-            <span className="text-gray-600 dark:text-gray-300">Start</span>
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <label className="flex items-center gap-2">
+            <span className="text-fg-secondary">Start</span>
             <input
               type="date"
               value={selection.start}
@@ -99,11 +100,11 @@ export function TimeframePicker({
               onChange={(event) =>
                 onChange({ preset: "Custom", start: event.target.value, end: selection.end })
               }
-              className="rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+              className={`${inputCompactClass} font-mono tabular-nums`}
             />
           </label>
-          <label className="flex items-center gap-1">
-            <span className="text-gray-600 dark:text-gray-300">End</span>
+          <label className="flex items-center gap-2">
+            <span className="text-fg-secondary">End</span>
             <input
               type="date"
               value={selection.end}
@@ -112,16 +113,16 @@ export function TimeframePicker({
               onChange={(event) =>
                 onChange({ preset: "Custom", start: selection.start, end: event.target.value })
               }
-              className="rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+              className={`${inputCompactClass} font-mono tabular-nums`}
             />
           </label>
         </div>
       )}
 
-      <p className="text-xs text-gray-500 dark:text-gray-400">
+      <p className="font-mono text-xs tabular-nums text-fg-muted">
         {describeWindow(resolved.start, resolved.end)}
       </p>
-      {error && <p className="text-xs text-amber-700 dark:text-amber-300">{error}</p>}
+      {error && <p className="text-xs text-warn">{error}</p>}
     </div>
   );
 }

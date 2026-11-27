@@ -1,18 +1,11 @@
 "use client";
 
-/**
- * Risk page: compare the current, optimized, equal-weight and benchmark
- * portfolios side by side.
- *
- * Every input comes from the shared store (the built universe, the evaluated
- * holdings and the chosen optimized mix). One call to `POST /api/v1/risk/compare`
- * returns the four portfolios' metrics and their historical growth series. The
- * metric list, names and descriptions come from the API registry, so a new core
- * metric appears here without a UI change.
- */
-
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { InfoTip } from "@/components/InfoTip";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { inputClass, selectClass } from "@/components/ui/Field";
 import {
   compareRisk,
   fetchDataFreshness,
@@ -38,7 +31,7 @@ import { useUniverse } from "@/lib/universe-context";
 
 import { CorrelationHeatmap } from "./charts/CorrelationHeatmap";
 import { DrawdownChart } from "./charts/DrawdownChart";
-import { PerformanceChart, type PerformanceSeries } from "./charts/PerformanceChart";
+import { PerformanceChart } from "./charts/PerformanceChart";
 import { TimeframePicker } from "./TimeframePicker";
 
 type SubjectId = "current" | "optimized" | "equal_weight" | "benchmark";
@@ -58,14 +51,12 @@ const SUBJECT_HELP: Record<SubjectId, string> = {
 };
 
 const SUBJECT_COLORS: Record<SubjectId, string> = {
-  current: "#2563eb",
-  optimized: "#059669",
-  equal_weight: "#d97706",
-  benchmark: "#6b7280",
+  current: "#3b82f6",
+  optimized: "#4cc38a",
+  equal_weight: "#e0a243",
+  benchmark: "#71717a",
 };
 
-//: Plain-language help for the tooltips, keyed by metric id. The registry
-//: description is the fallback for any metric not listed here.
 const PLAIN_HELP: Record<string, string> = {
   annualized_volatility: "How much the value typically swings in a year. Lower is calmer.",
   sharpe: "Return earned per unit of risk. Higher is better.",
@@ -133,18 +124,17 @@ export function RiskCalculator() {
     };
   }, []);
 
-  // The latest stored data date anchors every preset window.
   useEffect(() => {
-    let active = true;
+    let activeFlag = true;
     fetchDataFreshness()
       .then((freshness) => {
-        if (active) setLatestDate(freshness.latest_date);
+        if (activeFlag) setLatestDate(freshness.latest_date);
       })
       .catch(() => {
         // Fall back to today's date when freshness is unavailable.
       });
     return () => {
-      active = false;
+      activeFlag = false;
     };
   }, []);
 
@@ -203,20 +193,13 @@ export function RiskCalculator() {
     }
   }
 
-  // Keep the latest handler in a ref so the mount-time auto-run does not depend
-  // on a function identity that changes every render.
   runRef.current = () => {
     void handleAnalyze();
   };
 
-  // Rebuild automatically once when a saved universe and at least one portfolio
-  // are present, so returning to the page never shows an empty result. (Step 1
-  // rule.)
   useEffect(() => {
     if (autoRanRef.current || !options || !selection) return;
     if (!currentWeights && !optimizedWeights) return;
-    // Wait for the latest data date so a preset resolves to the same window
-    // that the freshness badge shows (a custom range does not need it).
     if (timeframe.preset !== "Custom" && !latestDate) return;
     autoRanRef.current = true;
     runRef.current();
@@ -241,7 +224,7 @@ export function RiskCalculator() {
   const activeBlock = subjects.find((subject) => subject.id === active)?.block ?? null;
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-6">
       <RiskControls
         options={options}
         benchmark={benchmark}
@@ -267,22 +250,24 @@ export function RiskCalculator() {
       />
 
       {!result ? (
-        <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+        <p className="rounded-xl border border-dashed border-strong p-6 text-center text-sm text-fg-muted">
           {selection
             ? "Press Analyse to compare your portfolios and the market index."
             : "Build a universe on the Optimize page first, then come back here."}
         </p>
       ) : (
         <>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            Here is how each portfolio&apos;s risk compares over {result.dates[0]} to{" "}
-            {result.dates[result.dates.length - 1]} against{" "}
-            {benchmarkName(options, result.benchmark)}. Lower volatility and drawdown
-            are calmer; higher Sharpe, Treynor and alpha are better.
+          <p className="text-sm leading-6 text-fg-secondary">
+            Here is how each portfolio&apos;s risk compares over{" "}
+            <span className="font-mono tabular-nums text-fg">
+              {result.dates[0]} to {result.dates[result.dates.length - 1]}
+            </span>{" "}
+            against {benchmarkName(options, result.benchmark)}. Lower volatility and drawdown are
+            calmer; higher Sharpe, Treynor and alpha are better.
           </p>
 
           {outdated && (
-            <p className="rounded-md bg-amber-50 p-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+            <p className="rounded-lg border border-warn-border bg-warn-subtle px-3 py-2 text-xs text-warn">
               The timeframe changed. These results are from an earlier window; press Analyse to
               update them.
             </p>
@@ -308,10 +293,8 @@ export function RiskCalculator() {
           {activeBlock && (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-lg font-semibold">Detailed risk</h2>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {SUBJECT_LABELS[active]}
-                </span>
+                <h2 className="text-base font-medium text-fg">Detailed risk</h2>
+                <span className="text-xs text-fg-muted">{SUBJECT_LABELS[active]}</span>
               </div>
               <DetailedCharts block={activeBlock} />
             </div>
@@ -321,8 +304,6 @@ export function RiskCalculator() {
     </section>
   );
 }
-
-// -- controls -----------------------------------------------------------------
 
 interface RiskControlsProps {
   options: RiskOptions | null;
@@ -368,21 +349,17 @@ function RiskControls({
   onCopyTimeframe,
 }: RiskControlsProps) {
   return (
-    <div className="space-y-4 rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+    <Card className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold">Compare the risk</h2>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+          <h2 className="text-base font-medium text-fg">Compare the risk</h2>
+          <p className="mt-1 text-sm text-fg-secondary">
             The metric list and the benchmark options come from the API.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onToggleAdvanced}
-          className="rounded-md border border-gray-300 px-3 py-1 text-xs hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-900"
-        >
+        <Button size="sm" onClick={onToggleAdvanced}>
           {showAdvanced ? "Hide advanced settings" : "Advanced settings"}
-        </button>
+        </Button>
       </div>
 
       <TimeframePicker
@@ -394,13 +371,13 @@ function RiskControls({
       />
 
       {showAdvanced && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm">
-            <span className="block font-medium">Benchmark</span>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block space-y-1.5 text-sm">
+            <span className="block font-medium text-fg">Benchmark</span>
             <select
               value={benchmark}
               onChange={(event) => onBenchmarkChange(event.target.value)}
-              className="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 dark:border-gray-700 dark:bg-gray-900"
+              className={`${selectClass} w-full`}
             >
               {(options?.benchmarks ?? []).map((item) => (
                 <option key={item.code} value={item.code}>
@@ -409,8 +386,8 @@ function RiskControls({
               ))}
             </select>
           </label>
-          <label className="block text-sm">
-            <span className="block font-medium">Worst-day confidence (%)</span>
+          <label className="block space-y-1.5 text-sm">
+            <span className="block font-medium text-fg">Worst-day confidence (%)</span>
             <input
               type="number"
               min={1}
@@ -418,28 +395,26 @@ function RiskControls({
               step="0.1"
               value={confidencePercent}
               onChange={(event) => onConfidenceChange(event.target.value)}
-              className="mt-1 w-full rounded-md border border-gray-300 px-2 py-2 dark:border-gray-700 dark:bg-gray-900"
+              className={`${inputClass} w-full font-mono tabular-nums`}
             />
           </label>
         </div>
       )}
 
-      <fieldset>
-        <legend className="text-sm font-medium">Metrics to compute</legend>
-        <div className="mt-1 grid gap-2 sm:grid-cols-2">
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium text-fg">Metrics to compute</legend>
+        <div className="grid gap-2.5 sm:grid-cols-2">
           {metricOptions.map((metric) => (
-            <label key={metric.id} className="flex items-start gap-2 text-xs">
+            <label key={metric.id} className="flex cursor-pointer items-start gap-2.5 text-xs">
               <input
                 type="checkbox"
                 checked={selected[metric.id] ?? false}
                 onChange={() => onToggleMetric(metric.id)}
-                className="mt-0.5"
+                className="mt-0.5 h-4 w-4 accent-accent"
               />
               <span>
-                <span className="font-medium">{metric.name}</span>
-                <span className="mt-0.5 block text-gray-500 dark:text-gray-400">
-                  {plainHelp(metric)}
-                </span>
+                <span className="font-medium text-fg">{metric.name}</span>
+                <span className="mt-0.5 block text-fg-muted">{plainHelp(metric)}</span>
               </span>
             </label>
           ))}
@@ -447,27 +422,24 @@ function RiskControls({
       </fieldset>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
+        <Button
+          variant="primary"
           onClick={onAnalyze}
           disabled={loading || !options || selectedCount === 0 || !hasUniverse}
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
         >
           {loading ? "Analysing\u2026" : "Analyse"}
-        </button>
+        </Button>
         {options && (
-          <span className="text-xs text-gray-500 dark:text-gray-400">
+          <span className="font-mono text-xs tabular-nums text-fg-muted">
             {selectedCount} of {metricOptions.length} metrics
           </span>
         )}
       </div>
 
-      {error && <p className="text-sm text-amber-700 dark:text-amber-300">{error}</p>}
-    </div>
+      {error && <p className="text-sm text-warn">{error}</p>}
+    </Card>
   );
 }
-
-// -- comparison panels --------------------------------------------------------
 
 function ComparisonGrid({
   subjects,
@@ -480,8 +452,12 @@ function ComparisonGrid({
   active: SubjectId;
   onSelect: (id: SubjectId) => void;
 }) {
+  const cols =
+    subjects.length === 3
+      ? "grid-cols-1 md:grid-cols-3"
+      : "grid-cols-1 md:grid-cols-2 xl:grid-cols-4";
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className={`grid gap-4 ${cols}`}>
       {subjects.map(({ id, block }) => (
         <ComparisonPanel
           key={id}
@@ -512,51 +488,47 @@ function ComparisonPanel({
   const cards = scalarCards(block, options);
   return (
     <div
-      className={
+      className={`flex flex-col justify-between space-y-3 rounded-xl border bg-surface p-4 transition-colors duration-150 ease-unslop ${
         active
-          ? "space-y-3 rounded-lg border-2 border-blue-500 p-4"
-          : "space-y-3 rounded-lg border border-gray-200 p-4 dark:border-gray-800"
-      }
+          ? "border-accent shadow-[inset_0_2px_0_0_var(--accent)]"
+          : "border-hairline hover:border-strong"
+      }`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-semibold">{SUBJECT_LABELS[id]}</h3>
-          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{SUBJECT_HELP[id]}</p>
-        </div>
-        <span
-          className="mt-1 h-3 w-3 shrink-0 rounded-full"
-          style={{ backgroundColor: SUBJECT_COLORS[id] }}
-          aria-hidden
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        {cards.map((card) => (
-          <div key={card.id} className="rounded-md bg-gray-50 p-2 dark:bg-gray-900">
-            <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-              <span>{card.label}</span>
-              <span
-                className="cursor-help text-[10px] text-gray-400"
-                title={card.help}
-                aria-label={card.help}
-              >
-                (?)
-              </span>
-            </div>
-            <div className="text-base font-semibold">{card.display}</div>
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-medium text-fg">{SUBJECT_LABELS[id]}</h3>
+            <p className="mt-0.5 text-xs text-fg-muted">{SUBJECT_HELP[id]}</p>
           </div>
-        ))}
+          <span
+            className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: SUBJECT_COLORS[id] }}
+            aria-hidden="true"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {cards.map((card) => (
+            <div key={card.id} className="rounded-lg border border-hairline bg-raised/50 p-2.5">
+              <div className="flex items-center gap-1 text-xs text-fg-muted">
+                <span className="truncate">{card.label}</span>
+                <InfoTip text={card.help} />
+              </div>
+              <div className="mt-1 font-mono text-base font-medium tabular-nums text-fg">
+                {card.display}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-      <button
-        type="button"
+
+      <Button
+        size="sm"
+        variant={active ? "ghost" : "secondary"}
         onClick={onSelect}
-        className={
-          active
-            ? "w-full rounded-md bg-blue-600 px-2 py-1 text-xs text-white"
-            : "w-full rounded-md border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-900"
-        }
+        className={`w-full ${active ? "text-accent-ink" : ""}`}
       >
         {active ? "Showing details" : "Show details"}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -618,8 +590,6 @@ function benchmarkName(options: RiskOptions | null, code: string): string {
   return options?.benchmarks.find((item) => item.code === code)?.name ?? code;
 }
 
-// -- detailed charts ----------------------------------------------------------
-
 function DetailedCharts({ block }: { block: RiskPortfolioBlock }) {
   const drawdown = block.metrics["max_drawdown"] as DrawdownMetric | undefined;
   const correlation = block.metrics["correlation_matrix"] as
@@ -634,8 +604,6 @@ function DetailedCharts({ block }: { block: RiskPortfolioBlock }) {
     </div>
   );
 }
-
-// -- formatting ---------------------------------------------------------------
 
 function buildMetricParams(
   ids: string[],
@@ -666,8 +634,3 @@ function formatRatio(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return "\u2014";
   return value.toFixed(2);
 }
-
-
-
-
-

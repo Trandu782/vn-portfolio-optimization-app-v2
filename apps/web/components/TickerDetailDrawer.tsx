@@ -1,15 +1,8 @@
 "use client";
 
-/**
- * Slide-over ticker detail drawer (docs/V2_SPEC.md section 3.3).
- *
- * Opened from the Optimize results (and usable from search). It hosts the shared
- * `FundamentalsDetail`, so the drawer and the Fundamentals sub-tab always show the
- * same numbers. Escape or a backdrop click closes it.
- */
-
 import { useEffect } from "react";
 
+import { XIcon } from "@/components/ui/Icons";
 import type { PeerVariant } from "@/lib/api";
 
 import { FundamentalsDetail } from "./FundamentalsDetail";
@@ -44,26 +37,28 @@ export function TickerDetailDrawer({
         type="button"
         aria-label="Close details"
         onClick={onClose}
-        className="absolute inset-0 cursor-default bg-black/40"
+        className="absolute inset-0 cursor-default bg-black/50 backdrop-blur-[2px] transition-opacity duration-150 ease-unslop"
       />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={`${symbol} fundamentals`}
-        className="relative h-full w-full max-w-xl overflow-y-auto bg-white p-4 shadow-xl dark:bg-gray-950"
+        className="relative h-full w-full max-w-xl overflow-y-auto overscroll-contain border-l border-hairline bg-surface p-5 pt-[calc(1.25rem+env(safe-area-inset-top))] pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl transition-transform duration-150 ease-unslop"
       >
-        <div className="flex items-start justify-between gap-2">
-          <h2 className="text-lg font-semibold">Fundamentals &middot; {symbol}</h2>
+        <div className="flex items-center justify-between gap-3 border-b border-hairline pb-3">
+          <h2 className="text-base font-medium text-fg">
+            Fundamentals &middot; <span className="font-mono">{symbol}</span>
+          </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close details"
-            className="rounded-md px-2 py-0.5 text-xl leading-none text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+            className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg text-fg-muted transition-colors duration-150 ease-unslop hover:bg-raised hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent md:min-h-[32px] md:min-w-[32px]"
           >
-            &times;
+            <XIcon size={16} />
           </button>
         </div>
-        <div className="mt-3">
+        <div className="mt-4">
           <FundamentalsDetail symbol={symbol} peerVariant={peerVariant} preset={preset} />
         </div>
       </div>

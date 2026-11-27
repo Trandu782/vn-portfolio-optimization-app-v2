@@ -16,7 +16,7 @@ export function SelectedUniverseBadge() {
     return (
       <Link
         href="/optimize"
-        className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300"
+        className="inline-flex min-h-[36px] items-center rounded-md border border-hairline bg-raised px-2.5 py-1 text-xs text-fg-secondary transition-colors duration-150 ease-unslop hover:border-strong hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         Universe: none selected
       </Link>
@@ -27,7 +27,7 @@ export function SelectedUniverseBadge() {
     <Link
       href="/optimize"
       title={`${selection.start} to ${selection.end}`}
-      className="rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-800 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-200"
+      className="inline-flex min-h-[36px] items-center rounded-md border border-accent/25 bg-accent-subtle px-2.5 py-1 font-mono text-xs tabular-nums text-accent-ink transition-colors duration-150 ease-unslop hover:border-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
     >
       Universe: {selection.symbols.length} tickers
     </Link>

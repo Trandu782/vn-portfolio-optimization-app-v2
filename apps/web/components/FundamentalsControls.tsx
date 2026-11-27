@@ -1,17 +1,9 @@
 "use client";
 
-/**
- * Controls for the Fundamentals sub-tab (docs/V2_SPEC.md section 3.3): a ticker
- * search, the period selector and the peer-set toggle.
- *
- * The dataset has fully populated TTM rows for the latest period but only partly
- * filled annual rows and empty quarterly rows, so only TTM is selectable; the other
- * two are disabled with a short "not enough data yet" tooltip. The peer toggle
- * offers the all-peers, active-liquidity-preset and VN100 variants.
- */
-
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
+import { Card } from "@/components/ui/Card";
+import { inputClass } from "@/components/ui/Field";
 import { fetchSymbols, type PeerVariant, type SymbolInfo } from "@/lib/api";
 
 import { InfoTip } from "./InfoTip";
@@ -77,30 +69,30 @@ export function FundamentalsControls({
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
-      <form onSubmit={handleSubmit} className="block text-sm">
-        <label htmlFor="fund-ticker-search" className="block font-medium">
+    <Card className="grid gap-4 sm:grid-cols-3">
+      <form onSubmit={handleSubmit} className="space-y-1.5 text-sm">
+        <label htmlFor="fund-ticker-search" className="block font-medium text-fg">
           Ticker
         </label>
-        <div className="relative mt-1">
+        <div className="relative">
           <input
             id="fund-ticker-search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Type a code or name (e.g. VCB)"
-            className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-900"
+            placeholder="Search ticker or company"
+            className={`${inputClass} w-full`}
           />
           {suggestions.length > 0 && (
-            <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border border-gray-200 bg-white text-sm shadow dark:border-gray-700 dark:bg-gray-900">
+            <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-strong bg-surface text-sm shadow-lg transition-opacity duration-150 ease-unslop">
               {suggestions.map((item) => (
                 <li key={item.code}>
                   <button
                     type="button"
                     onClick={() => pick(item.code)}
-                    className="flex w-full items-center justify-between px-2 py-1 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="flex min-h-[40px] w-full items-center justify-between px-3 py-2 text-left transition-colors duration-150 ease-unslop hover:bg-raised"
                   >
-                    <span className="font-medium">{item.code}</span>
-                    <span className="ml-2 truncate text-xs text-gray-500 dark:text-gray-400">
+                    <span className="font-mono font-medium text-fg">{item.code}</span>
+                    <span className="ml-2 truncate text-xs text-fg-muted">
                       {item.exchange}
                       {item.name ? ` · ${item.name}` : ""}
                     </span>
@@ -110,21 +102,21 @@ export function FundamentalsControls({
             </ul>
           )}
         </div>
-        <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+        <span className="block font-mono text-xs text-fg-muted">
           {symbol ? `Showing ${symbol}` : "No ticker selected yet."}
         </span>
       </form>
 
-      <div className="block text-sm">
-        <span className="flex items-center font-medium">
+      <div className="space-y-1.5 text-sm">
+        <span className="flex items-center font-medium text-fg">
           Period
           <InfoTip text="Only trailing twelve months (TTM) is populated for every ticker in the current dataset." />
         </span>
-        <div className="mt-1 flex flex-wrap gap-1" role="group" aria-label="Reporting period">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Reporting period">
           <button
             type="button"
             aria-pressed="true"
-            className="rounded-md border border-blue-600 bg-blue-600 px-2 py-1 text-xs font-medium text-white"
+            className="min-h-[36px] rounded-md border border-accent bg-accent px-3 py-1 text-xs font-medium text-white"
           >
             TTM
           </button>
@@ -132,7 +124,7 @@ export function FundamentalsControls({
             type="button"
             disabled
             title="not enough data yet"
-            className="cursor-not-allowed rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-400 dark:border-gray-700 dark:text-gray-500"
+            className="min-h-[36px] cursor-not-allowed rounded-md border border-hairline bg-raised px-3 py-1 text-xs text-fg-muted opacity-60"
           >
             Annual
           </button>
@@ -140,19 +132,19 @@ export function FundamentalsControls({
             type="button"
             disabled
             title="not enough data yet"
-            className="cursor-not-allowed rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-400 dark:border-gray-700 dark:text-gray-500"
+            className="min-h-[36px] cursor-not-allowed rounded-md border border-hairline bg-raised px-3 py-1 text-xs text-fg-muted opacity-60"
           >
             Quarterly
           </button>
         </div>
-        <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+        <span className="block text-xs text-fg-muted">
           Annual and quarterly are not comparable yet (not enough data).
         </span>
       </div>
 
-      <div className="block text-sm">
-        <span className="block font-medium">Peer set</span>
-        <div className="mt-1 flex flex-wrap gap-1" role="group" aria-label="Peer set">
+      <div className="space-y-1.5 text-sm">
+        <span className="block font-medium text-fg">Peer set</span>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Peer set">
           {PEER_OPTIONS.map((option) => {
             const active = option.id === peerVariant;
             return (
@@ -162,21 +154,21 @@ export function FundamentalsControls({
                 title={option.tip}
                 aria-pressed={active}
                 onClick={() => onPeerVariant(option.id)}
-                className={
+                className={`min-h-[36px] rounded-md border px-3 py-1 text-xs font-medium transition-colors duration-150 ease-unslop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                   active
-                    ? "rounded-md border border-blue-600 bg-blue-600 px-2 py-1 text-xs font-medium text-white"
-                    : "rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-700 dark:border-gray-700 dark:text-gray-200"
-                }
+                    ? "border-accent bg-accent text-white"
+                    : "border-strong bg-raised text-fg-secondary hover:bg-surface hover:text-fg"
+                }`}
               >
                 {option.label}
               </button>
             );
           })}
         </div>
-        <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+        <span className="block text-xs text-fg-muted">
           The peer set never crosses sectors, so banks are never compared with non-financials.
         </span>
       </div>
-    </div>
+    </Card>
   );
 }

@@ -2,12 +2,19 @@
 
 /**
  * Live valuation table shared by the Portfolio page (and reusable elsewhere).
- *
- * Editable share and average-cost inputs sit next to the API-computed price,
- * market value and weight, so the user sees the effect of an edit as soon as the
- * debounced evaluation returns. Totals include cash.
  */
 
+import { useState } from "react";
+
+import { Badge } from "@/components/ui/Badge";
+import {
+  inputCompactClass,
+  tableBodyCellClass,
+  tableHeaderCellClass,
+  tableHeaderRowClass,
+  tableRowHoverClass,
+} from "@/components/ui/Field";
+import { ChevronDownIcon, ChevronUpIcon, XIcon } from "@/components/ui/Icons";
 import type { HoldingValuation, PortfolioEvaluation } from "@/lib/api";
 import { formatVnd, formatWeight } from "@/lib/format";
 import type { PortfolioHolding } from "@/lib/portfolio";
@@ -34,67 +41,89 @@ export function HoldingsTable({
   onUpdate,
   onRemove,
 }: HoldingsTableProps) {
+  const [showWarnings, setShowWarnings] = useState(false);
+
   return (
     <div className="space-y-3">
       {evaluation && (
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="font-medium">Total value: {formatVnd(evaluation.total_value)}</span>
-          <span className="text-gray-600 dark:text-gray-300">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <span className="font-mono font-medium tabular-nums text-fg">
+            Total value: {formatVnd(evaluation.total_value)}
+          </span>
+          <span className="font-mono tabular-nums text-fg-secondary">
             Holdings {formatVnd(evaluation.market_value_total)} &middot; Cash{" "}
             {formatVnd(evaluation.cash)}
           </span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
+          <span className="font-mono text-xs tabular-nums text-fg-muted">
             Source: {evaluation.freshness.source ?? "n/a"}
             {evaluation.freshness.stale
-              ? " · some holdings lack a bar for the latest session (suspension/halt)"
+              ? " · some holdings lack a bar for the latest session"
               : ""}
           </span>
-          {loading && <span className="text-xs text-gray-500">updating&hellip;</span>}
+          {loading && <span className="text-xs text-fg-muted">Updating&hellip;</span>}
         </div>
       )}
 
       {evaluation && evaluation.warnings.length > 0 && (
-        <ul className="space-y-1 text-xs text-amber-700 dark:text-amber-300">
-          {evaluation.warnings.map((warning) => (
-            <li key={warning}>{warning}</li>
-          ))}
-        </ul>
+        <div className="rounded-lg border border-warn-border bg-warn-subtle px-3 py-2 text-xs text-warn">
+          <button
+            type="button"
+            onClick={() => setShowWarnings((prev) => !prev)}
+            className="flex w-full items-center justify-between gap-2 text-left font-medium"
+          >
+            <span>
+              {evaluation.warnings.length} data{" "}
+              {evaluation.warnings.length === 1 ? "note" : "notes"}
+            </span>
+            {showWarnings ? <ChevronUpIcon size={14} /> : <ChevronDownIcon size={14} />}
+          </button>
+          {showWarnings && (
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              {evaluation.warnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {holdings.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+        <p className="rounded-xl border border-dashed border-strong p-6 text-sm text-fg-muted">
           No holdings yet. Search for a ticker (or import a CSV/JSON file) to get started.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
-          <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-            <thead className="bg-gray-50 text-left dark:bg-gray-900">
-              <tr>
-                <th className="px-3 py-2 font-medium">Ticker</th>
-                <th className="px-3 py-2 font-medium">Shares</th>
-                <th className="px-3 py-2 font-medium">Avg cost (VND)</th>
-                <th className="px-3 py-2 font-medium">Buy date</th>
-                <th className="px-3 py-2 font-medium">Price (VND)</th>
-                <th className="px-3 py-2 font-medium">Value (VND)</th>
-                <th className="px-3 py-2 font-medium">Weight</th>
-                <th className="px-3 py-2 font-medium">Notes</th>
-                <th className="px-3 py-2" />
+        <div className="overflow-x-auto rounded-xl border border-hairline bg-surface">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className={tableHeaderRowClass}>
+                <th className={`${tableHeaderCellClass} sticky left-0 z-10 bg-raised`}>
+                  Ticker
+                </th>
+                <th className={tableHeaderCellClass}>Shares</th>
+                <th className={tableHeaderCellClass}>Avg cost (VND)</th>
+                <th className={tableHeaderCellClass}>Buy date</th>
+                <th className={`${tableHeaderCellClass} text-right`}>Price (VND)</th>
+                <th className={`${tableHeaderCellClass} text-right`}>Value (VND)</th>
+                <th className={`${tableHeaderCellClass} text-right`}>Weight</th>
+                <th className={tableHeaderCellClass}>Status</th>
+                <th className={tableHeaderCellClass} />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+            <tbody>
               {holdings.map((holding) => {
                 const valuation = valuationBySymbol.get(holding.symbol);
+                const hasWarnings = Boolean(valuation && valuation.warnings.length > 0);
                 return (
-                  <tr key={holding.symbol}>
-                    <td className="px-3 py-2 font-medium">
-                      {holding.symbol}
-                      {holding.shares === 0 && (
-                        <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-950 dark:text-blue-200">
-                          wishlist
-                        </span>
-                      )}
+                  <tr key={holding.symbol} className={tableRowHoverClass}>
+                    <td
+                      className={`${tableBodyCellClass} sticky left-0 z-10 bg-surface font-mono font-medium text-fg`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{holding.symbol}</span>
+                        {holding.shares === 0 && <Badge tone="accent">wishlist</Badge>}
+                      </div>
                     </td>
-                    <td className="px-3 py-2">
+                    <td className={tableBodyCellClass}>
                       <input
                         type="number"
                         inputMode="numeric"
@@ -106,10 +135,10 @@ export function HoldingsTable({
                         onChange={(event) =>
                           onUpdate(holding.symbol, { shares: parseWhole(event.target.value) })
                         }
-                        className="w-24 rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-900"
+                        className={`${inputCompactClass} w-24 font-mono tabular-nums`}
                       />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className={tableBodyCellClass}>
                       <input
                         type="number"
                         inputMode="numeric"
@@ -126,10 +155,10 @@ export function HoldingsTable({
                                 : parseWhole(event.target.value),
                           })
                         }
-                        className="w-28 rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-900"
+                        className={`${inputCompactClass} w-28 font-mono tabular-nums`}
                       />
                     </td>
-                    <td className="px-3 py-2">
+                    <td className={tableBodyCellClass}>
                       <input
                         type="date"
                         aria-label={`Buy date for ${holding.symbol}`}
@@ -140,88 +169,102 @@ export function HoldingsTable({
                               event.target.value.trim() === "" ? null : event.target.value,
                           })
                         }
-                        className="w-36 rounded-md border border-gray-300 px-2 py-1 text-sm dark:border-gray-700 dark:bg-gray-900"
+                        className={`${inputCompactClass} w-36 font-mono tabular-nums`}
                       />
                     </td>
-                    <td className="px-3 py-2">
+                    <td
+                      className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg`}
+                    >
                       {valuation && valuation.latest_price !== null
                         ? formatVnd(valuation.latest_price)
                         : "\u2014"}
                     </td>
-                    <td className="px-3 py-2">
+                    <td
+                      className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg`}
+                    >
                       {valuation ? formatVnd(valuation.market_value) : "\u2014"}
                     </td>
-                    <td className="px-3 py-2">
+                    <td
+                      className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg-secondary`}
+                    >
                       {valuation ? formatWeight(valuation.weight) : "\u2014"}
                     </td>
-                    <td className="px-3 py-2">
-                      {valuation && valuation.warnings.length > 0 ? (
-                        <span className="flex flex-wrap gap-1">
-                          {valuation.warnings.map((warning) => (
-                            <span
-                              key={warning}
-                              className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                            >
-                              {warning}
-                            </span>
-                          ))}
+                    <td className={tableBodyCellClass}>
+                      {hasWarnings ? (
+                        <span
+                          title={valuation!.warnings.join(" · ")}
+                          className="inline-flex cursor-help items-center gap-1.5 text-xs text-warn"
+                        >
+                          <span
+                            className="h-1.5 w-1.5 shrink-0 rounded-full bg-warn"
+                            aria-hidden="true"
+                          />
+                          <span>Stale</span>
                         </span>
                       ) : (
-                        <span className="text-xs text-emerald-600 dark:text-emerald-400">ok</span>
+                        <span className="text-xs text-positive">ok</span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className={`${tableBodyCellClass} text-right`}>
                       <button
                         type="button"
                         onClick={() => onRemove(holding.symbol)}
                         aria-label={`Remove ${holding.symbol}`}
-                        className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+                        className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-md text-fg-muted transition-colors duration-150 ease-unslop hover:bg-raised hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent md:min-h-[28px] md:min-w-[28px]"
                       >
-                        &times;
+                        <XIcon size={15} />
                       </button>
                     </td>
                   </tr>
                 );
               })}
-
             </tbody>
             {evaluation && (
-              <tfoot className="bg-gray-50 dark:bg-gray-900">
+              <tfoot className="border-t border-hairline bg-raised text-sm">
                 <tr>
-                  <td className="px-3 py-1 font-medium" colSpan={5}>
+                  <td className="px-4 py-2.5 font-medium text-fg" colSpan={5}>
                     Holdings
                   </td>
-                  <td className="px-3 py-1 font-medium">
+                  <td className="px-4 py-2.5 text-right font-mono font-medium tabular-nums whitespace-nowrap text-fg">
                     {formatVnd(evaluation.market_value_total)}
                   </td>
-                  <td className="px-3 py-1">{formatWeight(1 - evaluation.cash_weight)}</td>
-                  <td className="px-3 py-1" colSpan={2} />
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums whitespace-nowrap text-fg-secondary">
+                    {formatWeight(1 - evaluation.cash_weight)}
+                  </td>
+                  <td className="px-4 py-2.5" colSpan={2} />
                 </tr>
-                <tr>
-                  <td className="px-3 py-1" colSpan={5}>
+                <tr className="border-t border-hairline">
+                  <td className="px-4 py-2 text-fg-secondary" colSpan={5}>
                     Cash
                   </td>
-                  <td className="px-3 py-1">{formatVnd(evaluation.cash)}</td>
-                  <td className="px-3 py-1">{formatWeight(evaluation.cash_weight)}</td>
-                  <td className="px-3 py-1" colSpan={2} />
+                  <td className="px-4 py-2 text-right font-mono tabular-nums whitespace-nowrap text-fg-secondary">
+                    {formatVnd(evaluation.cash)}
+                  </td>
+                  <td className="px-4 py-2 text-right font-mono tabular-nums whitespace-nowrap text-fg-secondary">
+                    {formatWeight(evaluation.cash_weight)}
+                  </td>
+                  <td className="px-4 py-2" colSpan={2} />
                 </tr>
-                <tr className="font-semibold">
-                  <td className="px-3 py-1" colSpan={5}>
+                <tr className="border-t border-hairline font-medium">
+                  <td className="px-4 py-2.5 text-fg" colSpan={5}>
                     Total value
                   </td>
-                  <td className="px-3 py-1">{formatVnd(evaluation.total_value)}</td>
-                  <td className="px-3 py-1">{formatWeight(1)}</td>
-                  <td className="px-3 py-1" colSpan={2} />
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums whitespace-nowrap text-fg">
+                    {formatVnd(evaluation.total_value)}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums whitespace-nowrap text-fg">
+                    {formatWeight(1)}
+                  </td>
+                  <td className="px-4 py-2.5" colSpan={2} />
                 </tr>
               </tfoot>
             )}
-
           </table>
         </div>
       )}
 
       {loading && !evaluation && (
-        <p className="text-sm text-gray-500 dark:text-gray-400">Calculating valuations&hellip;</p>
+        <p className="text-sm text-fg-muted">Calculating valuations&hellip;</p>
       )}
     </div>
   );

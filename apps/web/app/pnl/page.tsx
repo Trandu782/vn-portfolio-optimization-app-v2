@@ -9,8 +9,10 @@ export const metadata: Metadata = { title: "P&L" };
 export default function PnLPage() {
   return (
     <section className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">P&amp;L</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-[28px] leading-[1.15] font-medium tracking-[-0.015em] text-fg">
+          P&amp;L
+        </h1>
         <SettingsBadge />
       </div>
       <Disclaimer context="This profit and loss report" verb="is" />

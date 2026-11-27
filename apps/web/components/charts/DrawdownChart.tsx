@@ -1,12 +1,5 @@
 "use client";
 
-/**
- * Drawdown chart: the decline from the running peak, 0 at the top.
- *
- * Shows date ticks, a percent Y axis, a crosshair tooltip and a marker on the
- * worst (maximum) drawdown point so the worst moment is obvious.
- */
-
 import {
   Area,
   AreaChart,
@@ -19,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { Card } from "@/components/ui/Card";
 import type { DrawdownMetric } from "@/lib/api";
 import {
   AXIS_TEXT,
@@ -43,8 +37,10 @@ function DrawdownTooltip({ active, label, payload }: DrawdownTooltipProps) {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
   return (
     <TooltipBox>
-      <p className="font-medium">{String(label ?? "")}</p>
-      <p className="tabular-nums">Drawdown {formatPercent(value)}</p>
+      <p className="font-mono font-medium text-fg">{String(label ?? "")}</p>
+      <p className="mt-1 font-mono tabular-nums text-fg-secondary">
+        Drawdown {formatPercent(value)}
+      </p>
     </TooltipBox>
   );
 }
@@ -64,19 +60,18 @@ export function DrawdownChart({ metric }: { metric: DrawdownMetric }) {
   const worst = data[lowestIndex];
 
   return (
-    <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+    <Card className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">Drawdown</h3>
-        <span className="text-xs text-red-600 dark:text-red-400">
+        <h3 className="text-sm font-medium text-fg">Drawdown</h3>
+        <span className="font-mono text-xs tabular-nums text-negative">
           Max {formatPercent(metric.max_drawdown)}
         </span>
       </div>
       <div
-        className="mt-2"
         role="img"
         aria-label={`Drawdown from ${metric.dates[0]} to ${metric.dates[metric.dates.length - 1]}, worst ${formatPercent(metric.max_drawdown)}.`}
       >
-        <ResponsiveContainer width="100%" height={200}>
+        <ResponsiveContainer width="100%" height={240}>
           <AreaChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
             <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" />
             <XAxis
@@ -109,7 +104,7 @@ export function DrawdownChart({ metric }: { metric: DrawdownMetric }) {
               dataKey="drawdown"
               stroke={CHART_COLORS.drawdown}
               fill={CHART_COLORS.drawdown}
-              fillOpacity={0.15}
+              fillOpacity={0.14}
               strokeWidth={1.5}
               dot={false}
               isAnimationActive={false}
@@ -120,16 +115,17 @@ export function DrawdownChart({ metric }: { metric: DrawdownMetric }) {
                 y={worst.drawdown}
                 r={4}
                 fill={CHART_COLORS.drawdown}
-                stroke="#ffffff"
-                strokeWidth={1}
+                stroke="var(--bg-surface)"
+                strokeWidth={1.5}
               />
             )}
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        {data.length} observations &middot; {metric.dates[0]} to {metric.dates[metric.dates.length - 1]}
+      <p className="font-mono text-xs tabular-nums text-fg-muted">
+        {data.length} observations &middot; {metric.dates[0]} to{" "}
+        {metric.dates[metric.dates.length - 1]}
       </p>
-    </div>
+    </Card>
   );
 }

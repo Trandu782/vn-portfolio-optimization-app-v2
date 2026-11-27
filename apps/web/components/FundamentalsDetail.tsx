@@ -1,14 +1,8 @@
 "use client";
 
-/**
- * Fetch one ticker's peer comparison and render it with every state handled
- * (docs/V2_SPEC.md 3.3): loading, the friendly "no fundamentals loaded yet" for an
- * uncovered ticker, the "run the precompute job" state, a genuine error and the
- * empty peer set. Shared by the sub-tab and the ticker drawer.
- */
-
 import { useEffect, useState } from "react";
 
+import { Card } from "@/components/ui/Card";
 import {
   fetchFundamentals,
   type FundamentalsComparison,
@@ -65,7 +59,7 @@ export function FundamentalsDetail({
 
   if (!symbol) {
     return (
-      <p className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+      <p className="rounded-xl border border-dashed border-strong p-6 text-sm text-fg-muted">
         Search for a ticker above to see its fundamentals against the sector.
       </p>
     );
@@ -75,22 +69,23 @@ export function FundamentalsDetail({
 
   if (state === "loading") {
     return (
-      <p className="rounded-lg border border-gray-200 p-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-        Loading {symbol} fundamentals&hellip;
-      </p>
+      <Card className="text-sm text-fg-muted">
+        Loading <span className="font-mono font-medium text-fg">{symbol}</span> fundamentals&hellip;
+      </Card>
     );
   }
   if (state === "no_fundamentals") {
     return (
-      <p className="rounded-lg border border-gray-200 p-4 text-sm text-gray-600 dark:border-gray-800 dark:text-gray-300">
-        No fundamentals loaded for this ticker yet ({symbol.toUpperCase()}). It has no stored
-        financial ratios in the current dataset.
-      </p>
+      <Card className="text-sm text-fg-secondary">
+        No fundamentals loaded for this ticker yet (
+        <span className="font-mono font-medium text-fg">{symbol.toUpperCase()}</span>). It has no
+        stored financial ratios in the current dataset.
+      </Card>
     );
   }
   if (state === "unavailable") {
     return (
-      <p className="rounded-lg bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+      <p className="rounded-lg border border-warn-border bg-warn-subtle p-4 text-sm text-warn">
         Fundamentals data is not available yet: run the precompute job to populate the ratio
         tables.
       </p>
@@ -98,16 +93,18 @@ export function FundamentalsDetail({
   }
   if (state === "error") {
     return (
-      <p className="rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">
+      <p className="rounded-lg border border-negative/25 bg-negative-subtle p-4 text-sm text-negative">
         {message(error)}
       </p>
     );
   }
   if (state === "empty" || comparison === null) {
     return (
-      <p className="rounded-lg border border-gray-200 p-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-        No ratios are available for {symbol.toUpperCase()} under this peer set.
-      </p>
+      <Card className="text-sm text-fg-muted">
+        No ratios are available for{" "}
+        <span className="font-mono font-medium text-fg">{symbol.toUpperCase()}</span> under this
+        peer set.
+      </Card>
     );
   }
   return <FundamentalsPanel comparison={comparison} />;

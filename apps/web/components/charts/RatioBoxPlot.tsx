@@ -1,16 +1,6 @@
 "use client";
 
-/**
- * Box plot of one ratio's sector distribution with the ticker marked
- * (docs/V2_SPEC.md section 3.3).
- *
- * A single horizontal box per ratio is clearer than a dense Recharts box plot and
- * keeps the "how to read this" story explicit: the box is the middle half of the
- * sector (Q1-Q3), the line is the median, the whiskers run to the lowest/highest
- * peer and the coloured dot marks this ticker. Every drawn element carries a
- * native tooltip, and the value axis is labelled with real values.
- */
-
+import { Card } from "@/components/ui/Card";
 import { AXIS_TEXT, GRID_STROKE } from "@/lib/chart-theme";
 import {
   formatRatioValue,
@@ -21,24 +11,71 @@ import {
 } from "@/lib/fundamentals";
 
 const TONE_FILL: Record<VerdictTone, string> = {
-  good: "#16a34a",
-  bad: "#dc2626",
-  warn: "#d97706",
-  neutral: "#6b7280",
+  good: "#4cc38a",
+  bad: "#e5484d",
+  warn: "#e0a243",
+  neutral: "#71717a",
 };
 
 const VIEW_W = 640;
-const VIEW_H = 150;
-const PAD_X = 24;
-const CENTER_Y = 66;
+const VIEW_H = 164;
+const PAD_X = 28;
+const CENTER_Y = 64;
 const BOX_H = 30;
-const BOX_FILL = "#dbeafe";
-const BOX_STROKE = "#2563eb";
-const MEDIAN_STROKE = "#1e3a8a";
-const WHISKER_STROKE = "#6b7280";
+const BOX_FILL = "rgba(59, 130, 246, 0.16)";
+const BOX_STROKE = "#3b82f6";
+const MEDIAN_STROKE = "#60a5fa";
+const WHISKER_STROKE = "#85858b";
+const MIN_TICK_GAP = 48;
 
-function uniqueSorted(values: number[]): number[] {
-  return [...new Set(values)].sort((a, b) => a - b);
+interface TickEntry {
+  value: number;
+  xPos: number;
+  priority: number;
+  row: 0 | 1;
+}
+
+function layoutTicks(stats: BoxPlotStats, x: (value: number) => number): TickEntry[] {
+  const candidates: Array<{ value: number; priority: number }> = [
+    { value: stats.median, priority: 3 },
+    { value: stats.min, priority: 2 },
+    { value: stats.max, priority: 2 },
+    { value: stats.q1, priority: 1 },
+    { value: stats.q3, priority: 1 },
+  ];
+
+  // Deduplicate by exact value, keeping highest priority.
+  const byValue = new Map<number, number>();
+  for (const item of candidates) {
+    const prev = byValue.get(item.value) ?? 0;
+    if (item.priority > prev) byValue.set(item.value, item.priority);
+  }
+
+  const sorted = [...byValue.entries()]
+    .map(([value, priority]) => ({ value, xPos: x(value), priority, row: 0 as 0 | 1 }))
+    .sort((a, b) => a.xPos - b.xPos);
+
+  const row0Xs: number[] = [];
+  const row1Xs: number[] = [];
+  const placed: TickEntry[] = [];
+
+  // Place higher-priority ticks first so median/min/max win row 0.
+  const byPriority = [...sorted].sort((a, b) => b.priority - a.priority);
+  for (const item of byPriority) {
+    const fitsRow0 = row0Xs.every((other) => Math.abs(other - item.xPos) >= MIN_TICK_GAP);
+    if (fitsRow0) {
+      row0Xs.push(item.xPos);
+      placed.push({ ...item, row: 0 });
+      continue;
+    }
+    const fitsRow1 = row1Xs.every((other) => Math.abs(other - item.xPos) >= MIN_TICK_GAP);
+    if (fitsRow1) {
+      row1Xs.push(item.xPos);
+      placed.push({ ...item, row: 1 });
+    }
+  }
+
+  return placed.sort((a, b) => a.xPos - b.xPos);
 }
 
 export function RatioBoxPlot({
@@ -66,24 +103,24 @@ export function RatioBoxPlot({
   const innerW = VIEW_W - PAD_X * 2;
   const x = (value: number) => PAD_X + ((value - low) / (high - low)) * innerW;
   const clampX = (value: number) => Math.min(PAD_X + innerW, Math.max(PAD_X, x(value)));
-  const ticks = uniqueSorted([stats.min, stats.q1, stats.median, stats.q3, stats.max]);
+  const ticks = layoutTicks(stats, x);
   const tone = verdictTone(verdict);
   const markerX = tickerValue === null ? null : clampX(tickerValue);
   const axisY = CENTER_Y + BOX_H / 2 + 14;
 
   return (
-    <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+    <Card className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-sm font-semibold">{label}: sector distribution</h3>
-        <span className="text-xs text-gray-500 dark:text-gray-400">N = {n} peers</span>
+        <h3 className="text-sm font-medium text-fg">{label}: sector distribution</h3>
+        <span className="font-mono text-xs tabular-nums text-fg-muted">N = {n} peers</span>
       </div>
-      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+      <p className="text-xs text-fg-muted">
         The box is the middle half of the sector (25th-75th percentile), the line is the
         median and the whiskers run to the lowest and highest peer. The dot is this ticker.
       </p>
       <svg
         viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-        className="mt-2 w-full"
+        className="w-full"
         role="img"
         aria-label={`${label} sector distribution box plot with this ticker marked`}
       >
@@ -95,16 +132,24 @@ export function RatioBoxPlot({
           stroke={GRID_STROKE}
         />
         {ticks.map((tick) => (
-          <g key={tick}>
-            <line x1={x(tick)} y1={axisY} x2={x(tick)} y2={axisY + 4} stroke={AXIS_TEXT} />
+          <g key={tick.value}>
+            <line
+              x1={tick.xPos}
+              y1={axisY}
+              x2={tick.xPos}
+              y2={axisY + (tick.row === 1 ? 16 : 4)}
+              stroke={AXIS_TEXT}
+              strokeOpacity={tick.row === 1 ? 0.5 : 1}
+            />
             <text
-              x={x(tick)}
-              y={axisY + 16}
+              x={tick.xPos}
+              y={axisY + (tick.row === 1 ? 28 : 16)}
               textAnchor="middle"
               fontSize={10}
+              fontFamily="var(--font-mono)"
               fill={AXIS_TEXT}
             >
-              {fmt(tick)}
+              {fmt(tick.value)}
             </text>
           </g>
         ))}
@@ -129,15 +174,27 @@ export function RatioBoxPlot({
         >
           <title>{`75th percentile ${fmt(stats.q3)} to highest ${fmt(stats.max)}`}</title>
         </line>
-        <line x1={x(stats.min)} y1={CENTER_Y - 7} x2={x(stats.min)} y2={CENTER_Y + 7} stroke={WHISKER_STROKE} />
-        <line x1={x(stats.max)} y1={CENTER_Y - 7} x2={x(stats.max)} y2={CENTER_Y + 7} stroke={WHISKER_STROKE} />
+        <line
+          x1={x(stats.min)}
+          y1={CENTER_Y - 7}
+          x2={x(stats.min)}
+          y2={CENTER_Y + 7}
+          stroke={WHISKER_STROKE}
+        />
+        <line
+          x1={x(stats.max)}
+          y1={CENTER_Y - 7}
+          x2={x(stats.max)}
+          y2={CENTER_Y + 7}
+          stroke={WHISKER_STROKE}
+        />
 
         <rect
           x={x(stats.q1)}
           y={CENTER_Y - BOX_H / 2}
           width={Math.max(1, x(stats.q3) - x(stats.q1))}
           height={BOX_H}
-          rx={3}
+          rx={4}
           fill={BOX_FILL}
           stroke={BOX_STROKE}
         >
@@ -161,7 +218,7 @@ export function RatioBoxPlot({
               cy={CENTER_Y}
               r={6}
               fill={TONE_FILL[tone]}
-              stroke="#ffffff"
+              stroke="var(--bg-surface)"
               strokeWidth={2}
             >
               <title>{`This ticker ${fmt(tickerValue)}`}</title>
@@ -170,8 +227,9 @@ export function RatioBoxPlot({
               x={markerX}
               y={CENTER_Y - BOX_H / 2 - 10}
               textAnchor="middle"
-              fontSize={10}
-              fontWeight={600}
+              fontSize={11}
+              fontFamily="var(--font-mono)"
+              fontWeight={500}
               fill={TONE_FILL[tone]}
             >
               {`Ticker ${fmt(tickerValue)}`}
@@ -189,6 +247,14 @@ export function RatioBoxPlot({
           Ratio value
         </text>
       </svg>
-    </div>
+
+      <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-hairline pt-2.5 font-mono text-xs tabular-nums text-fg-secondary">
+        <span>Min {fmt(stats.min)}</span>
+        <span>Q1 {fmt(stats.q1)}</span>
+        <span className="font-medium text-fg">Median {fmt(stats.median)}</span>
+        <span>Q3 {fmt(stats.q3)}</span>
+        <span>Max {fmt(stats.max)}</span>
+      </div>
+    </Card>
   );
 }

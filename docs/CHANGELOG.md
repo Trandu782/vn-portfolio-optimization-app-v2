@@ -6,6 +6,11 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- **UI/UX Redesign (Unslop)**:
+  - Introduced semantic Graphite design tokens (light/dark) in `apps/web/app/globals.css` and `apps/web/tailwind.config.ts`, self-hosted `IBM Plex Sans` & `IBM Plex Mono` via `next/font/google`, and added `viewportFit: "cover"` + safe-area/touch-target iOS ergonomics in `apps/web/app/layout.tsx`.
+  - Added shared UI primitives (`Button`, `Card`, `Badge`, `Field`, `Icons`) in `apps/web/components/ui/` and widened the layout shell to `max-w-[1440px]` with a `56px` sticky `Nav` and mobile menu drawer.
+  - Redesigned all 8 routes (`/`, `/portfolio`, `/pnl`, `/optimize`, `/sector`, `/risk`, `/rebalance`, `/settings`) with right-aligned `font-mono tabular-nums` tables, sticky `Ticker` columns on mobile, quiet `Disclaimer` and collapsible warning callouts, unified `InfoTip` icons, and balanced `/risk` comparison grids.
+  - Upgraded charts (`FrontierChart`, `RatioBoxPlot`, `RelativeSectorChart`, `CorrelationHeatmap`, `SectorCorrelationHeatmap`, `PerformanceChart`, `DrawdownChart`, `CurrentVsTargetChart`, `MarketVsCostChart`, `PnLBarChart`, `SectorScatter`) with tight frontier domains, high-contrast non-overlapping labels, staggered box-plot ticks, hover-isolated sector lines, and Graphite-harmonized colors.
 - Consolidated `.github/workflows/precompute_v2.yml` to a single weekday end-of-day cron (`47 12 * * 1-5`, 12:47 UTC = 19:47 ICT, Mon–Fri) and removed the `13 19 * * 1-5` (02:13 ICT) nightly repair cron to cut scheduled GitHub Actions runs and Supabase egress in half (5 runs/week instead of 10). Updated `docs/DATA.md`, `docs/DEPLOYMENT.md`, and `docs/DECISIONS.md`.
 
 ### Performance & Supabase egress (v2.0.2)

@@ -6,12 +6,7 @@ import { fetchDataFreshness, type DataFreshness } from "@/lib/api";
 
 /**
  * Global badge showing the latest stored price date and the provider that owns the
- * freshest bar, sourced from GET /api/v1/data/freshness. The API reports the V2
- * source (e.g. `ssi_statistics`) when V2 owns the latest bar and falls back to the
- * first healthy provider in PROVIDER_ORDER otherwise, so this badge matches the
- * source the Portfolio page values against. Amber when a provider is down or the
- * latest bar looks stale; when every provider is unhealthy it reports that cached
- * (possibly stale) data is served.
+ * freshest bar, sourced from GET /api/v1/data/freshness.
  */
 export function DataFreshnessBadge() {
   const [freshness, setFreshness] = useState<DataFreshness | null>(null);
@@ -40,17 +35,19 @@ export function DataFreshnessBadge() {
     return (
       <span
         title="Data freshness is unavailable"
-        className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+        className="inline-flex items-center gap-2 rounded-md border border-hairline bg-surface px-2.5 py-1 font-mono text-xs tabular-nums text-fg-muted"
       >
-        data: unknown
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-fg-muted" aria-hidden="true" />
+        <span>offline</span>
       </span>
     );
   }
 
   if (!freshness) {
     return (
-      <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-        data: ...
+      <span className="inline-flex items-center gap-2 rounded-md border border-hairline bg-surface px-2.5 py-1 font-mono text-xs tabular-nums text-fg-muted">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-fg-muted" aria-hidden="true" />
+        <span>syncing</span>
       </span>
     );
   }
@@ -74,14 +71,18 @@ export function DataFreshnessBadge() {
   return (
     <span
       title={title}
-      className={
-        needsAttention
-          ? "rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-          : "rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
-      }
+      className="inline-flex items-center gap-2 rounded-md border border-hairline bg-surface px-2.5 py-1 font-mono text-xs tabular-nums text-fg-secondary"
     >
-      data: {active} · {latest}
-      {down.length > 0 ? ` · failover: ${down.map((status) => status.id).join(", ")}` : ""}
+      <span
+        className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+          needsAttention ? "bg-warn" : "bg-positive"
+        }`}
+        aria-hidden="true"
+      />
+      <span className="whitespace-nowrap">
+        {active} · {latest}
+        {down.length > 0 ? ` · failover: ${down.map((status) => status.id).join(", ")}` : ""}
+      </span>
     </span>
   );
 }

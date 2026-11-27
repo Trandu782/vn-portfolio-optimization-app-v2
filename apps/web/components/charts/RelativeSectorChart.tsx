@@ -1,15 +1,5 @@
 "use client";
 
-/**
- * Relative Sector Movement chart (docs/V2_SPEC.md section 3.2).
- *
- * Multi-line normalised return, base 0%, with the benchmark drawn as a distinct dashed
- * grey line so it never collides with a sector colour. The legend toggles each line, both
- * axes are labelled and the tooltip shows the level and the percent change from the start
- * of the window. The x-axis uses unambiguous labels: "May 2026" for normal windows and
- * "20 May" for short windows (so a one-month window does not repeat the same month).
- */
-
 import { useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -22,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { Card } from "@/components/ui/Card";
 import type { SectorReturnPoint } from "@/lib/api";
 import {
   AXIS_TEXT,
@@ -36,9 +27,7 @@ import { toggleHidden } from "@/lib/sector-analysis";
 
 import { TooltipBox } from "./TooltipBox";
 
-/** Distinct dashed grey for the benchmark (never one of the sector colours). */
-const BENCHMARK_COLOR = "#6b7280";
-/** Windows at or below this many calendar days use day + month axis labels. */
+const BENCHMARK_COLOR = "#71717a";
 const SHORT_WINDOW_DAYS = 92;
 
 export interface RelativeSectorSeries {
@@ -71,19 +60,19 @@ function ChartTooltip({
   if (rows.length === 0) return null;
   return (
     <TooltipBox>
-      <p className="font-medium">{String(label ?? "")}</p>
-      <ul className="mt-1 space-y-0.5">
+      <p className="font-mono font-medium text-fg">{String(label ?? "")}</p>
+      <ul className="mt-1.5 space-y-1">
         {rows.map((entry) => (
           <li key={String(entry.dataKey ?? entry.name)} className="flex items-center gap-3">
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5 text-fg-secondary">
               <span
                 className="inline-block h-2 w-2 rounded-full"
-                style={{ backgroundColor: entry.color ?? "#6b7280" }}
-                aria-hidden
+                style={{ backgroundColor: entry.color ?? BENCHMARK_COLOR }}
+                aria-hidden="true"
               />
               {String(entry.name ?? "")}
             </span>
-            <span className="ml-auto tabular-nums">
+            <span className="ml-auto font-mono tabular-nums text-fg">
               {formatSignedPercent((entry.value as number) / 100)}
             </span>
           </li>
@@ -107,6 +96,7 @@ export function RelativeSectorChart({
   windowLabel: string;
 }) {
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
+  const [hoveredSector, setHoveredSector] = useState<string | null>(null);
 
   const rows = useMemo(() => {
     const byDate = new Map<string, ChartRow>();
@@ -139,34 +129,41 @@ export function RelativeSectorChart({
     ...series.map((line) => ({ id: line.id, label: line.label, color: line.color })),
   ];
 
-
   return (
-    <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
-      <h2 className="text-lg font-semibold">Relative sector movement</h2>
-      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-        Each line is a sector index set to 0% at the start of the window ({windowLabel}).
-        The dashed grey line is {benchmarkLabel}; the gap to it is the sector&apos;s relative move.
-      </p>
+    <Card className="space-y-3">
+      <div>
+        <h2 className="text-base font-medium text-fg">Relative sector movement</h2>
+        <p className="mt-1 text-xs text-fg-muted">
+          Each line is a sector index set to 0% at the start of the window (
+          <span className="font-mono tabular-nums">{windowLabel}</span>). The dashed grey line is{" "}
+          {benchmarkLabel}; hover a sector chip to isolate it.
+        </p>
+      </div>
 
-      <div className="mt-2 flex flex-wrap gap-2 text-xs" role="group" aria-label="Toggle a sector">
+      <div className="flex flex-wrap gap-1.5 text-xs" role="group" aria-label="Toggle a sector">
         {legend.map((item) => {
           const off = hidden[item.id] ?? false;
+          const isHovered = hoveredSector === item.id;
           return (
             <button
               key={item.id}
               type="button"
               onClick={() => setHidden((current) => toggleHidden(current, item.id))}
+              onMouseEnter={() => setHoveredSector(item.id)}
+              onMouseLeave={() => setHoveredSector(null)}
               aria-pressed={!off}
-              className={
+              className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 transition-colors duration-150 ease-unslop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                 off
-                  ? "flex items-center gap-1 rounded-full border border-gray-300 px-2 py-0.5 text-gray-400 line-through dark:border-gray-700"
-                  : "flex items-center gap-1 rounded-full border border-gray-300 px-2 py-0.5 dark:border-gray-700"
-              }
+                  ? "border-hairline bg-surface text-fg-muted line-through"
+                  : isHovered
+                    ? "border-strong bg-raised font-medium text-fg"
+                    : "border-hairline bg-surface text-fg-secondary hover:border-strong hover:text-fg"
+              }`}
             >
               <span
-                className="inline-block h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: off ? "#9ca3af" : item.color }}
-                aria-hidden
+                className="inline-block h-2 w-2 rounded-full"
+                style={{ backgroundColor: off ? "#85858b" : item.color }}
+                aria-hidden="true"
               />
               {item.label}
             </button>
@@ -174,7 +171,7 @@ export function RelativeSectorChart({
         })}
       </div>
 
-      <div className="mt-2" role="img" aria-label="Normalised sector returns versus the benchmark, base 0%.">
+      <div role="img" aria-label="Normalised sector returns versus the benchmark, base 0%.">
         <ResponsiveContainer width="100%" height={320}>
           <LineChart data={rows} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
             <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" />
@@ -207,31 +204,37 @@ export function RelativeSectorChart({
               dataKey="benchmark"
               name={benchmarkLabel}
               stroke={BENCHMARK_COLOR}
-              strokeWidth={2.6}
+              strokeWidth={hoveredSector === "benchmark" ? 2.8 : 2.2}
+              strokeOpacity={
+                hoveredSector === null || hoveredSector === "benchmark" ? 1 : 0.25
+              }
               strokeDasharray="6 4"
               dot={false}
               connectNulls
               isAnimationActive={false}
               hide={hidden.benchmark ?? false}
             />
-            {series.map((line) => (
-              <Line
-                key={line.id}
-                type="monotone"
-                dataKey={line.id}
-                name={line.label}
-                stroke={line.color}
-                strokeWidth={1.5}
-                dot={false}
-                connectNulls
-                isAnimationActive={false}
-                hide={hidden[line.id] ?? false}
-              />
-            ))}
+            {series.map((line) => {
+              const active = hoveredSector === null || hoveredSector === line.id;
+              return (
+                <Line
+                  key={line.id}
+                  type="monotone"
+                  dataKey={line.id}
+                  name={line.label}
+                  stroke={line.color}
+                  strokeWidth={hoveredSector === line.id ? 2.4 : 1.5}
+                  strokeOpacity={active ? 1 : 0.2}
+                  dot={false}
+                  connectNulls
+                  isAnimationActive={false}
+                  hide={hidden[line.id] ?? false}
+                />
+              );
+            })}
           </LineChart>
         </ResponsiveContainer>
       </div>
-    </div>
+    </Card>
   );
 }
-

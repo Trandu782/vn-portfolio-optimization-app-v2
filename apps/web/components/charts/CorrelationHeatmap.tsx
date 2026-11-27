@@ -1,22 +1,19 @@
 "use client";
 
-/**
- * Correlation heatmap: ticker labels on both axes, a -1..+1 colour legend and a
- * hover state that names the pair ("VHM vs LPB: 0.32") and highlights the
- * hovered row and column.
- */
-
 import { useState } from "react";
 
+import { Card } from "@/components/ui/Card";
 import type { CorrelationMatrixMetric } from "@/lib/api";
 
 function correlationColor(value: number): string {
   const clamped = Math.max(-1, Math.min(1, value));
   if (clamped >= 0) {
-    return `rgba(220, 38, 38, ${(clamped * 0.7).toFixed(3)})`;
+    return `rgba(229, 72, 77, ${(clamped * 0.68).toFixed(3)})`;
   }
-  return `rgba(37, 99, 235, ${(-clamped * 0.7).toFixed(3)})`;
+  return `rgba(59, 130, 246, ${(-clamped * 0.68).toFixed(3)})`;
 }
+
+const SCALE_SWATCHES = [-1, -0.5, 0, 0.5, 1];
 
 export function CorrelationHeatmap({ metric }: { metric: CorrelationMatrixMetric }) {
   const symbols = metric.symbols;
@@ -27,14 +24,17 @@ export function CorrelationHeatmap({ metric }: { metric: CorrelationMatrixMetric
       : `${symbols[hover.row]} vs ${symbols[hover.col]}: ${(metric.matrix[hover.row]?.[hover.col] ?? 0).toFixed(2)}`;
 
   return (
-    <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
-      <h3 className="text-sm font-semibold">Correlation heatmap</h3>
-      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        Pairwise correlation of the analysed symbols. Red is positive, blue is negative.
-      </p>
-      <div className="mt-3 overflow-x-auto">
+    <Card className="space-y-3">
+      <div>
+        <h3 className="text-sm font-medium text-fg">Correlation heatmap</h3>
+        <p className="mt-1 text-xs text-fg-muted">
+          Pairwise correlation of the analysed symbols. Red is positive, blue is negative.
+        </p>
+      </div>
+
+      <div className="overflow-x-auto">
         <table
-          className="border-collapse text-[10px]"
+          className="mx-auto border-separate border-spacing-[2px] text-xs"
           onMouseLeave={() => setHover(null)}
           aria-label="Pairwise correlation matrix of the analysed symbols"
         >
@@ -45,7 +45,11 @@ export function CorrelationHeatmap({ metric }: { metric: CorrelationMatrixMetric
             <tr>
               <th scope="col" className="p-1" />
               {symbols.map((symbol) => (
-                <th key={symbol} scope="col" className="p-1 font-medium">
+                <th
+                  key={symbol}
+                  scope="col"
+                  className="p-1.5 font-mono text-xs font-medium text-fg-secondary"
+                >
                   {symbol}
                 </th>
               ))}
@@ -54,7 +58,10 @@ export function CorrelationHeatmap({ metric }: { metric: CorrelationMatrixMetric
           <tbody>
             {metric.matrix.map((row, rowIndex) => (
               <tr key={symbols[rowIndex] ?? rowIndex}>
-                <th scope="row" className="p-1 text-right font-medium">
+                <th
+                  scope="row"
+                  className="p-1.5 text-right font-mono text-xs font-medium text-fg-secondary"
+                >
                   {symbols[rowIndex]}
                 </th>
                 {row.map((value, columnIndex) => {
@@ -70,9 +77,9 @@ export function CorrelationHeatmap({ metric }: { metric: CorrelationMatrixMetric
                       tabIndex={0}
                       title={`${symbols[rowIndex]} vs ${symbols[columnIndex]}: ${value.toFixed(2)}`}
                       aria-label={`${symbols[rowIndex]} vs ${symbols[columnIndex]}: ${value.toFixed(2)}`}
-                      className={`h-7 w-10 p-1 text-center ${
-                        inHover ? "ring-2 ring-blue-500" : ""
-                      } ${dimmed ? "opacity-60" : ""}`}
+                      className={`h-8 w-12 rounded-sm p-1 text-center font-mono text-xs tabular-nums transition-opacity duration-150 ease-unslop ${
+                        inHover ? "ring-2 ring-accent" : ""
+                      } ${dimmed ? "opacity-55" : ""}`}
                       style={{
                         backgroundColor: correlationColor(value),
                         color: Math.abs(value) > 0.55 ? "#ffffff" : undefined,
@@ -88,24 +95,24 @@ export function CorrelationHeatmap({ metric }: { metric: CorrelationMatrixMetric
         </table>
       </div>
 
-      <p className="mt-2 min-h-[1rem] text-xs text-gray-600 dark:text-gray-300" aria-live="polite">
+      <p className="min-h-[1rem] font-mono text-xs tabular-nums text-fg-secondary" aria-live="polite">
         {hovered ?? "Hover a cell to read the pair."}
       </p>
 
-      <div className="mt-2 flex items-center gap-2 text-[10px] text-gray-500 dark:text-gray-400">
-        <span aria-hidden>-1</span>
-        <span
-          className="h-2 flex-1 rounded-full"
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, rgba(37,99,235,0.7), transparent, rgba(220,38,38,0.7))",
-            border: "1px solid rgba(107,114,128,0.3)",
-          }}
-          aria-hidden
-        />
-        <span aria-hidden>+1</span>
+      <div className="flex items-center gap-1.5 font-mono text-xs text-fg-muted">
+        <span aria-hidden="true">-1</span>
+        <div className="flex flex-1 gap-1" aria-hidden="true">
+          {SCALE_SWATCHES.map((val) => (
+            <span
+              key={val}
+              className="h-2 flex-1 rounded-sm border border-hairline"
+              style={{ backgroundColor: correlationColor(val) }}
+            />
+          ))}
+        </div>
+        <span aria-hidden="true">+1</span>
         <span className="sr-only">Colour scale from minus one (blue) to plus one (red).</span>
       </div>
-    </div>
+    </Card>
   );
 }

@@ -1,17 +1,9 @@
 "use client";
 
-/**
- * The shared V2 universe filter for the Optimize tab.
- *
- * It renders the sector multi-select (ICB level 2), the VN30/VN100 chips, the
- * liquidity preset and the live "N tickers pass" counter, and it calls the read-only
- * `/v2/universe` and `/v2/sectors` endpoints. The selection lives in the single app
- * store (`v2Filter`), so it survives tab switches and reloads. Filtering is done by
- * the API (`filter_universe`); this component never re-implements it.
- */
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/Button";
+import { selectClass } from "@/components/ui/Field";
 import {
   fetchV2Sectors,
   fetchV2Universe,
@@ -199,14 +191,17 @@ export function UniverseFilterPanel({
   const unavailable = universe !== null && !universe.available;
 
   return (
-    <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-sm">
-          <span className="block font-medium">Liquidity preset</span>
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <label htmlFor="v2-liquidity-preset" className="block text-sm font-medium text-fg">
+            Liquidity preset
+          </label>
           <select
+            id="v2-liquidity-preset"
             value={v2Filter.preset}
             onChange={(event) => setV2Filter({ ...v2Filter, preset: event.target.value })}
-            className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+            className={`${selectClass} w-full`}
           >
             {PRESETS.map((preset) => (
               <option key={preset.id} value={preset.id}>
@@ -214,14 +209,15 @@ export function UniverseFilterPanel({
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-            Market cap is full (free-float is unavailable); ADTV and ADV are the real
-            liquidity guards.
-          </span>
-        </label>
-        <div className="block text-sm">
-          <span className="block font-medium">Index membership</span>
-          <div className="mt-1 flex flex-wrap gap-2">
+          <p className="text-xs text-fg-muted">
+            Market cap is full (free-float is unavailable); ADTV and ADV are the real liquidity
+            guards.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <span className="block text-sm font-medium text-fg">Index membership</span>
+          <div className="flex flex-wrap gap-2">
             {["VN30", "VN100"].map((code) => {
               const active = v2Filter.indexes.includes(code);
               return (
@@ -229,10 +225,11 @@ export function UniverseFilterPanel({
                   key={code}
                   type="button"
                   onClick={() => toggleIndex(code)}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                  aria-pressed={active}
+                  className={`min-h-[40px] md:min-h-[36px] rounded-md border px-3 py-1.5 font-mono text-xs font-medium transition-colors duration-150 ease-unslop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                     active
-                      ? "border-blue-600 bg-blue-600 text-white"
-                      : "border-gray-300 text-gray-700 dark:border-gray-700 dark:text-gray-200"
+                      ? "border-accent bg-accent text-white"
+                      : "border-strong bg-raised text-fg-secondary hover:bg-surface hover:text-fg"
                   }`}
                 >
                   {code}
@@ -240,30 +237,28 @@ export function UniverseFilterPanel({
               );
             })}
           </div>
-          <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-fg-muted">
             Chips are ANDed with the sector selection. VN30 is a subset of VN100.
-          </span>
+          </p>
         </div>
       </div>
 
       {unavailable ? (
-        <p className="rounded-md bg-amber-50 p-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+        <p className="rounded-lg border border-warn-border bg-warn-subtle px-3 py-2 text-xs text-warn">
           V2 data not available: the precompute job has not populated the database. You can
           still pick tickers manually below.
         </p>
       ) : (
-        <div>
-          <span className="block text-sm font-medium">Sectors (ICB level 2)</span>
+        <div className="space-y-1.5">
+          <span className="block text-sm font-medium text-fg">Sectors (ICB level 2)</span>
           {sectors && !sectors.available && (
-            <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+            <p className="text-xs text-warn">
               Sector list unavailable; type tickers manually below.
             </p>
           )}
-          <div className="mt-1 flex max-h-40 flex-wrap gap-1 overflow-auto rounded-md border border-gray-200 p-2 dark:border-gray-800">
+          <div className="flex max-h-44 flex-wrap gap-1.5 overflow-auto rounded-lg border border-hairline bg-raised/40 p-2.5">
             {sectorOptions.length === 0 && (
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                Loading sectors\u2026
-              </span>
+              <span className="text-xs text-fg-muted">Loading sectors&hellip;</span>
             )}
             {sectorOptions.map((sector) => {
               const active = v2Filter.sectors.includes(sector.name);
@@ -272,13 +267,17 @@ export function UniverseFilterPanel({
                   key={sector.name}
                   type="button"
                   onClick={() => toggleSector(sector.name)}
-                  className={`rounded-full border px-2 py-0.5 text-xs ${
+                  aria-pressed={active}
+                  className={`rounded-md border px-2.5 py-1 text-xs transition-colors duration-150 ease-unslop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                     active
-                      ? "border-blue-600 bg-blue-600 text-white"
-                      : "border-gray-300 text-gray-700 dark:border-gray-700 dark:text-gray-200"
+                      ? "border-accent bg-accent text-white"
+                      : "border-hairline bg-surface text-fg-secondary hover:border-strong hover:text-fg"
                   }`}
                 >
-                  {sector.name} ({sector.passing}/{sector.total})
+                  {sector.name}{" "}
+                  <span className="font-mono tabular-nums opacity-80">
+                    ({sector.passing}/{sector.total})
+                  </span>
                 </button>
               );
             })}
@@ -287,66 +286,66 @@ export function UniverseFilterPanel({
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <span className="rounded-md bg-gray-100 px-3 py-1 text-sm font-medium dark:bg-gray-800">
+        <span className="rounded-md border border-hairline bg-raised px-3 py-1.5 font-mono text-xs font-medium tabular-nums text-fg">
           {loading ? "Counting\u2026" : `${passingCount} tickers pass`}
         </span>
-        <button
-          type="button"
+        <Button
+          size="sm"
           onClick={addAllPassing}
           disabled={loading || unavailable || passingCount === 0}
-          className="rounded-md border border-blue-600 px-3 py-1 text-sm font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50 dark:text-blue-400 dark:hover:bg-blue-950"
         >
           Add all passing (max {maxStocks})
-        </button>
-        <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300">
+        </Button>
+        <label className="flex min-h-[36px] cursor-pointer items-center gap-2 text-xs text-fg-secondary">
           <input
             type="checkbox"
             checked={v2Filter.excludeAdjustmentFlagged}
             onChange={(event) =>
               setV2Filter({ ...v2Filter, excludeAdjustmentFlagged: event.target.checked })
             }
+            className="h-4 w-4 rounded border-strong accent-accent"
           />
-          Exclude tickers flagged for adjustment quality
+          <span>Exclude tickers flagged for adjustment quality</span>
         </label>
       </div>
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="text-sm text-negative">{error}</p>}
       {trimMessage && (
-        <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+        <p className="rounded-lg border border-warn-border bg-warn-subtle px-3 py-2 text-xs text-warn">
           {trimMessage}
         </p>
       )}
 
       {universe && (
-        <div className="space-y-1">
+        <div className="space-y-2">
           {(universe.warnings ?? []).map((warning) => (
             <p
               key={warning}
-              className="rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+              className="rounded-lg border border-warn-border bg-warn-subtle px-3 py-2 text-xs text-warn"
             >
               {warning}
             </p>
           ))}
           {universe.flags_available === false && (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-fg-muted">
               Adjustment-quality flags have not been computed yet (the precompute job
               populates them).
             </p>
           )}
           {universe.flags_available === true && universe.flags_policy_current === false && (
-            <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+            <p className="rounded-lg border border-warn-border bg-warn-subtle px-3 py-2 text-xs text-warn">
               Adjustment checks are outdated; rerun the update to refresh them.
             </p>
           )}
           {(universe.adjustment_flags ?? []).length > 0 && (
-            <details className="rounded-md bg-gray-50 p-2 text-xs dark:bg-gray-900">
-              <summary className="cursor-pointer font-medium">
+            <details className="rounded-lg border border-hairline bg-raised/50 p-3 text-xs">
+              <summary className="cursor-pointer font-medium text-fg-secondary">
                 {(universe.adjustment_flags ?? []).length} adjustment-quality flag(s)
               </summary>
-              <ul className="mt-1 space-y-0.5">
+              <ul className="mt-2 space-y-1 text-fg-secondary">
                 {(universe.adjustment_flags ?? []).map((flag) => (
                   <li key={flag.ticker}>
-                    <span className="font-medium">{flag.ticker}</span>:{" "}
+                    <span className="font-mono font-medium text-fg">{flag.ticker}</span>:{" "}
                     {(flag.reasons ?? []).join("; ")}
                   </li>
                 ))}

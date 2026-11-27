@@ -2,12 +2,6 @@
 
 /**
  * Portfolio page: enter holdings and cash once, see current value and weights.
- *
- * Tickers are added through the same `/symbols` autocomplete as the Universe page.
- * Each row has a whole-share input (0 == wishlist), an optional average cost and
- * an optional buy date. The live table values everything through the shared
- * `usePortfolio` store, and holdings/cash persist in localStorage. CSV and JSON
- * import/export keep the data portable.
  */
 
 import Link from "next/link";
@@ -21,6 +15,11 @@ import {
 } from "react";
 
 import { HoldingsTable } from "@/components/HoldingsTable";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { inputClass } from "@/components/ui/Field";
+import { DownloadIcon, UploadIcon } from "@/components/ui/Icons";
 import { fetchSymbols, type HoldingValuation, type SymbolInfo } from "@/lib/api";
 import { usePortfolio } from "@/lib/portfolio-context";
 import { holdingsToCsv, parseHoldingsCsv } from "@/lib/portfolio-csv";
@@ -153,7 +152,7 @@ export function PortfolioBuilder() {
         return;
       }
       replacePortfolio({ holdings: parsed.holdings, cash });
-      setNotice(`Imported ${parsed.holdings.length} holdings from CSV.`);
+      setNotice(`Imported ${parsed.holdings.length} holdings from CSV`);
     } catch (err: unknown) {
       setImportError(err instanceof Error ? err.message : "CSV import failed");
     }
@@ -174,7 +173,7 @@ export function PortfolioBuilder() {
     try {
       const portfolio = portfolioFromJson(await file.text());
       replacePortfolio(portfolio);
-      setNotice(`Imported ${portfolio.holdings.length} holdings from JSON.`);
+      setNotice(`Imported ${portfolio.holdings.length} holdings from JSON`);
     } catch (err: unknown) {
       setImportError(err instanceof Error ? err.message : "JSON import failed");
     }
@@ -197,7 +196,7 @@ export function PortfolioBuilder() {
     saveNamedPortfolio(name);
     setSaveName("");
     setImportError(null);
-    setNotice(`Saved portfolio "${name}".`);
+    setNotice(`Saved portfolio "${name}"`);
   }
 
   async function handleLibraryFile(event: ChangeEvent<HTMLInputElement>) {
@@ -214,7 +213,7 @@ export function PortfolioBuilder() {
     }
     try {
       const count = importLibraryJson(await file.text());
-      setNotice(`Imported ${count} saved portfolios.`);
+      setNotice(`Imported ${count} saved portfolios`);
     } catch (err: unknown) {
       setImportError(err instanceof Error ? err.message : "Saved portfolio import failed");
     }
@@ -226,25 +225,24 @@ export function PortfolioBuilder() {
 
   function handleLoadNamed(id: string, name: string) {
     loadNamedPortfolio(id);
-    setNotice(`Loaded "${name}".`);
+    setNotice(`Loaded "${name}"`);
   }
 
   function handleDeleteNamed(id: string, name: string) {
     deleteNamedPortfolio(id);
-    setNotice(`Deleted "${name}".`);
+    setNotice(`Deleted "${name}"`);
   }
-
-  const buttonClass =
-    "rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-900";
 
   return (
     <section className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Portfolio</h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-300">
+      <div className="space-y-2">
+        <h1 className="text-[28px] leading-[1.15] font-medium tracking-[-0.015em] text-fg">
+          Portfolio
+        </h1>
+        <p className="max-w-3xl text-sm leading-6 text-fg-secondary">
           Enter the stocks you hold (and the ones you want to hold) once. Every other page
           uses this portfolio, so you never retype your holdings. A holding with zero shares
-          is a wishlist ticker. Average cost is stored only; profit/loss comes in V2.
+          is a wishlist ticker.
         </p>
       </div>
 
@@ -270,45 +268,42 @@ export function PortfolioBuilder() {
           onChange={(event) => void handleLibraryFile(event)}
           className="hidden"
         />
-        <button type="button" onClick={() => csvInputRef.current?.click()} className={buttonClass}>
+        <Button size="sm" onClick={() => csvInputRef.current?.click()}>
+          <UploadIcon size={14} />
           Import CSV
-        </button>
-        <button
-          type="button"
-          onClick={handleCsvExport}
-          disabled={holdings.length === 0}
-          className={buttonClass}
-        >
+        </Button>
+        <Button size="sm" onClick={handleCsvExport} disabled={holdings.length === 0}>
+          <DownloadIcon size={14} />
           Export CSV
-        </button>
-        <button type="button" onClick={() => jsonInputRef.current?.click()} className={buttonClass}>
+        </Button>
+        <Button size="sm" onClick={() => jsonInputRef.current?.click()}>
+          <UploadIcon size={14} />
           Import JSON
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          size="sm"
           onClick={handleJsonExport}
           disabled={holdings.length === 0 && cash === 0}
-          className={buttonClass}
         >
+          <DownloadIcon size={14} />
           Export JSON
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
           onClick={clear}
           disabled={holdings.length === 0 && cash === 0}
-          className={buttonClass}
         >
           Clear
-        </button>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
-          CSV columns: symbol, shares, avg_cost, buy_date (the last two are optional; buy_date is
-          YYYY-MM-DD).
+        </Button>
+        <span className="font-mono text-xs text-fg-muted">
+          CSV: symbol, shares, avg_cost, buy_date
         </span>
       </div>
 
-      <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
-        <h2 className="text-sm font-medium">Saved portfolios</h2>
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+      <Card>
+        <h2 className="text-sm font-medium text-fg">Saved portfolios</h2>
+        <p className="mt-1 text-xs text-fg-muted">
           Save the current holdings under a name to switch between strategies later. Saved
           portfolios live in this browser and travel with the saved-portfolio JSON export.
         </p>
@@ -316,126 +311,117 @@ export function PortfolioBuilder() {
           <input
             value={saveName}
             onChange={(event) => setSaveName(event.target.value)}
-            placeholder="Name this portfolio (e.g. Income)"
+            placeholder="Portfolio name"
             maxLength={80}
-            className="w-64 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
+            className={`${inputClass} w-full sm:w-64`}
           />
-          <button type="submit" disabled={saveName.trim() === ""} className={buttonClass}>
+          <Button type="submit" size="md" disabled={saveName.trim() === ""}>
             Save current
-          </button>
-          <button
-            type="button"
-            onClick={() => libraryInputRef.current?.click()}
-            className={buttonClass}
-          >
+          </Button>
+          <Button type="button" size="md" onClick={() => libraryInputRef.current?.click()}>
             Import saved JSON
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            size="md"
             onClick={handleLibraryExport}
             disabled={namedPortfolios.length === 0}
-            className={buttonClass}
           >
             Export saved JSON
-          </button>
+          </Button>
         </form>
         {namedPortfolios.length === 0 ? (
-          <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            No saved portfolios yet.
-          </p>
+          <p className="mt-3 text-xs text-fg-muted">No saved portfolios yet.</p>
         ) : (
-          <ul className="mt-3 divide-y divide-gray-100 text-sm dark:divide-gray-800">
+          <ul className="mt-4 divide-y divide-hairline text-sm">
             {namedPortfolios.map((entry) => (
               <li
                 key={entry.id}
-                className="flex flex-wrap items-center justify-between gap-2 py-2"
+                className="flex flex-wrap items-center justify-between gap-2 py-2.5"
               >
-                <div>
-                  <span className="font-medium">{entry.name}</span>
-                  {entry.id === activeNamedId ? (
-                    <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900 dark:text-blue-200">
-                      active
-                    </span>
-                  ) : null}
-                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-fg">{entry.name}</span>
+                  {entry.id === activeNamedId ? <Badge tone="accent">active</Badge> : null}
+                  <span className="font-mono text-xs tabular-nums text-fg-muted">
                     {entry.portfolio.holdings.length} holdings · cash{" "}
-                    {entry.portfolio.cash.toLocaleString()}
+                    {entry.portfolio.cash.toLocaleString("en-US")}
                   </span>
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleLoadNamed(entry.id, entry.name)}
-                    className={buttonClass}
-                  >
+                  <Button size="sm" onClick={() => handleLoadNamed(entry.id, entry.name)}>
                     Load
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
                     onClick={() => handleDeleteNamed(entry.id, entry.name)}
-                    className={buttonClass}
                   >
                     Delete
-                  </button>
+                  </Button>
                 </div>
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </Card>
 
-      <form onSubmit={handleSearchSubmit} className="space-y-2">
-        <label htmlFor="portfolio-search" className="block text-sm font-medium">
-          Add a ticker
-        </label>
-        <div className="relative">
-          <input
-            id="portfolio-search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Type a code or name (e.g. VNM)"
-            className="w-72 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-          />
-          {suggestions.length > 0 && (
-            <ul className="absolute z-10 mt-1 max-h-56 w-72 overflow-auto rounded-md border border-gray-200 bg-white text-sm shadow dark:border-gray-700 dark:bg-gray-900">
-              {suggestions.map((symbol) => (
-                <li key={symbol.code}>
-                  <button
-                    type="button"
-                    onClick={() => handleAddSymbol(symbol.code)}
-                    className="flex w-full items-center justify-between px-3 py-1 text-left hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    <span className="font-medium">{symbol.code}</span>
-                    <span className="ml-2 truncate text-xs text-gray-500 dark:text-gray-400">
-                      {symbol.exchange}
-                      {symbol.name ? ` \u00b7 ${symbol.name}` : ""}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:max-w-2xl">
+        <form onSubmit={handleSearchSubmit} className="space-y-1.5">
+          <label htmlFor="portfolio-search" className="block text-sm font-medium text-fg">
+            Add a ticker
+          </label>
+          <div className="relative">
+            <input
+              id="portfolio-search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search ticker or company"
+              className={`${inputClass} w-full`}
+            />
+            {suggestions.length > 0 && (
+              <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-strong bg-surface text-sm shadow-lg transition-opacity duration-150 ease-unslop">
+                {suggestions.map((symbol) => (
+                  <li key={symbol.code}>
+                    <button
+                      type="button"
+                      onClick={() => handleAddSymbol(symbol.code)}
+                      className="flex min-h-[40px] w-full items-center justify-between px-3 py-2 text-left transition-colors duration-150 ease-unslop hover:bg-raised"
+                    >
+                      <span className="font-mono font-medium text-fg">{symbol.code}</span>
+                      <span className="ml-2 truncate text-xs text-fg-muted">
+                        {symbol.exchange}
+                        {symbol.name ? ` \u00b7 ${symbol.name}` : ""}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {symbolsError && (
+            <p className="text-xs text-warn">
+              Ticker search is unavailable ({symbolsError}); type a code and press Enter to add it.
+            </p>
           )}
-        </div>
-        {symbolsError && (
-          <p className="text-xs text-amber-600 dark:text-amber-400">
-            Ticker search is unavailable ({symbolsError}); type a code and press Enter to add it.
-          </p>
-        )}
-      </form>
+        </form>
 
-      <label className="block text-sm">
-        <span className="block font-medium">Cash (VND)</span>
-        <input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          step={1000}
-          value={cash === 0 ? "" : String(cash)}
-          placeholder="0"
-          onChange={(event) => setCash(parseWhole(event.target.value))}
-          className="mt-1 w-48 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-        />
-      </label>
+        <div className="space-y-1.5">
+          <label htmlFor="portfolio-cash" className="block text-sm font-medium text-fg">
+            Cash (VND)
+          </label>
+          <input
+            id="portfolio-cash"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1000}
+            value={cash === 0 ? "" : String(cash)}
+            placeholder="0"
+            onChange={(event) => setCash(parseWhole(event.target.value))}
+            className={`${inputClass} w-full font-mono tabular-nums sm:w-52`}
+          />
+        </div>
+      </div>
 
       <HoldingsTable
         holdings={holdings}
@@ -446,28 +432,25 @@ export function PortfolioBuilder() {
         onRemove={removeHolding}
       />
 
+      {importError && <p className="text-sm text-negative">{importError}</p>}
+      {error && <p className="text-sm text-negative">Evaluation failed: {error}</p>}
+      {notice && <p className="text-sm text-positive">{notice}</p>}
 
-      {importError && <p className="text-sm text-red-600 dark:text-red-400">{importError}</p>}
-      {error && (
-        <p className="text-sm text-red-600 dark:text-red-400">Evaluation failed: {error}</p>
-      )}
-      {notice && <p className="text-sm text-green-600 dark:text-green-400">{notice}</p>}
-
-      <p className="text-xs text-gray-500 dark:text-gray-400">
+      <p className="text-xs text-fg-muted">
         Values update automatically and feed the{" "}
-        <Link href="/pnl" className="text-blue-600 hover:underline dark:text-blue-400">
+        <Link href="/pnl" className="text-accent-ink hover:underline">
           P&amp;L
         </Link>
         {", "}
-        <Link href="/optimize" className="text-blue-600 hover:underline dark:text-blue-400">
+        <Link href="/optimize" className="text-accent-ink hover:underline">
           Optimize
         </Link>
         {", "}
-        <Link href="/risk" className="text-blue-600 hover:underline dark:text-blue-400">
+        <Link href="/risk" className="text-accent-ink hover:underline">
           Risk
         </Link>{" "}
         and{" "}
-        <Link href="/rebalance" className="text-blue-600 hover:underline dark:text-blue-400">
+        <Link href="/rebalance" className="text-accent-ink hover:underline">
           Rebalance
         </Link>{" "}
         pages. Decision support only, not financial advice.
@@ -475,5 +458,3 @@ export function PortfolioBuilder() {
     </section>
   );
 }
-
-

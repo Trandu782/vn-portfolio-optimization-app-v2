@@ -1,15 +1,7 @@
 ﻿"use client";
 
-/**
- * Sector Analysis control header (docs/V2_SPEC.md section 3.2).
- *
- * Benchmark, sector timeframe, liquidity preset, weighting (full market cap with an
- * optional single-stock cap, or equal weight) and the include-default-excluded toggle.
- * Every change is written to the shared store by the parent; this component only reads
- * and calls the callbacks. Any index/exchange facet carried over from the Optimize tab
- * is labelled so the user knows the view is narrowed.
- */
-
+import { Card } from "@/components/ui/Card";
+import { inputClass, inputCompactClass, selectClass } from "@/components/ui/Field";
 import { SECTOR_TIMEFRAME_PRESETS, type SectorTimeframeSelection } from "@/lib/sector-timeframe";
 
 const BENCHMARKS = [
@@ -63,21 +55,21 @@ export function SectorControls({
   if (exchange) facets.push(`Exchange ${exchange}`);
 
   return (
-    <div className="space-y-3 rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+    <Card className="space-y-4">
       {facets.length > 0 && (
-        <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+        <p className="rounded-lg border border-warn-border bg-warn-subtle px-3 py-2 text-xs text-warn">
           Facet applied from the Optimize filter: {facets.join(" \u00b7 ")}. The Sector tab
           analyses all ICB sectors within that narrower universe.
         </p>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-sm">
-          <span className="block font-medium">Benchmark</span>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block space-y-1.5 text-sm">
+          <span className="block font-medium text-fg">Benchmark</span>
           <select
             value={benchmark}
             onChange={(event) => onBenchmark(event.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+            className={`${selectClass} w-full`}
           >
             {BENCHMARKS.map((item) => (
               <option key={item.code} value={item.code}>
@@ -85,18 +77,18 @@ export function SectorControls({
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+          <span className="block text-xs text-fg-muted">
             Banks and real estate are a large share of VN30/VN100, so beta against them is
             mechanically inflated.
           </span>
         </label>
 
-        <label className="block text-sm">
-          <span className="block font-medium">Liquidity preset</span>
+        <label className="block space-y-1.5 text-sm">
+          <span className="block font-medium text-fg">Liquidity preset</span>
           <select
             value={preset}
             onChange={(event) => onPreset(event.target.value)}
-            className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+            className={`${selectClass} w-full`}
           >
             {PRESETS.map((item) => (
               <option key={item.id} value={item.id}>
@@ -104,25 +96,28 @@ export function SectorControls({
               </option>
             ))}
           </select>
-          <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+          <span className="block text-xs text-fg-muted">
             Market cap is full (free-float is unavailable); ADTV and ADV are the real guards.
           </span>
         </label>
 
-        <div className="block text-sm">
-          <span className="block font-medium">Weighting</span>
+        <div className="space-y-1.5 text-sm">
+          <label htmlFor="sector-weighting" className="block font-medium text-fg">
+            Weighting
+          </label>
           <select
+            id="sector-weighting"
             value={weighting}
             onChange={(event) => onWeighting(event.target.value as "market_cap" | "equal")}
-            className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+            className={`${selectClass} w-full`}
           >
             <option value="market_cap">Full market cap</option>
             <option value="equal">Equal weight</option>
           </select>
         </div>
 
-        <label className="block text-sm">
-          <span className="block font-medium">Single-stock cap (%)</span>
+        <label className="block space-y-1.5 text-sm">
+          <span className="block font-medium text-fg">Single-stock cap (%)</span>
           <input
             type="number"
             min={0.1}
@@ -135,20 +130,20 @@ export function SectorControls({
               onCapPercent(raw === "" ? null : Number(raw));
             }}
             placeholder="No cap"
-            className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900"
+            className={`${inputClass} w-full font-mono tabular-nums`}
           />
-          <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+          <span className="block text-xs text-fg-muted">
             Default 15% on full market cap. Clear the box for no cap. Ignored for equal weight.
           </span>
         </label>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium">Timeframe</span>
+        <span className="text-sm font-medium text-fg">Timeframe</span>
         <div
           role="group"
           aria-label="Sector timeframe"
-          className="inline-flex flex-wrap overflow-hidden rounded-md border border-gray-300 dark:border-gray-700"
+          className="inline-flex flex-wrap overflow-hidden rounded-lg border border-strong bg-raised"
         >
           {SECTOR_TIMEFRAME_PRESETS.map((item) => {
             const active = timeframe.preset === item;
@@ -164,11 +159,11 @@ export function SectorControls({
                   )
                 }
                 aria-pressed={active}
-                className={
+                className={`min-h-[40px] md:min-h-0 px-3 py-1.5 text-xs font-medium transition-colors duration-150 ease-unslop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent ${
                   active
-                    ? "bg-blue-600 px-2.5 py-1 text-xs font-medium text-white"
-                    : "px-2.5 py-1 text-xs hover:bg-gray-100 dark:hover:bg-gray-800"
-                }
+                    ? "bg-accent text-white"
+                    : "text-fg-secondary hover:bg-surface hover:text-fg"
+                }`}
               >
                 {item}
               </button>
@@ -178,9 +173,9 @@ export function SectorControls({
       </div>
 
       {timeframe.preset === "Custom" && (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <label className="flex items-center gap-1">
-            <span className="text-gray-600 dark:text-gray-300">Start</span>
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <label className="flex items-center gap-2">
+            <span className="text-fg-secondary">Start</span>
             <input
               type="date"
               value={timeframe.start}
@@ -188,11 +183,11 @@ export function SectorControls({
               onChange={(event) =>
                 onTimeframe({ preset: "Custom", start: event.target.value, end: timeframe.end })
               }
-              className="rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+              className={`${inputCompactClass} font-mono tabular-nums`}
             />
           </label>
-          <label className="flex items-center gap-1">
-            <span className="text-gray-600 dark:text-gray-300">End</span>
+          <label className="flex items-center gap-2">
+            <span className="text-fg-secondary">End</span>
             <input
               type="date"
               value={timeframe.end}
@@ -200,20 +195,21 @@ export function SectorControls({
               onChange={(event) =>
                 onTimeframe({ preset: "Custom", start: timeframe.start, end: event.target.value })
               }
-              className="rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900"
+              className={`${inputCompactClass} font-mono tabular-nums`}
             />
           </label>
         </div>
       )}
 
-      <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+      <label className="flex min-h-[36px] cursor-pointer items-center gap-2 text-xs text-fg-secondary">
         <input
           type="checkbox"
           checked={includeDefaultExcluded}
           onChange={(event) => onIncludeDefaultExcluded(event.target.checked)}
+          className="h-4 w-4 accent-accent"
         />
-        Include tickers the adjustment checks drop by default
+        <span>Include tickers the adjustment checks drop by default</span>
       </label>
-    </div>
+    </Card>
   );
 }

@@ -1,18 +1,12 @@
 "use client";
 
-/**
- * Cross-Sector Correlation heatmap (docs/V2_SPEC.md section 3.2).
- *
- * N x N Pearson correlation on the clustered display order, a diverging -1..+1 scale
- * with an opaque neutral grey at 0 (so neutral cells read on a dark background), a hover
- * tooltip with the exact value and the window label, and the average pairwise correlation
- * as the diversification indicator.
- */
-
 import { useState } from "react";
 
+import { Card } from "@/components/ui/Card";
 import type { SectorCorrelation } from "@/lib/api";
 import { correlationColor, orderedHeatmap } from "@/lib/sector-analysis";
+
+const SCALE_SWATCHES = [-1, -0.5, 0, 0.5, 1];
 
 export function SectorCorrelationHeatmap({
   correlation,
@@ -31,30 +25,30 @@ export function SectorCorrelationHeatmap({
       : `${labels[hover.row]} vs ${labels[hover.col]}: ${(matrix[hover.row]?.[hover.col] ?? 0).toFixed(2)} (${windowLabel})`;
 
   return (
-    <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <Card className="space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold">Cross-sector correlation</h2>
-          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-            Pairwise Pearson correlation of the sector indices over {windowLabel}, in a
-            clustered order so similar sectors sit together. Red is positive, blue negative,
-            and grey is no relationship.
+          <h2 className="text-base font-medium text-fg">Cross-sector correlation</h2>
+          <p className="mt-1 text-xs text-fg-muted">
+            Pairwise Pearson correlation of the sector indices over{" "}
+            <span className="font-mono tabular-nums">{windowLabel}</span>, in a clustered order so
+            similar sectors sit together.
           </p>
         </div>
         <div className="text-right text-xs">
-          <div className="text-gray-500 dark:text-gray-400">Average correlation</div>
-          <div className="text-lg font-semibold tabular-nums">
+          <div className="text-fg-muted">Average correlation</div>
+          <div className="mt-0.5 font-mono text-lg font-medium tabular-nums text-fg">
             {averageCorrelation === null ? "n/a" : averageCorrelation.toFixed(2)}
           </div>
-          <div className="text-gray-500 dark:text-gray-400">
-            Lower means the sectors move more independently (more diversification).
+          <div className="text-fg-muted">
+            Lower means the sectors move more independently.
           </div>
         </div>
       </div>
 
-      <div className="mt-3 overflow-x-auto">
+      <div className="overflow-x-auto">
         <table
-          className="border-collapse text-[10px]"
+          className="mx-auto border-separate border-spacing-[2px] text-xs"
           aria-label="Pairwise correlation of the sector indices"
           onMouseLeave={() => setHover(null)}
         >
@@ -65,7 +59,11 @@ export function SectorCorrelationHeatmap({
             <tr>
               <th scope="col" className="p-1" />
               {labels.map((label) => (
-                <th key={label} scope="col" className="p-1 font-medium">
+                <th
+                  key={label}
+                  scope="col"
+                  className="p-1.5 text-xs font-medium text-fg-secondary"
+                >
                   {label}
                 </th>
               ))}
@@ -74,7 +72,10 @@ export function SectorCorrelationHeatmap({
           <tbody>
             {matrix.map((row, rowIndex) => (
               <tr key={labels[rowIndex] ?? rowIndex}>
-                <th scope="row" className="p-1 text-right font-medium">
+                <th
+                  scope="row"
+                  className="p-1.5 text-right text-xs font-medium text-fg-secondary whitespace-nowrap"
+                >
                   {labels[rowIndex]}
                 </th>
                 {row.map((value, columnIndex) => {
@@ -89,9 +90,9 @@ export function SectorCorrelationHeatmap({
                       tabIndex={0}
                       title={`${labels[rowIndex]} vs ${labels[columnIndex]}: ${value.toFixed(2)} (${windowLabel})`}
                       aria-label={`${labels[rowIndex]} vs ${labels[columnIndex]}: ${value.toFixed(2)}`}
-                      className={`h-7 w-10 p-1 text-center ${
-                        inHover ? "ring-2 ring-blue-500" : ""
-                      } ${dimmed ? "opacity-60" : ""}`}
+                      className={`h-8 w-12 rounded-sm p-1 text-center font-mono text-xs tabular-nums transition-opacity duration-150 ease-unslop ${
+                        inHover ? "ring-2 ring-accent" : ""
+                      } ${dimmed ? "opacity-55" : ""}`}
                       style={{
                         backgroundColor: correlationColor(value),
                         color: Math.abs(value) > 0.55 ? "#ffffff" : undefined,
@@ -107,25 +108,26 @@ export function SectorCorrelationHeatmap({
         </table>
       </div>
 
-      <p className="mt-2 min-h-[1rem] text-xs text-gray-600 dark:text-gray-300" aria-live="polite">
+      <p className="min-h-[1rem] font-mono text-xs tabular-nums text-fg-secondary" aria-live="polite">
         {hovered ?? "Hover a cell to read the pair."}
       </p>
 
-      <div className="mt-2 flex items-center gap-2 text-[10px] text-gray-500 dark:text-gray-400">
-        <span aria-hidden>-1</span>
-        <span
-          className="h-2 flex-1 rounded-full"
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, rgb(37,99,235), rgb(107,114,128), rgb(220,38,38))",
-            border: "1px solid rgba(107,114,128,0.3)",
-          }}
-          aria-hidden
-        />
-        <span aria-hidden>+1</span>
-        <span className="sr-only">Colour scale from minus one (blue) to neutral grey to plus one (red).</span>
+      <div className="flex items-center gap-1.5 font-mono text-xs text-fg-muted">
+        <span aria-hidden="true">-1</span>
+        <div className="flex flex-1 gap-1" aria-hidden="true">
+          {SCALE_SWATCHES.map((val) => (
+            <span
+              key={val}
+              className="h-2 flex-1 rounded-sm border border-hairline"
+              style={{ backgroundColor: correlationColor(val) }}
+            />
+          ))}
+        </div>
+        <span aria-hidden="true">+1</span>
+        <span className="sr-only">
+          Colour scale from minus one (blue) to neutral grey to plus one (red).
+        </span>
       </div>
-    </div>
+    </Card>
   );
 }
-

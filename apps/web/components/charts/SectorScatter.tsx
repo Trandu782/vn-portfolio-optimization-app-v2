@@ -1,13 +1,5 @@
 "use client";
 
-/**
- * Optional risk/return-versus-beta scatter (docs/V2_SPEC.md section 3.2).
- *
- * One point per published sector: beta on the x-axis, period return on the y-axis. Each
- * point is coloured like the sector's line in the movement chart and labelled with the
- * sector name, so the two charts read together; hovering keeps the exact numbers.
- */
-
 import {
   CartesianGrid,
   LabelList,
@@ -19,9 +11,11 @@ import {
   YAxis,
 } from "recharts";
 
+import { Card } from "@/components/ui/Card";
 import {
   AXIS_TEXT,
   AXIS_TICK,
+  CHART_COLORS,
   GRID_STROKE,
   formatAxisPercent,
   formatSignedPercent,
@@ -29,8 +23,6 @@ import {
 import type { SectorRow } from "@/lib/sector-analysis";
 
 import { TooltipBox } from "./TooltipBox";
-
-const DEFAULT_POINT_COLOR = "#2563eb";
 
 function ScatterTooltip({
   active,
@@ -43,9 +35,13 @@ function ScatterTooltip({
   if (!active || point === undefined) return null;
   return (
     <TooltipBox>
-      <p className="font-medium">{point.name}</p>
-      <p className="tabular-nums">Beta {point.beta?.toFixed(2)}</p>
-      <p className="tabular-nums">Return {formatSignedPercent((point.periodReturn ?? 0) / 100)}</p>
+      <p className="font-medium text-fg">{point.name}</p>
+      <p className="mt-1 font-mono tabular-nums text-fg-secondary">
+        Beta {point.beta?.toFixed(2)}
+      </p>
+      <p className="font-mono tabular-nums text-fg-secondary">
+        Return {formatSignedPercent((point.periodReturn ?? 0) / 100)}
+      </p>
     </TooltipBox>
   );
 }
@@ -63,7 +59,7 @@ export function SectorScatter({
       name: row.name,
       beta: row.beta as number,
       periodReturn: row.periodReturn as number,
-      fill: colorBySector.get(row.name) ?? DEFAULT_POINT_COLOR,
+      fill: colorBySector.get(row.name) ?? CHART_COLORS.frontier,
     }));
 
   if (points.length === 0) {
@@ -71,16 +67,18 @@ export function SectorScatter({
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
-      <h2 className="text-lg font-semibold">Return versus beta</h2>
-      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-        Each point is a sector, coloured like its line above: the further right, the more it
-        moves with the benchmark; the higher, the more it returned over the window. Hover a
-        point for the exact numbers.
-      </p>
-      <div className="mt-2" role="img" aria-label="Sector period return against beta.">
+    <Card className="space-y-3">
+      <div>
+        <h2 className="text-base font-medium text-fg">Return versus beta</h2>
+        <p className="mt-1 text-xs text-fg-muted">
+          Each point is a sector, coloured like its line above: the further right, the more it
+          moves with the benchmark; the higher, the more it returned over the window. Hover a
+          point for the exact numbers.
+        </p>
+      </div>
+      <div role="img" aria-label="Sector period return against beta.">
         <ResponsiveContainer width="100%" height={300}>
-          <ScatterChart margin={{ top: 8, right: 16, bottom: 8, left: 4 }}>
+          <ScatterChart margin={{ top: 12, right: 20, bottom: 12, left: 4 }}>
             <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" />
             <XAxis
               type="number"
@@ -88,7 +86,13 @@ export function SectorScatter({
               name="Beta"
               tick={AXIS_TICK}
               tickFormatter={(value: number) => value.toFixed(1)}
-              label={{ value: "Beta vs benchmark", position: "insideBottom", offset: -4, fill: AXIS_TEXT, fontSize: 11 }}
+              label={{
+                value: "Beta vs benchmark",
+                position: "insideBottom",
+                offset: -6,
+                fill: AXIS_TEXT,
+                fontSize: 11,
+              }}
             />
             <YAxis
               type="number"
@@ -97,17 +101,30 @@ export function SectorScatter({
               tick={AXIS_TICK}
               width={56}
               tickFormatter={(value: number) => formatAxisPercent(value / 100)}
-              label={{ value: "Period return", angle: -90, position: "insideLeft", fill: AXIS_TEXT, fontSize: 11 }}
+              label={{
+                value: "Period return",
+                angle: -90,
+                position: "insideLeft",
+                fill: AXIS_TEXT,
+                fontSize: 11,
+              }}
             />
-            <Tooltip content={<ScatterTooltip />} cursor={{ stroke: GRID_STROKE, strokeDasharray: "3 3" }} />
+            <Tooltip
+              content={<ScatterTooltip />}
+              cursor={{ stroke: GRID_STROKE, strokeDasharray: "3 3" }}
+            />
             {points.map((point) => (
               <Scatter key={point.name} data={[point]} fill={point.fill} isAnimationActive={false}>
-                <LabelList dataKey="name" position="top" style={{ fontSize: 10, fill: AXIS_TEXT }} />
+                <LabelList
+                  dataKey="name"
+                  position="top"
+                  style={{ fontSize: 11, fill: AXIS_TEXT }}
+                />
               </Scatter>
             ))}
           </ScatterChart>
         </ResponsiveContainer>
       </div>
-    </div>
+    </Card>
   );
 }

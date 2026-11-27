@@ -1,17 +1,14 @@
 "use client";
 
-/**
- * Detail table for one ticker's ratios versus its sector (docs/V2_SPEC.md 3.3).
- *
- * Columns: ratio, ticker value, sector median, winsorized mean, percentile rank and
- * N. The ticker value is coloured direction-aware (higher- or lower-is-better,
- * valuation neutral) and shows "n/m" where a non-positive valuation multiple is not
- * meaningful. Every numeric column header carries the reporting period, and a row
- * with fewer than five peers is flagged "insufficient peers (N < 5)".
- */
-
+import {
+  tableBodyCellClass,
+  tableHeaderCellClass,
+  tableHeaderRowClass,
+  tableRowHoverClass,
+} from "@/components/ui/Field";
 import type { FundamentalsComparison } from "@/lib/api";
 import {
+  classifyRatio,
   formatPercentileRank,
   formatRatioValue,
   INSUFFICIENT_PEERS_LABEL,
@@ -20,7 +17,6 @@ import {
   reportingPeriodLabel,
   TONE_CHIP_CLASS,
   TONE_TEXT_CLASS,
-  classifyRatio,
   verdictTone,
 } from "@/lib/fundamentals";
 
@@ -47,53 +43,51 @@ export function FundamentalsTable({
   }
 
   const periodSub = (
-    <span className="block text-[10px] font-normal text-gray-500 dark:text-gray-400">
-      {periodShort}
-    </span>
+    <span className="block font-mono text-xs font-normal text-fg-muted">{periodShort}</span>
   );
 
   return (
-    <section className="space-y-2">
-      <h2 className="flex items-center text-lg font-semibold">
-        Detail
+    <section className="space-y-3">
+      <h2 className="flex items-center text-base font-medium text-fg">
+        <span>Detail</span>
         <InfoTip text="Compare each ratio with the sector median and the winsorized mean (the mean with the 5th/95th percentiles pulled in so one outlier cannot distort it). The percentile rank says how many peers this ticker beats." />
       </h2>
-      <p className="text-xs text-gray-500 dark:text-gray-400">
+      <p className="text-xs text-fg-muted">
         All values are for {periodLabel}. The median is the primary comparison; the
         winsorized mean is shown for reference.
       </p>
       {anyThin && (
-        <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+        <p className="rounded-lg border border-warn-border bg-warn-subtle px-3 py-2 text-xs text-warn">
           Some ratios have {INSUFFICIENT_PEERS_LABEL}: the ticker&apos;s own value and the
           sector figures are shown, but treat the rank with caution.
         </p>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
-        <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-          <thead className="bg-gray-50 text-left dark:bg-gray-900">
-            <tr>
-              <th className="px-3 py-2 font-medium">Ratio</th>
-              <th className="px-3 py-2 font-medium">
+      <div className="overflow-x-auto rounded-xl border border-hairline bg-surface">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className={tableHeaderRowClass}>
+              <th className={tableHeaderCellClass}>Ratio</th>
+              <th className={`${tableHeaderCellClass} text-right`}>
                 Ticker value
                 {periodSub}
               </th>
-              <th className="px-3 py-2 font-medium">
+              <th className={`${tableHeaderCellClass} text-right`}>
                 Sector median
                 {periodSub}
               </th>
-              <th className="px-3 py-2 font-medium">
+              <th className={`${tableHeaderCellClass} text-right`}>
                 Winsorized mean
                 {periodSub}
               </th>
-              <th className="px-3 py-2 font-medium">
+              <th className={`${tableHeaderCellClass} text-right`}>
                 Percentile rank
                 {periodSub}
               </th>
-              <th className="px-3 py-2 font-medium">N</th>
+              <th className={`${tableHeaderCellClass} text-right`}>N</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          <tbody>
             {ratios.map((ratio) => {
               const peers = ratio.peers;
               const n = peers?.n ?? 0;
@@ -101,29 +95,37 @@ export function FundamentalsTable({
               const verdict = classifyRatio(ratio);
               const tone = verdictTone(verdict);
               return (
-                <tr key={ratio.ratio}>
-                  <td className="px-3 py-2">
-                    <span className="font-medium">{ratio.label}</span>
+                <tr key={ratio.ratio} className={tableRowHoverClass}>
+                  <td className={tableBodyCellClass}>
+                    <span className="font-medium text-fg">{ratio.label}</span>
                     <InfoTip text={directionHint(ratio.direction)} />
                   </td>
-                  <td className={`px-3 py-2 font-medium tabular-nums ${TONE_TEXT_CLASS[tone]}`}>
+                  <td
+                    className={`${tableBodyCellClass} text-right font-mono font-medium tabular-nums ${TONE_TEXT_CLASS[tone]}`}
+                  >
                     {ratioDisplayValue(ratio)}
                   </td>
-                  <td className="px-3 py-2 tabular-nums text-gray-700 dark:text-gray-300">
+                  <td
+                    className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg-secondary`}
+                  >
                     {formatRatioValue(peers?.median, ratio.is_percentage)}
                   </td>
-                  <td className="px-3 py-2 tabular-nums text-gray-700 dark:text-gray-300">
+                  <td
+                    className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg-secondary`}
+                  >
                     {formatRatioValue(peers?.winsorized_mean, ratio.is_percentage)}
                   </td>
-                  <td className="px-3 py-2 tabular-nums text-gray-700 dark:text-gray-300">
+                  <td
+                    className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg-secondary`}
+                  >
                     {formatPercentileRank(peers?.percentile_rank)}
                   </td>
-                  <td className="px-3 py-2">
-                    <span className="tabular-nums">{n}</span>
+                  <td className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg`}>
+                    <span>{n}</span>
                     {thin && (
                       <span
                         title={INSUFFICIENT_PEERS_LABEL}
-                        className={`ml-2 rounded-full px-2 py-0.5 text-[11px] ${TONE_CHIP_CLASS.warn}`}
+                        className={`ml-2 rounded-md px-2 py-0.5 text-xs ${TONE_CHIP_CLASS.warn}`}
                       >
                         N &lt; 5
                       </span>

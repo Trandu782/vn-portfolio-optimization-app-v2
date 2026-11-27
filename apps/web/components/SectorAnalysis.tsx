@@ -1,19 +1,10 @@
 "use client";
 
-/**
- * Sector Analysis | Market sub-tab (docs/V2_SPEC.md section 3.2).
- *
- * Reads the shared controls (benchmark, liquidity preset, weighting/cap and the flag
- * toggles) plus the Sector timeframe from the one app store, fetches the precomputed
- * payload once per change and renders the movement chart, the beta table, the optional
- * scatter, the correlation heatmap and the excluded-tickers panel. It never filters by
- * `v2Filter.sectors`: the tab always analyses every sector, so "Send sectors to
- * Optimizer" does not shrink it.
- */
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import {
   fetchSectorAnalytics,
   type SectorAnalytics,
@@ -62,8 +53,14 @@ export function SectorAnalysis() {
   const [showScatter, setShowScatter] = useState(false);
 
   const {
-    benchmark, preset, indexes, exchange, weighting, capPercent,
-    excludeAdjustmentFlagged, includeDefaultExcluded,
+    benchmark,
+    preset,
+    indexes,
+    exchange,
+    weighting,
+    capPercent,
+    excludeAdjustmentFlagged,
+    includeDefaultExcluded,
   } = v2Filter;
   const sectorTimeframe = timeframes.sector;
 
@@ -83,8 +80,15 @@ export function SectorAnalysis() {
       exclude_adjustment_flagged: excludeAdjustmentFlagged,
     };
   }, [
-    benchmark, preset, indexes, exchange, weighting, capPercent,
-    excludeAdjustmentFlagged, includeDefaultExcluded, sectorTimeframe,
+    benchmark,
+    preset,
+    indexes,
+    exchange,
+    weighting,
+    capPercent,
+    excludeAdjustmentFlagged,
+    includeDefaultExcluded,
+    sectorTimeframe,
   ]);
 
   useEffect(() => {
@@ -176,9 +180,8 @@ export function SectorAnalysis() {
 
   const windowLabel = data ? `${data.window.start} to ${data.window.end}` : "";
 
-
   return (
-    <section className="space-y-4">
+    <section className="space-y-6">
       <SectorControls
         benchmark={benchmark}
         preset={preset}
@@ -192,27 +195,29 @@ export function SectorAnalysis() {
         onPreset={(id) => setV2Filter({ ...v2Filter, preset: id })}
         onWeighting={(next) => setV2Filter({ ...v2Filter, weighting: next })}
         onCapPercent={(percent) => setV2Filter({ ...v2Filter, capPercent: percent })}
-        onIncludeDefaultExcluded={(value) => setV2Filter({ ...v2Filter, includeDefaultExcluded: value })}
+        onIncludeDefaultExcluded={(value) =>
+          setV2Filter({ ...v2Filter, includeDefaultExcluded: value })
+        }
         onTimeframe={(selection: SectorTimeframeSelection) => setSectorTimeframe(selection)}
       />
 
       {viewState === "loading" && (
-        <p className="rounded-lg border border-gray-200 p-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-          Loading sector analysis&hellip;
-        </p>
+        <Card className="text-sm text-fg-muted">Loading sector analysis&hellip;</Card>
       )}
       {viewState === "unavailable" && (
-        <p className="rounded-lg bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+        <p className="rounded-lg border border-warn-border bg-warn-subtle p-4 text-sm text-warn">
           V2 data not available: run the precompute job to populate the sector tables.
         </p>
       )}
       {viewState === "error" && (
-        <p className="rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950 dark:text-red-300">{error}</p>
+        <p className="rounded-lg border border-negative/25 bg-negative-subtle p-4 text-sm text-negative">
+          {error}
+        </p>
       )}
       {viewState === "empty" && (
-        <p className="rounded-lg border border-gray-200 p-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+        <Card className="text-sm text-fg-muted">
           No sectors pass the current filters. Try a looser liquidity preset or clear the index facet.
-        </p>
+        </Card>
       )}
 
       {viewState === "ready" && data && (
@@ -234,21 +239,19 @@ export function SectorAnalysis() {
           />
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={sendToOptimizer}
               disabled={selected.size === 0}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400"
             >
               Send {selected.size} sector(s) to Optimizer
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="secondary"
               onClick={() => setShowScatter((value) => !value)}
-              className="rounded-md border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-900"
             >
               {showScatter ? "Hide" : "Show"} return vs beta
-            </button>
+            </Button>
           </div>
 
           {showScatter && <SectorScatter rows={rows} colorBySector={colorBySector} />}
@@ -270,44 +273,46 @@ export function SectorAnalysis() {
             flagsPolicyCurrent={data.flags_policy_current}
           />
 
-          <dl className="grid gap-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-600 sm:grid-cols-2 dark:bg-gray-900 dark:text-gray-300">
+          <dl className="grid gap-3 rounded-xl border border-hairline bg-raised/50 p-4 text-xs text-fg-secondary sm:grid-cols-2">
             <div>
-              <dt className="font-medium">Data as of</dt>
-              <dd>{data.data_as_of}</dd>
+              <dt className="font-medium text-fg">Data as of</dt>
+              <dd className="mt-0.5 font-mono tabular-nums">{data.data_as_of}</dd>
             </div>
             <div>
-              <dt className="font-medium">Weighting basis</dt>
-              <dd>{weightingLabel(data.weighting, capPercent)}</dd>
+              <dt className="font-medium text-fg">Weighting basis</dt>
+              <dd className="mt-0.5">{weightingLabel(data.weighting, capPercent)}</dd>
             </div>
             <div>
-              <dt className="font-medium">Price basis</dt>
-              <dd>{data.price_adjustment_basis ?? "unknown"}</dd>
+              <dt className="font-medium text-fg">Price basis</dt>
+              <dd className="mt-0.5 font-mono">{data.price_adjustment_basis ?? "unknown"}</dd>
             </div>
             <div>
-              <dt className="font-medium">Volume basis</dt>
-              <dd>{data.volume_basis ?? "unknown"}</dd>
+              <dt className="font-medium text-fg">Volume basis</dt>
+              <dd className="mt-0.5 font-mono">{data.volume_basis ?? "unknown"}</dd>
             </div>
             <div className="sm:col-span-2">
-              <dt className="font-medium">Current-constituents index</dt>
-              <dd>
+              <dt className="font-medium text-fg">Current-constituents index</dt>
+              <dd className="mt-0.5 leading-relaxed">
                 Constituents are fixed at the end date and the current ICB level-2 sector map
                 is applied to history. A sector needs at least 3 constituents to publish.
               </dd>
             </div>
           </dl>
 
-          <div className="rounded-lg border border-gray-200 p-3 text-xs text-gray-600 dark:border-gray-800 dark:text-gray-300">
-            <p className="font-medium">Limitations</p>
-            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+          <Card compact className="text-xs text-fg-muted">
+            <p className="font-medium text-fg-secondary">Limitations</p>
+            <ul className="mt-1.5 list-disc space-y-1 pl-5">
               <li>Returns across a trading halt are dropped that day, not compounded over the gap.</li>
               <li>Rights-issue (ISS) adjustments are not verified; treat them with caution.</li>
-              <li>Market cap is full, not free-float, so a low-float large cap can look cheaper to trade than it is.</li>
+              <li>
+                Market cap is full, not free-float, so a low-float large cap can look cheaper to
+                trade than it is.
+              </li>
               <li>Sectors are today&apos;s ICB level-2 classification applied to history.</li>
             </ul>
-          </div>
+          </Card>
         </>
       )}
     </section>
   );
 }
-

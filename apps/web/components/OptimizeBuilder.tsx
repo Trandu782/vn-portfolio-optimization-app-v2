@@ -10,6 +10,18 @@ import {
   type ReactNode,
 } from "react";
 
+import { InfoTip } from "@/components/InfoTip";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import {
+  inputClass,
+  selectClass,
+  tableBodyCellClass,
+  tableHeaderCellClass,
+  tableHeaderRowClass,
+  tableRowHoverClass,
+} from "@/components/ui/Field";
+import { ChevronDownIcon, ChevronUpIcon, XIcon } from "@/components/ui/Icons";
 import {
   buildUniverse,
   fetchDataFreshness,
@@ -50,6 +62,7 @@ import { OptimizeCapital, resolveCapital, type CapitalMode } from "./OptimizeCap
 import { TickerDetailDrawer } from "./TickerDetailDrawer";
 import { TimeframePicker } from "./TimeframePicker";
 import { UniverseFilterPanel, type V2UniverseView } from "./UniverseFilterPanel";
+
 const GOALS = [
   { id: "min_variance", label: "Lowest risk", detail: "Minimum variance - the steadiest mix." },
   { id: "max_sharpe", label: "Best return for the risk", detail: "Maximum Sharpe ratio." },
@@ -89,7 +102,6 @@ function defaultParams(filter: UniverseFilterOption): Record<string, unknown> {
   return params;
 }
 
-/** The fixed sensible filters: everything except the single-exchange filter. */
 function fixedFilters(options: UniverseOptions | null): UniverseFilterSelection[] {
   if (!options) return [];
   return options.filters
@@ -171,14 +183,16 @@ export function OptimizeBuilder() {
   const outdated =
     ranWindow !== null &&
     (ranWindow.start !== resolved.start || ranWindow.end !== resolved.end);
-  // Seed an empty stock list with the portfolio's tickers once.
-  useEffect(function () {
-    if (portfolioSeeded.current || portfolioSymbols.length === 0) return;
-    portfolioSeeded.current = true;
-    setSelected((current) => (current.length ? current : [...portfolioSymbols]));
-  }, [portfolioSymbols]);
 
-  // Load the option catalogues, the symbol list for search and the latest data date.
+  useEffect(
+    function () {
+      if (portfolioSeeded.current || portfolioSymbols.length === 0) return;
+      portfolioSeeded.current = true;
+      setSelected((current) => (current.length ? current : [...portfolioSymbols]));
+    },
+    [portfolioSymbols],
+  );
+
   useEffect(function () {
     let active = true;
     Promise.all([
@@ -198,30 +212,32 @@ export function OptimizeBuilder() {
         if (optimizePayload.frontier_defaults.max_stocks) {
           setMaxStocks(optimizePayload.frontier_defaults.max_stocks);
         }
-        // The cloud cap is published by the API so the input never hardcodes it.
         if (optimizePayload.frontier_defaults.max_portfolios) {
           setMaxPortfolios(optimizePayload.frontier_defaults.max_portfolios);
         }
       })
       .catch(function () {
-        // The search and fixed filters degrade gracefully if the API is down.
+        // Degrade gracefully if API is down.
       });
     return function () {
       active = false;
     };
   }, []);
 
-  const suggestions = useMemo(function () {
-    const query = search.trim().toUpperCase();
-    if (!query) return [];
-    return universeSymbols
-      .filter(
-        (symbol) =>
-          symbol.code.includes(query) || (symbol.name ?? "").toUpperCase().includes(query),
-      )
-      .filter((symbol) => !selected.includes(symbol.code))
-      .slice(0, 8);
-  }, [search, universeSymbols, selected]);
+  const suggestions = useMemo(
+    function () {
+      const query = search.trim().toUpperCase();
+      if (!query) return [];
+      return universeSymbols
+        .filter(
+          (symbol) =>
+            symbol.code.includes(query) || (symbol.name ?? "").toUpperCase().includes(query),
+        )
+        .filter((symbol) => !selected.includes(symbol.code))
+        .slice(0, 8);
+    },
+    [search, universeSymbols, selected],
+  );
 
   function addSymbol(raw: string) {
     const code = raw.trim().toUpperCase();
@@ -256,7 +272,7 @@ export function OptimizeBuilder() {
     try {
       const response = await fetchPresetSymbols("VN30");
       setSelected(response.symbols);
-      setNotice(`Loaded ${response.count} VN30 stocks.`);
+      setNotice(`Loaded ${response.count} VN30 stocks`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to load VN30.");
     } finally {
@@ -268,150 +284,176 @@ export function OptimizeBuilder() {
   const keptCount = universeResult?.symbols.length ?? 0;
   const sizeWarnings = keptCount ? universeSizeWarnings(keptCount) : [];
 
-  const handleFind = useCallback(async function () {
-    setError(null);
-    setNotice(null);
-    if (selected.length === 0) {
-      setError("Add at least one stock to consider.");
-      return;
-    }
-    if (exceedsHardMax(selected.length, maxStocks)) {
-      setError(
-        `At most ${maxStocks} stocks are supported. You picked ${selected.length}; remove some.`,
-      );
-      return;
-    }
-    if (capital <= 0) {
-      setError("Add money to invest, or add holdings with value on the Portfolio page.");
-      return;
-    }
-    if (windowError) {
-      setError(windowError);
-      return;
-    }
-    setRunning(true);
-    clearResult();
-    setFrontier(null);
-    try {
-      const filters = fixedFilters(universeOptions);
-      const universe = await buildUniverse({
-        symbols: selected,
-        filters,
-        start: resolved.start,
-        end: resolved.end,
-      });
-      setUniverseResult(universe);
-      setSelection({
-        symbols: universe.symbols,
-        selected,
-        start: resolved.start,
-        end: resolved.end,
-        filters,
-        result: universe,
-      });
-      if (universe.symbols.length === 0) {
-        setError("No stocks passed the filters. Add more stocks or see the dropped list below.");
+  const handleFind = useCallback(
+    async function () {
+      setError(null);
+      setNotice(null);
+      if (selected.length === 0) {
+        setError("Add at least one stock to consider.");
         return;
       }
-      if (exceedsHardMax(universe.symbols.length, maxStocks)) {
+      if (exceedsHardMax(selected.length, maxStocks)) {
         setError(
-          `Filters kept ${universe.symbols.length} stocks, above the ${maxStocks} cap. Remove some stocks.`,
+          `At most ${maxStocks} stocks are supported. You picked ${selected.length}; remove some.`,
         );
         return;
       }
-      const requestedCap =
-        showAdvanced && maxWeightPercent !== ""
-          ? Number(maxWeightPercent) / 100
-          : defaultMaxWeight(universe.symbols.length);
-      const cap = feasibleMaxWeight(universe.symbols.length, requestedCap);
-      if (cap.raised) {
-        setNotice(
-          `Raised the max weight to ${(cap.value * 100).toFixed(0)}% so the portfolio can be fully invested.`,
-        );
+      if (capital <= 0) {
+        setError("Add money to invest, or add holdings with value on the Portfolio page.");
+        return;
       }
-      const parsedSeed = seed.trim() === "" ? null : Number(seed);
-      const requestedSectorCap =
-        showAdvanced && maxSectorPct.trim() !== "" ? Number(maxSectorPct) / 100 : null;
-      const sectorMap =
-        Object.keys(v2View.sectorByTicker).length > 0 ? v2View.sectorByTicker : null;
-      const payload = await runFrontier({
-        symbols: universe.symbols,
-        start: resolved.start,
-        end: resolved.end,
-        capital,
-        max_weight: cap.value,
-        max_sector_weight: requestedSectorCap,
-        sectors: sectorMap,
-        num_portfolios: numPortfolios,
-        seed: parsedSeed !== null && !Number.isNaN(parsedSeed) ? parsedSeed : null,
-        current_weights: evaluation?.weights ?? {},
-      });
-      setFrontier(payload);
-      setRanWindow({ start: resolved.start, end: resolved.end });
-      const bestIndex = payload.frontier.reduce(
-        (best, point, index) => (point.sharpe > payload.frontier[best].sharpe ? index : best),
-        0,
-      );
-      setFrontierIndex(goalId === "max_sharpe" ? bestIndex : 0);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong while finding your portfolio.");
-    } finally {
-      setRunning(false);
-    }
-  }, [
-    selected,
-    capital,
-    universeOptions,
-    resolved.start,
-    resolved.end,
-    windowError,
-    setSelection,
-    clearResult,
-    showAdvanced,
-    maxWeightPercent,
-    goalId,
-    evaluation,
-    numPortfolios,
-    seed,
-    maxStocks,
-    maxSectorPct,
-    v2View.sectorByTicker,
-  ]);
+      if (windowError) {
+        setError(windowError);
+        return;
+      }
+      setRunning(true);
+      clearResult();
+      setFrontier(null);
+      try {
+        const filters = fixedFilters(universeOptions);
+        const universe = await buildUniverse({
+          symbols: selected,
+          filters,
+          start: resolved.start,
+          end: resolved.end,
+        });
+        setUniverseResult(universe);
+        setSelection({
+          symbols: universe.symbols,
+          selected,
+          start: resolved.start,
+          end: resolved.end,
+          filters,
+          result: universe,
+        });
+        if (universe.symbols.length === 0) {
+          setError("No stocks passed the filters. Add more stocks or see the dropped list below.");
+          return;
+        }
+        if (exceedsHardMax(universe.symbols.length, maxStocks)) {
+          setError(
+            `Filters kept ${universe.symbols.length} stocks, above the ${maxStocks} cap. Remove some stocks.`,
+          );
+          return;
+        }
+        const requestedCap =
+          showAdvanced && maxWeightPercent !== ""
+            ? Number(maxWeightPercent) / 100
+            : defaultMaxWeight(universe.symbols.length);
+        const cap = feasibleMaxWeight(universe.symbols.length, requestedCap);
+        if (cap.raised) {
+          setNotice(
+            `Raised the max weight to ${(cap.value * 100).toFixed(0)}% so the portfolio can be fully invested`,
+          );
+        }
+        const parsedSeed = seed.trim() === "" ? null : Number(seed);
+        const requestedSectorCap =
+          showAdvanced && maxSectorPct.trim() !== "" ? Number(maxSectorPct) / 100 : null;
+        const sectorMap =
+          Object.keys(v2View.sectorByTicker).length > 0 ? v2View.sectorByTicker : null;
+        const payload = await runFrontier({
+          symbols: universe.symbols,
+          start: resolved.start,
+          end: resolved.end,
+          capital,
+          max_weight: cap.value,
+          max_sector_weight: requestedSectorCap,
+          sectors: sectorMap,
+          num_portfolios: numPortfolios,
+          seed: parsedSeed !== null && !Number.isNaN(parsedSeed) ? parsedSeed : null,
+          current_weights: evaluation?.weights ?? {},
+        });
+        setFrontier(payload);
+        setRanWindow({ start: resolved.start, end: resolved.end });
+        const bestIndex = payload.frontier.reduce(
+          (best, point, index) => (point.sharpe > payload.frontier[best].sharpe ? index : best),
+          0,
+        );
+        setFrontierIndex(goalId === "max_sharpe" ? bestIndex : 0);
+      } catch (err: unknown) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Something went wrong while finding your portfolio.",
+        );
+      } finally {
+        setRunning(false);
+      }
+    },
+    [
+      selected,
+      capital,
+      universeOptions,
+      resolved.start,
+      resolved.end,
+      windowError,
+      setSelection,
+      clearResult,
+      showAdvanced,
+      maxWeightPercent,
+      goalId,
+      evaluation,
+      numPortfolios,
+      seed,
+      maxStocks,
+      maxSectorPct,
+      v2View.sectorByTicker,
+    ],
+  );
 
   function handleUsePortfolio() {
     if (!frontier) return;
     const point = frontier.frontier[Math.min(frontierIndex, frontier.frontier.length - 1)];
     if (!point) return;
     publishResult(toOptimizeResult(frontier, point, goalId, capital));
-    setNotice("Saved this mix. The Risk and Rebalance pages now use it.");
+    setNotice("Saved this mix. The Risk and Rebalance pages now use it");
   }
 
   return (
     <section className="space-y-6">
-      <StepCard number={1} title="Stocks to consider" description="Filter by sector, index and liquidity; the server returns the tickers that pass (the same filter_universe the Sector tab uses). Add all passing or pick tickers manually.">
+      <StepCard
+        number={1}
+        title="Stocks to consider"
+        description="Filter by sector, index and liquidity; the server returns the tickers that pass. Add all passing or pick tickers manually."
+      >
         <UniverseFilterPanel
           selected={selected}
           maxStocks={maxStocks}
           onAddMany={addMany}
           onUniverse={setV2View}
         />
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => startFromVn30()} disabled={presetLoading} className="rounded-md border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:hover:bg-gray-900">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={() => void startFromVn30()} disabled={presetLoading}>
             {presetLoading ? "Loading\u2026" : "Start from VN30"}
-          </button>
+          </Button>
         </div>
 
-        <form onSubmit={handleSearchSubmit} className="mt-3 space-y-2">
-          <label htmlFor="ticker-search" className="block text-sm font-medium">Ticker search</label>
-          <div className="relative">
-            <input id="ticker-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Type a code or name (e.g. VNM)" className="w-72 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900" />
+        <form onSubmit={handleSearchSubmit} className="mt-4 space-y-2">
+          <label htmlFor="ticker-search" className="block text-sm font-medium text-fg">
+            Ticker search
+          </label>
+          <div className="relative max-w-xs">
+            <input
+              id="ticker-search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search ticker or company"
+              className={`${inputClass} w-full`}
+            />
             {suggestions.length !== 0 && (
-              <ul className="absolute z-10 mt-1 max-h-56 w-72 overflow-auto rounded-md border border-gray-200 bg-white text-sm shadow dark:border-gray-700 dark:bg-gray-900">
+              <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-strong bg-surface text-sm shadow-lg transition-opacity duration-150 ease-unslop">
                 {suggestions.map((symbol) => (
                   <li key={symbol.code}>
-                    <button type="button" onClick={() => addSymbol(symbol.code)} className="flex w-full items-center justify-between px-3 py-1 text-left hover:bg-gray-100 dark:hover:bg-gray-800">
-                      <span className="font-medium">{symbol.code}</span>
-                      <span className="ml-2 truncate text-xs text-gray-500 dark:text-gray-400">{symbol.exchange}{symbol.name ? ` \u00b7 ${symbol.name}` : ""}</span>
+                    <button
+                      type="button"
+                      onClick={() => addSymbol(symbol.code)}
+                      className="flex min-h-[40px] w-full items-center justify-between px-3 py-2 text-left transition-colors duration-150 ease-unslop hover:bg-raised"
+                    >
+                      <span className="font-mono font-medium text-fg">{symbol.code}</span>
+                      <span className="ml-2 truncate text-xs text-fg-muted">
+                        {symbol.exchange}
+                        {symbol.name ? ` \u00b7 ${symbol.name}` : ""}
+                      </span>
                     </button>
                   </li>
                 ))}
@@ -419,91 +461,178 @@ export function OptimizeBuilder() {
             )}
           </div>
           {selected.length !== 0 && (
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="flex flex-wrap gap-1.5 pt-1">
               {selected.map((code) => (
-                <span key={code} className="flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-800 dark:bg-blue-950 dark:text-blue-200">{code}<button type="button" onClick={() => removeSymbol(code)} aria-label={`Remove ${code}`} className="text-blue-600 hover:text-blue-900 dark:text-blue-300">&times;</button></span>
+                <span
+                  key={code}
+                  className="inline-flex items-center gap-1 rounded-md border border-accent/25 bg-accent-subtle px-2 py-1 font-mono text-xs text-accent-ink"
+                >
+                  <span>{code}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeSymbol(code)}
+                    aria-label={`Remove ${code}`}
+                    className="inline-flex items-center justify-center rounded-sm text-accent-ink/80 transition-colors duration-150 ease-unslop hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  >
+                    <XIcon size={12} />
+                  </button>
+                </span>
               ))}
             </div>
           )}
         </form>
 
         {keptCount !== 0 && (
-          <p className="mt-3 text-sm text-gray-600 dark:text-gray-300">{keptCount} kept &middot; {universeResult?.dropped.length ?? 0} dropped ({universeResult?.start ?? resolved.start} to {universeResult?.end ?? resolved.end})</p>
+          <p className="mt-4 font-mono text-xs tabular-nums text-fg-secondary">
+            {keptCount} kept &middot; {universeResult?.dropped.length ?? 0} dropped (
+            {universeResult?.start ?? resolved.start} to {universeResult?.end ?? resolved.end})
+          </p>
         )}
 
         {sizeWarnings.map((warning) => (
-          <p key={warning} className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">{warning}</p>
+          <p
+            key={warning}
+            className="mt-3 rounded-lg border border-warn-border bg-warn-subtle px-3 py-2 text-xs text-warn"
+          >
+            {warning}
+          </p>
         ))}
 
-        {universeResult && universeResult.dropped.length !== 0 && <DroppedTable dropped={universeResult.dropped} />}
+        {universeResult && universeResult.dropped.length !== 0 && (
+          <DroppedTable dropped={universeResult.dropped} />
+        )}
       </StepCard>
 
       <StepCard number={2} title="Money" description="Where does the money come from?">
-        <OptimizeCapital mode={capitalMode} newCapital={newCapital} onModeChange={setCapitalMode} onNewCapitalChange={setNewCapital} />
+        <OptimizeCapital
+          mode={capitalMode}
+          newCapital={newCapital}
+          onModeChange={setCapitalMode}
+          onNewCapitalChange={setNewCapital}
+        />
       </StepCard>
 
       <StepCard number={3} title="Goal" description="What do you want, in plain language?">
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-3">
           {GOALS.map((goal) => (
-            <label key={goal.id} className="flex items-start gap-2 rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-800">
-              <input type="radio" name="goal" checked={goalId === goal.id} onChange={() => setGoalId(goal.id)} className="mt-1" />
+            <label
+              key={goal.id}
+              className={`flex cursor-pointer items-start gap-2.5 rounded-lg border p-3.5 text-sm transition-colors duration-150 ease-unslop ${
+                goalId === goal.id
+                  ? "border-accent bg-accent-subtle/50"
+                  : "border-hairline bg-surface hover:border-strong"
+              }`}
+            >
+              <input
+                type="radio"
+                name="goal"
+                checked={goalId === goal.id}
+                onChange={() => setGoalId(goal.id)}
+                className="mt-1 h-4 w-4 accent-accent"
+              />
               <span>
-                <span className="font-medium">{goal.label}</span>
-                <Tip text={goal.detail} />
+                <span className="font-medium text-fg">{goal.label}</span>
+                <InfoTip text={goal.detail} />
               </span>
             </label>
           ))}
         </div>
       </StepCard>
 
-      <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
-        <button type="button" onClick={() => setShowAdvanced(!showAdvanced)} className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400">{showAdvanced ? "Hide advanced settings" : "Advanced settings"}</button>
+      <Card>
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="flex items-center gap-1.5 text-sm font-medium text-accent-ink transition-colors duration-150 ease-unslop hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
+        >
+          <span>{showAdvanced ? "Hide advanced settings" : "Advanced settings"}</span>
+          {showAdvanced ? <ChevronUpIcon size={15} /> : <ChevronDownIcon size={15} />}
+        </button>
         {showAdvanced && (
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm">
-              <span className="block font-medium">Max weight per stock (%)</span>
-              <input type="number" min={0} max={100} value={maxWeightPercent} onChange={(event) => setMaxWeightPercent(event.target.value)} placeholder={`Default ${(defaultMaxWeight(keptCount || 1) * 100).toFixed(0)}%`} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900" />
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label className="block space-y-1.5 text-sm">
+              <span className="block font-medium text-fg">Max weight per stock (%)</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={maxWeightPercent}
+                onChange={(event) => setMaxWeightPercent(event.target.value)}
+                placeholder={`Default ${(defaultMaxWeight(keptCount || 1) * 100).toFixed(0)}%`}
+                className={`${inputClass} w-full font-mono tabular-nums`}
+              />
             </label>
-            <label className="block text-sm">
-              <span className="block font-medium">Max weight per sector (%)</span>
-              <input type="number" min={0} max={100} value={maxSectorPct} onChange={(event) => setMaxSectorPct(event.target.value)} placeholder="Optional, e.g. 30" className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900" />
-              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+            <label className="block space-y-1.5 text-sm">
+              <span className="block font-medium text-fg">Max weight per sector (%)</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={maxSectorPct}
+                onChange={(event) => setMaxSectorPct(event.target.value)}
+                placeholder="Optional, e.g. 30"
+                className={`${inputClass} w-full font-mono tabular-nums`}
+              />
+              <span className="block text-xs text-fg-muted">
                 Applies to the frontier and the random cloud. Tickers without a sector count
                 as &quot;Unknown&quot;.
               </span>
             </label>
-            <label className="block text-sm">
-              <span className="block font-medium">Benchmark</span>
-              <select value={benchmark} onChange={(event) => setBenchmark(event.target.value)} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900">
+            <label className="block space-y-1.5 text-sm">
+              <span className="block font-medium text-fg">Benchmark</span>
+              <select
+                value={benchmark}
+                onChange={(event) => setBenchmark(event.target.value)}
+                className={`${selectClass} w-full`}
+              >
                 {(riskOptions?.benchmarks ?? []).map((item) => (
-                  <option key={item.code} value={item.code}>{item.name}</option>
+                  <option key={item.code} value={item.code}>
+                    {item.name}
+                  </option>
                 ))}
               </select>
             </label>
-            <label className="block text-sm">
-              <span className="block font-medium">VaR confidence (%)</span>
-              <input type="number" min={1} max={99} value={varConfidence} onChange={(event) => setVarConfidence(Number(event.target.value))} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900" />
+            <label className="block space-y-1.5 text-sm">
+              <span className="block font-medium text-fg">VaR confidence (%)</span>
+              <input
+                type="number"
+                min={1}
+                max={99}
+                value={varConfidence}
+                onChange={(event) => setVarConfidence(Number(event.target.value))}
+                className={`${inputClass} w-full font-mono tabular-nums`}
+              />
             </label>
-            <label className="block text-sm">
-              <span className="block font-medium">Number of random portfolios</span>
-              <input type="number" min={1} max={maxPortfolios ?? undefined} value={numPortfolios} onChange={(event) => setNumPortfolios(Number(event.target.value))} className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900" />
-              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
-                {maxPortfolios
-                  ? `Up to ${maxPortfolios.toLocaleString()}. `
-                  : ""}
-                The statistics use every portfolio; the chart plots a sampled subset of
-                them.
+            <label className="block space-y-1.5 text-sm">
+              <span className="block font-medium text-fg">Number of random portfolios</span>
+              <input
+                type="number"
+                min={1}
+                max={maxPortfolios ?? undefined}
+                value={numPortfolios}
+                onChange={(event) => setNumPortfolios(Number(event.target.value))}
+                className={`${inputClass} w-full font-mono tabular-nums`}
+              />
+              <span className="block text-xs text-fg-muted">
+                {maxPortfolios ? `Up to ${maxPortfolios.toLocaleString("en-US")}. ` : ""}
+                The statistics use every portfolio; the chart plots a sampled subset of them.
               </span>
             </label>
-            <label className="block text-sm">
-              <span className="block font-medium">Seed</span>
-              <input type="text" value={seed} onChange={(event) => setSeed(event.target.value)} placeholder="leave blank for a random seed" className="mt-1 w-full rounded-md border border-gray-300 px-2 py-1 dark:border-gray-700 dark:bg-gray-900" />
+            <label className="block space-y-1.5 text-sm">
+              <span className="block font-medium text-fg">Seed</span>
+              <input
+                type="text"
+                value={seed}
+                onChange={(event) => setSeed(event.target.value)}
+                placeholder="Random seed (optional)"
+                className={`${inputClass} w-full font-mono`}
+              />
             </label>
           </div>
         )}
-      </div>
+      </Card>
 
-      <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+      <Card>
         <TimeframePicker
           selection={timeframe}
           latestDate={latestDate}
@@ -511,25 +640,33 @@ export function OptimizeBuilder() {
           copyLabel="Risk"
           onCopyOther={() => setTimeframe("optimize", timeframes.risk)}
         />
-      </div>
+      </Card>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={handleFind} disabled={running || selected.length === 0} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400">{running ? "Finding\u2026" : "Find my portfolio"}</button>
-        <span className="text-xs text-gray-500 dark:text-gray-400">{selected.length} tickers to consider</span>
+        <Button
+          variant="primary"
+          onClick={() => void handleFind()}
+          disabled={running || selected.length === 0}
+        >
+          {running ? "Finding\u2026" : "Find my portfolio"}
+        </Button>
+        <span className="font-mono text-xs tabular-nums text-fg-muted">
+          {selected.length} tickers to consider
+        </span>
       </div>
 
-      <p className="rounded-md bg-gray-50 p-2 text-xs text-gray-600 dark:bg-gray-900 dark:text-gray-300">
+      <p className="rounded-lg border border-hairline bg-raised/50 px-3 py-2.5 text-xs text-fg-secondary">
         Price source: the optimizer, P&amp;L and risk pages read the V2 precomputed dataset
         (adjusted closes for returns, raw closes for share sizing). A ticker whose V2 history is
         missing or stale is reported explicitly instead of being valued from an older V1 series.
       </p>
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-      {notice && <p className="text-sm text-green-600 dark:text-green-400">{notice}</p>}
+      {error && <p className="text-sm text-negative">{error}</p>}
+      {notice && <p className="text-sm text-positive">{notice}</p>}
       {outdated && !running && (
-        <p className="rounded-md bg-amber-50 p-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-          The timeframe changed. These results are from an earlier window; press Find my portfolio to
-          update them.
+        <p className="rounded-lg border border-warn-border bg-warn-subtle px-3 py-2 text-xs text-warn">
+          The timeframe changed. These results are from an earlier window; press Find my portfolio
+          to update them.
         </p>
       )}
 
@@ -554,30 +691,38 @@ export function OptimizeBuilder() {
     </section>
   );
 }
-function StepCard({ number, title, description, children }: { number: number; title: string; description?: string; children: ReactNode }) {
-  return (
-    <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
-      <div className="flex items-baseline gap-2">
-        <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">Step {number}</span>
-        <h2 className="text-lg font-semibold">{title}</h2>
-      </div>
-      {description && <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{description}</p>}
-      <div className="mt-3">{children}</div>
-    </div>
-  );
-}
 
-function Tip({ text }: { text: string }) {
+function StepCard({
+  number,
+  title,
+  description,
+  children,
+}: {
+  number: number;
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
   return (
-    <span title={text} aria-label={text} className="ml-1 cursor-help rounded-full border border-gray-300 px-1 text-[10px] leading-4 text-gray-500 dark:border-gray-600 dark:text-gray-400">?</span>
+    <Card>
+      <div className="flex items-baseline gap-2.5">
+        <span className="font-mono text-xs font-medium text-accent-ink">Step {number}</span>
+        <h2 className="text-base font-medium text-fg">{title}</h2>
+      </div>
+      {description && <p className="mt-1 text-sm text-fg-secondary">{description}</p>}
+      <div className="mt-4">{children}</div>
+    </Card>
   );
 }
 
 function MetricCard({ label, value, tip }: { label: string; value: string; tip: string }) {
   return (
-    <div className="rounded-md bg-gray-50 p-3 dark:bg-gray-900">
-      <div className="flex items-center text-xs text-gray-500 dark:text-gray-400">{label}<Tip text={tip} /></div>
-      <div className="mt-1 text-lg font-semibold">{value}</div>
+    <div className="rounded-lg border border-hairline bg-raised/50 p-3.5">
+      <div className="flex items-center text-xs text-fg-muted">
+        <span>{label}</span>
+        <InfoTip text={tip} />
+      </div>
+      <div className="mt-1.5 font-mono text-xl font-medium tabular-nums text-fg">{value}</div>
     </div>
   );
 }
@@ -656,16 +801,16 @@ function FrontierResults({
     (warning) => !warning.toLowerCase().startsWith("in-sample"),
   );
   return (
-    <div className="space-y-4 rounded-lg border border-gray-200 p-4 dark:border-gray-800">
+    <Card className="space-y-5">
       <FrontierChart result={frontier} selectedIndex={index} onSelect={onSelect} />
 
-      <div className="space-y-2 rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+      <div className="space-y-2.5 rounded-lg border border-hairline bg-raised/40 p-3.5">
         <div className="flex items-center justify-between text-sm">
-          <span className="font-medium">
+          <span className="font-medium text-fg">
             Risk level
-            <Tip text="Slide from the steadiest mix (left) to the highest expected return (right)." />
+            <InfoTip text="Slide from the steadiest mix (left) to the highest expected return (right)." />
           </span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
+          <span className="font-mono text-xs tabular-nums text-fg-secondary">
             {(point.volatility * 100).toFixed(1)}% yearly swings
           </span>
         </div>
@@ -675,92 +820,132 @@ function FrontierResults({
           max={points.length - 1}
           value={index}
           onChange={(event) => onSelect(Number(event.target.value))}
-          className="w-full"
+          className="w-full accent-accent"
           aria-label="Risk level"
         />
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => onSelect(0)} className="rounded-md border border-gray-300 px-3 py-1 text-xs hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-900">
+          <Button size="sm" onClick={() => onSelect(0)}>
             Lowest risk
-          </button>
-          <button type="button" onClick={() => onSelect(bestIndex)} className="rounded-md border border-gray-300 px-3 py-1 text-xs hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-900">
+          </Button>
+          <Button size="sm" onClick={() => onSelect(bestIndex)}>
             Best return for the risk
-          </button>
+          </Button>
         </div>
       </div>
 
-      <p className="text-sm text-gray-700 dark:text-gray-200">{frontierSentence(frontier, point, goalId)}</p>
+      <p className="text-sm leading-6 text-fg-secondary">
+        {frontierSentence(frontier, point, goalId)}
+      </p>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <MetricCard label="Expected return" value={`${(point.expected_return * 100).toFixed(2)}%`} tip="The average yearly return the historical estimates imply for this mix." />
-        <MetricCard label="Volatility" value={`${(point.volatility * 100).toFixed(2)}%`} tip="How much the mix's yearly return has swung up and down. Lower means steadier." />
-        <MetricCard label="Sharpe" value={point.sharpe.toFixed(3)} tip="Return above the risk-free rate for each unit of risk. Higher is better." />
+        <MetricCard
+          label="Expected return"
+          value={`${(point.expected_return * 100).toFixed(2)}%`}
+          tip="The average yearly return the historical estimates imply for this mix."
+        />
+        <MetricCard
+          label="Volatility"
+          value={`${(point.volatility * 100).toFixed(2)}%`}
+          tip="How much the mix's yearly return has swung up and down. Lower means steadier."
+        />
+        <MetricCard
+          label="Sharpe"
+          value={point.sharpe.toFixed(3)}
+          tip="Return above the risk-free rate for each unit of risk. Higher is better."
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={onUse} className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
+        <Button variant="primary" onClick={onUse}>
           Use this portfolio
-        </button>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
+        </Button>
+        <span className="font-mono text-xs tabular-nums text-fg-muted">
           Mix {index + 1} of {points.length} on the line
         </span>
       </div>
 
       <SectorAllocation weights={point.weights} sectorByTicker={sectorByTicker} />
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
-        <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-          <thead className="bg-gray-50 text-left dark:bg-gray-900">
-            <tr>
-              <th className="px-3 py-2 font-medium">Ticker</th>
-              <th className="px-3 py-2 font-medium">Sector</th>
-              <th className="px-3 py-2 font-medium">Weight</th>
-              <th className="px-3 py-2 font-medium">Lots</th>
-              <th className="px-3 py-2 font-medium">Shares</th>
-              <th className="px-3 py-2 font-medium">Value</th>
+      <div className="overflow-x-auto rounded-xl border border-hairline bg-surface">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className={tableHeaderRowClass}>
+              <th className={`${tableHeaderCellClass} sticky left-0 z-10 bg-raised`}>
+                Ticker
+              </th>
+              <th className={tableHeaderCellClass}>Sector</th>
+              <th className={`${tableHeaderCellClass} text-right`}>Weight</th>
+              <th className={`${tableHeaderCellClass} text-right`}>Lots</th>
+              <th className={`${tableHeaderCellClass} text-right`}>Shares</th>
+              <th className={`${tableHeaderCellClass} text-right`}>Value</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          <tbody>
             {frontier.symbols.map((code) => (
-              <tr key={code}>
-                <td className="px-3 py-2 font-medium">
+              <tr key={code} className={tableRowHoverClass}>
+                <td
+                  className={`${tableBodyCellClass} sticky left-0 z-10 bg-surface font-mono font-medium text-fg`}
+                >
                   <span>{code}</span>
                   <button
                     type="button"
                     onClick={() => onOpenDetail(code)}
                     aria-label={`Show fundamentals for ${code}`}
-                    className="ml-2 text-xs font-normal text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                    className="ml-2 font-sans text-xs font-normal text-accent-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
                   >
                     Details
                   </button>
                 </td>
-                <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{sectorByTicker[code] ?? "Unknown"}</td>
-                <td className="px-3 py-2">{formatWeight(point.weights[code] ?? 0)}</td>
-                <td className="px-3 py-2">{point.lots[code] ?? 0}</td>
-                <td className="px-3 py-2">{point.shares[code] ?? 0}</td>
-                <td className="px-3 py-2">{formatVnd(point.values[code] ?? 0)}</td>
+                <td className={`${tableBodyCellClass} text-fg-secondary`}>
+                  {sectorByTicker[code] ?? "Unknown"}
+                </td>
+                <td
+                  className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg`}
+                >
+                  {formatWeight(point.weights[code] ?? 0)}
+                </td>
+                <td
+                  className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg-secondary`}
+                >
+                  {point.lots[code] ?? 0}
+                </td>
+                <td
+                  className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg-secondary`}
+                >
+                  {(point.shares[code] ?? 0).toLocaleString("en-US")}
+                </td>
+                <td
+                  className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg`}
+                >
+                  {formatVnd(point.values[code] ?? 0)}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <div className="text-sm">
-        <span className="font-medium">Residual cash:</span> {formatVnd(point.residual_cash)}
+      <div className="text-sm text-fg-secondary">
+        <span className="font-medium text-fg">Residual cash:</span>{" "}
+        <span className="font-mono tabular-nums">{formatVnd(point.residual_cash)}</span>
       </div>
 
       {remainingWarnings.map((warning) => (
-        <p key={warning} className="rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+        <p
+          key={warning}
+          className="rounded-lg border border-warn-border bg-warn-subtle px-3 py-2 text-xs text-warn"
+        >
           {warning}
         </p>
       ))}
 
       {dropped.length !== 0 && <DroppedTable dropped={dropped} />}
 
-      <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+      <p className="rounded-lg border border-warn-border bg-warn-subtle px-3 py-2 text-xs text-warn">
         In-sample warning: these weights come from historical estimates over the selected window.
         They are decision support, not a forecast or financial advice.
       </p>
-    </div>
+    </Card>
   );
 }
 
@@ -784,44 +969,50 @@ function SectorAllocation({
   );
   if (totals.length === 0) return null;
   return (
-    <div className="space-y-1">
-      <h3 className="text-sm font-semibold">Sector allocation</h3>
-      <p className="text-xs text-gray-500 dark:text-gray-400">
+    <div className="space-y-2">
+      <h3 className="text-sm font-medium text-fg">Sector allocation</h3>
+      <p className="text-xs text-fg-muted">
         How the optimized mix splits across sectors (market cap is full, not free-float).
       </p>
-      {totals.map(([sector, weight]) => (
-        <div key={sector} className="flex items-center gap-2 text-xs">
-          <span className="w-32 truncate">{sector}</span>
-          <div className="h-2 flex-1 rounded bg-gray-100 dark:bg-gray-800">
-            <div
-              className="h-2 rounded bg-blue-500"
-              style={{ width: `${Math.min(100, weight * 100).toFixed(1)}%` }}
-            />
+      <div className="space-y-1.5">
+        {totals.map(([sector, weight]) => (
+          <div key={sector} className="flex items-center gap-3 text-xs">
+            <span className="w-36 truncate text-fg-secondary">{sector}</span>
+            <div className="h-2 flex-1 overflow-hidden rounded-sm bg-raised">
+              <div
+                className="h-2 rounded-sm bg-accent"
+                style={{ width: `${Math.min(100, weight * 100).toFixed(1)}%` }}
+              />
+            </div>
+            <span className="w-14 text-right font-mono tabular-nums text-fg">
+              {formatWeight(weight)}
+            </span>
           </div>
-          <span className="w-12 text-right">{formatWeight(weight)}</span>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
 
 function DroppedTable({ dropped }: { dropped: UniverseBuildResponse["dropped"] }) {
   return (
-    <div className="space-y-2">
-      <h3 className="text-sm font-semibold">Dropped tickers</h3>
-      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
-        <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-          <thead className="bg-gray-50 text-left dark:bg-gray-900">
-            <tr>
-              <th className="px-3 py-2 font-medium">Ticker</th>
-              <th className="px-3 py-2 font-medium">Reason</th>
+    <div className="mt-4 space-y-2">
+      <h3 className="text-sm font-medium text-fg">Dropped tickers</h3>
+      <div className="overflow-x-auto rounded-xl border border-hairline bg-surface">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className={tableHeaderRowClass}>
+              <th className={tableHeaderCellClass}>Ticker</th>
+              <th className={tableHeaderCellClass}>Reason</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+          <tbody>
             {dropped.map((item) => (
-              <tr key={item.code}>
-                <td className="px-3 py-2 font-medium">{item.code}</td>
-                <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{item.reason}</td>
+              <tr key={item.code} className={tableRowHoverClass}>
+                <td className={`${tableBodyCellClass} font-mono font-medium text-fg`}>
+                  {item.code}
+                </td>
+                <td className={`${tableBodyCellClass} text-fg-secondary`}>{item.reason}</td>
               </tr>
             ))}
           </tbody>

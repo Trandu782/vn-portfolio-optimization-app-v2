@@ -1,15 +1,5 @@
 "use client";
 
-/**
- * Historical performance: growth of 100 for each portfolio versus the benchmark.
- *
- * Features required by the product: visible axis ticks, a dashed baseline at
- * 100, a crosshair tooltip (date, level and percent versus the start), a legend
- * that shows/hides a series and a brush for drag-to-zoom with a reset button.
- * The summary table is explicitly labelled "Full timeframe" so it is never
- * mistaken for the zoomed range.
- */
-
 import { useMemo, useState } from "react";
 import {
   Brush,
@@ -23,6 +13,13 @@ import {
   YAxis,
 } from "recharts";
 
+import { Card } from "@/components/ui/Card";
+import {
+  tableBodyCellClass,
+  tableHeaderCellClass,
+  tableHeaderRowClass,
+  tableRowHoverClass,
+} from "@/components/ui/Field";
 import type { PerformanceResult } from "@/lib/api";
 import {
   AXIS_TEXT,
@@ -65,23 +62,23 @@ function PerformanceTooltip({ active, label, payload }: PerformanceTooltipProps)
   if (rows.length === 0) return null;
   return (
     <TooltipBox>
-      <p className="font-medium">{String(label ?? "")}</p>
-      <ul className="mt-1 space-y-0.5">
+      <p className="font-mono font-medium text-fg">{String(label ?? "")}</p>
+      <ul className="mt-1.5 space-y-1">
         {rows.map((entry) => {
           const level = entry.value as number;
           return (
             <li key={String(entry.dataKey ?? entry.name)} className="flex items-center gap-3">
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1.5 text-fg-secondary">
                 <span
                   className="inline-block h-2 w-2 rounded-full"
-                  style={{ backgroundColor: entry.color ?? "#6b7280" }}
-                  aria-hidden
+                  style={{ backgroundColor: entry.color ?? "#71717a" }}
+                  aria-hidden="true"
                 />
                 {String(entry.name ?? "")}
               </span>
-              <span className="ml-auto tabular-nums">
+              <span className="ml-auto font-mono tabular-nums text-fg">
                 {formatLevel(level)}{" "}
-                <span className="text-gray-500 dark:text-gray-400">
+                <span className="text-fg-muted">
                   ({formatSignedPercent(level / 100 - 1)})
                 </span>
               </span>
@@ -95,7 +92,6 @@ function PerformanceTooltip({ active, label, payload }: PerformanceTooltipProps)
 
 type ChartRow = Record<string, string | number | null>;
 
-/** Align every series' growth to the shared date axis, carrying gaps forward. */
 function buildRows(dates: string[], series: PerformanceSeries[]): ChartRow[] {
   const maps = series.map((item) => {
     const byDate = new Map<string, number>();
@@ -144,17 +140,17 @@ export function PerformanceChart({
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-800">
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <Card className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Historical performance</h2>
-          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+          <h2 className="text-base font-medium text-fg">Historical performance</h2>
+          <p className="mt-1 text-xs text-fg-muted">
             Growth of 100 with fixed weights, no costs, raw prices, in-sample. A descriptive chart,
             not a backtest.
           </p>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <div className="flex flex-wrap gap-2 text-xs" role="group" aria-label="Toggle a series">
+        <div className="flex flex-col items-start sm:items-end gap-1.5">
+          <div className="flex flex-wrap gap-1.5 text-xs" role="group" aria-label="Toggle a series">
             {series.map((item) => {
               const off = hidden[item.id] ?? false;
               return (
@@ -163,16 +159,16 @@ export function PerformanceChart({
                   type="button"
                   onClick={() => toggle(item.id)}
                   aria-pressed={!off}
-                  className={
+                  className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 transition-colors duration-150 ease-unslop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                     off
-                      ? "flex items-center gap-1 rounded-full border border-gray-300 px-2 py-0.5 text-gray-400 line-through dark:border-gray-700"
-                      : "flex items-center gap-1 rounded-full border border-gray-300 px-2 py-0.5 dark:border-gray-700"
-                  }
+                      ? "border-hairline bg-surface text-fg-muted line-through"
+                      : "border-hairline bg-surface text-fg-secondary hover:border-strong hover:text-fg"
+                  }`}
                 >
                   <span
-                    className="inline-block h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: off ? "#9ca3af" : item.color }}
-                    aria-hidden
+                    className="inline-block h-2 w-2 rounded-full"
+                    style={{ backgroundColor: off ? "#85858b" : item.color }}
+                    aria-hidden="true"
                   />
                   {item.label}
                 </button>
@@ -182,7 +178,7 @@ export function PerformanceChart({
           <button
             type="button"
             onClick={resetZoom}
-            className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400"
+            className="text-xs text-accent-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
           >
             Reset zoom
           </button>
@@ -190,7 +186,6 @@ export function PerformanceChart({
       </div>
 
       <div
-        className="mt-2"
         role="img"
         aria-label="Growth of 100 for each portfolio versus the benchmark, with a dashed baseline at 100. Drag the brush under the chart to zoom."
       >
@@ -249,58 +244,71 @@ export function PerformanceChart({
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+      <p className="text-xs text-fg-muted">
         {zoomed
           ? "Zoomed view: drag the handles under the chart, or press Reset zoom."
           : "Drag the handles under the chart to zoom into a period."}
       </p>
 
-      <div className="mt-3 overflow-x-auto">
-        <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-fg-secondary">
           Summary for the full timeframe
         </p>
-        <table className="w-full text-xs">
-          <caption className="sr-only">
-            Full-timeframe return statistics for each portfolio
-          </caption>
-          <thead>
-            <tr className="text-left text-gray-500 dark:text-gray-400">
-              <th scope="col" className="py-1 font-medium">
-                Portfolio
-              </th>
-              <th scope="col" className="py-1 font-medium">
-                Total return
-              </th>
-              <th scope="col" className="py-1 font-medium">
-                Annualized
-              </th>
-              <th scope="col" className="py-1 font-medium">
-                Max drawdown
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {series.map((item) => (
-              <tr key={item.id}>
-                <td className="py-1">
-                  <span className="flex items-center gap-1">
-                    <span
-                      className="inline-block h-2 w-2 rounded-full"
-                      style={{ backgroundColor: item.color }}
-                      aria-hidden
-                    />
-                    {item.label}
-                  </span>
-                </td>
-                <td className="py-1">{formatSignedPercent(item.performance.total_return)}</td>
-                <td className="py-1">{formatSignedPercent(item.performance.annualized_return)}</td>
-                <td className="py-1">{formatPercent(item.performance.max_drawdown)}</td>
+        <div className="overflow-x-auto rounded-xl border border-hairline">
+          <table className="w-full text-xs">
+            <caption className="sr-only">
+              Full-timeframe return statistics for each portfolio
+            </caption>
+            <thead>
+              <tr className={tableHeaderRowClass}>
+                <th scope="col" className={tableHeaderCellClass}>
+                  Portfolio
+                </th>
+                <th scope="col" className={`${tableHeaderCellClass} text-right`}>
+                  Total return
+                </th>
+                <th scope="col" className={`${tableHeaderCellClass} text-right`}>
+                  Annualized
+                </th>
+                <th scope="col" className={`${tableHeaderCellClass} text-right`}>
+                  Max drawdown
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {series.map((item) => (
+                <tr key={item.id} className={tableRowHoverClass}>
+                  <td className={`${tableBodyCellClass} text-fg`}>
+                    <span className="flex items-center gap-2">
+                      <span
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                        aria-hidden="true"
+                      />
+                      {item.label}
+                    </span>
+                  </td>
+                  <td
+                    className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg`}
+                  >
+                    {formatSignedPercent(item.performance.total_return)}
+                  </td>
+                  <td
+                    className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg`}
+                  >
+                    {formatSignedPercent(item.performance.annualized_return)}
+                  </td>
+                  <td
+                    className={`${tableBodyCellClass} text-right font-mono tabular-nums text-fg-secondary`}
+                  >
+                    {formatPercent(item.performance.max_drawdown)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+    </Card>
   );
 }
-

@@ -8,9 +8,11 @@ export const metadata: Metadata = { title: "Optimize" };
 
 export default function OptimizePage() {
   return (
-    <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Optimize</h1>
+    <section className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-[28px] leading-[1.15] font-medium tracking-[-0.015em] text-fg">
+          Optimize
+        </h1>
         <SettingsBadge />
       </div>
       <Disclaimer context="Optimizer weights" />

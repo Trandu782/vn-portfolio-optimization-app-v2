@@ -1,15 +1,5 @@
 "use client";
 
-/**
- * Efficient-frontier chart.
- *
- * A Recharts scatter chart with the random portfolio cloud, the exact frontier
- * line, the capital allocation line and the labelled special portfolios. It
- * supports hover tooltips (volatility, return, Sharpe and weights), clicking a
- * frontier point to move the risk slider, a highlighted marker for the selected
- * point and chips that show/hide the cloud and the capital line.
- */
-
 import { useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -24,6 +14,7 @@ import {
   ZAxis,
 } from "recharts";
 
+import { Card } from "@/components/ui/Card";
 import type { FrontierResult } from "@/lib/api";
 import {
   AXIS_TEXT,
@@ -68,18 +59,13 @@ function pointTitle(point: ChartPoint): string {
   return point.kind;
 }
 
-/**
- * Header caption for the cloud. The API runs the whole simulation and plots a
- * stratified sample of it, so say how many of the generated portfolios are drawn:
- * the chart must never imply it shows every one.
- */
 function cloudLabel(result: FrontierResult): string {
   const plotted = result.assumptions.portfolios_plotted;
   const generated = result.assumptions.portfolios_generated;
   if (plotted < generated) {
-    return `showing ${plotted.toLocaleString()} of ${generated.toLocaleString()} random mixes`;
+    return `showing ${plotted.toLocaleString("en-US")} of ${generated.toLocaleString("en-US")} random mixes`;
   }
-  return `${generated.toLocaleString()} random mixes`;
+  return `${generated.toLocaleString("en-US")} random mixes`;
 }
 
 function FrontierTooltip({ active, payload, symbols }: TooltipProps) {
@@ -92,18 +78,24 @@ function FrontierTooltip({ active, payload, symbols }: TooltipProps) {
   const held = symbols.filter((symbol) => (weights[symbol] ?? 0) > 0);
   return (
     <TooltipBox>
-      <p className="font-medium">{pointTitle(point)}</p>
-      <p className="tabular-nums">Yearly volatility {formatPercent(point.volatility)}</p>
-      <p className="tabular-nums">Yearly return {formatPercent(point.expected_return)}</p>
-      <p className="tabular-nums">
+      <p className="font-medium text-fg">{pointTitle(point)}</p>
+      <p className="mt-1 font-mono tabular-nums text-fg-secondary">
+        Volatility {formatPercent(point.volatility)}
+      </p>
+      <p className="font-mono tabular-nums text-fg-secondary">
+        Return {formatPercent(point.expected_return)}
+      </p>
+      <p className="font-mono tabular-nums text-fg-secondary">
         Sharpe {Number.isFinite(point.sharpe) ? point.sharpe.toFixed(2) : "\u2014"}
       </p>
       {held.length > 0 && (
-        <ul className="mt-1 space-y-0.5 border-t border-gray-200 pt-1 dark:border-gray-700">
+        <ul className="mt-1.5 space-y-0.5 border-t border-hairline pt-1.5 font-mono">
           {held.map((symbol) => (
-            <li key={symbol} className="flex justify-between gap-3">
-              <span>{symbol}</span>
-              <span className="tabular-nums">{formatPercent(weights[symbol] ?? 0)}</span>
+            <li key={symbol} className="flex justify-between gap-4">
+              <span className="text-fg">{symbol}</span>
+              <span className="tabular-nums text-fg-secondary">
+                {formatPercent(weights[symbol] ?? 0)}
+              </span>
             </li>
           ))}
         </ul>
@@ -126,8 +118,8 @@ function frontierShape(onSelect: (index: number) => void, selectedIndex: number)
         cy={cy}
         r={isSelected ? 6 : 2.5}
         fill={isSelected ? CHART_COLORS.selected : CHART_COLORS.frontier}
-        stroke="#ffffff"
-        strokeWidth={isSelected ? 2 : 0.5}
+        stroke="var(--bg-surface)"
+        strokeWidth={isSelected ? 2 : 0.75}
         style={{ cursor: "pointer" }}
         onClick={() => onSelect(index)}
       />
@@ -135,9 +127,20 @@ function frontierShape(onSelect: (index: number) => void, selectedIndex: number)
   };
 }
 
+const LABEL_OFFSETS: Record<SpecialKind, { dx: number; dy: number; anchor: "start" | "end" }> = {
+  min_variance: { dx: -8, dy: 4, anchor: "end" },
+  tangency: { dx: 8, dy: -8, anchor: "start" },
+  equal_weight: { dx: 8, dy: 12, anchor: "start" },
+  current: { dx: -8, dy: -8, anchor: "end" },
+};
+
 function specialShape(props: ShapeProps) {
   const { cx, cy, payload } = props;
   if (cx === undefined || cy === undefined || !payload) return null;
+  const offset =
+    payload.kind in LABEL_OFFSETS
+      ? LABEL_OFFSETS[payload.kind as SpecialKind]
+      : { dx: 8, dy: -6, anchor: "start" as const };
   return (
     <g>
       <circle
@@ -145,10 +148,21 @@ function specialShape(props: ShapeProps) {
         cy={cy}
         r={5}
         fill={payload.fill ?? CHART_COLORS.equalWeight}
-        stroke="#ffffff"
-        strokeWidth={1}
+        stroke="var(--bg-surface)"
+        strokeWidth={1.5}
       />
-      <text x={cx + 7} y={cy - 7} fontSize={10} fill={AXIS_TEXT}>
+      <text
+        x={cx + offset.dx}
+        y={cy + offset.dy}
+        textAnchor={offset.anchor}
+        fontSize={11}
+        fontWeight={500}
+        fill="currentColor"
+        stroke="var(--bg-surface)"
+        strokeWidth={3.5}
+        paintOrder="stroke"
+        className="text-fg"
+      >
         {payload.label}
       </text>
     </g>
@@ -179,9 +193,6 @@ export function FrontierChart({
       }))
       .sort((a, b) => a.volatility - b.volatility);
 
-    // The API already sends a stratified sample of the simulation; thin it once
-    // more here because Recharts renders one SVG node per point (the sample's
-    // extremes sit within a dot's width of each other at this size).
     const step = Math.max(1, Math.ceil(result.random_cloud.length / 1200));
     const cloudPoints: ChartPoint[] = result.random_cloud
       .filter((_, index) => index % step === 0)
@@ -193,46 +204,91 @@ export function FrontierChart({
       }));
 
     const specials: ChartPoint[] = [
-      { kind: "min_variance", label: "Min variance", fill: CHART_COLORS.minVariance, ...result.min_variance },
-      { kind: "tangency", label: "Max Sharpe", fill: CHART_COLORS.tangency, ...result.tangency },
-      { kind: "equal_weight", label: "Equal weight", fill: CHART_COLORS.equalWeight, ...result.equal_weight },
+      {
+        kind: "min_variance",
+        label: "Min variance",
+        fill: CHART_COLORS.minVariance,
+        ...result.min_variance,
+      },
+      {
+        kind: "tangency",
+        label: "Max Sharpe",
+        fill: CHART_COLORS.tangency,
+        ...result.tangency,
+      },
+      {
+        kind: "equal_weight",
+        label: "Equal weight",
+        fill: CHART_COLORS.equalWeight,
+        ...result.equal_weight,
+      },
     ];
     if (result.current) {
-      specials.push({ kind: "current", label: "Your portfolio", fill: CHART_COLORS.current, ...result.current });
+      specials.push({
+        kind: "current",
+        label: "Your portfolio",
+        fill: CHART_COLORS.current,
+        ...result.current,
+      });
     }
 
-    const vols = [0, ...frontierPoints.map((point) => point.volatility), ...cloudPoints.map((point) => point.volatility)];
-    const rets = [result.risk_free_rate, ...frontierPoints.map((point) => point.expected_return), ...cloudPoints.map((point) => point.expected_return)];
-    const maxVol = Math.max(...vols, 0.01) * 1.05;
-    const retMin = Math.min(...rets);
-    const retMax = Math.max(...rets);
-    const retSpan = retMax - retMin || 0.01;
-    const minRet = retMin - retSpan * 0.08;
-    const maxRet = retMax + retSpan * 0.08;
+    const vols = [
+      ...frontierPoints.map((point) => point.volatility),
+      ...cloudPoints.map((point) => point.volatility),
+      ...specials.map((point) => point.volatility),
+    ];
+    const rets = [
+      ...frontierPoints.map((point) => point.expected_return),
+      ...cloudPoints.map((point) => point.expected_return),
+      ...specials.map((point) => point.expected_return),
+    ];
+
+    const rawMinVol = Math.min(...vols);
+    const rawMaxVol = Math.max(...vols, rawMinVol + 0.01);
+    const volSpan = rawMaxVol - rawMinVol || 0.02;
+    const minVol = Math.max(0, rawMinVol - volSpan * 0.14);
+    const maxVol = rawMaxVol + volSpan * 0.14;
+
+    const rawMinRet = Math.min(...rets);
+    const rawMaxRet = Math.max(...rets, rawMinRet + 0.01);
+    const retSpan = rawMaxRet - rawMinRet || 0.02;
+    const minRet = rawMinRet - retSpan * 0.12;
+    const maxRet = rawMaxRet + retSpan * 0.12;
 
     const tangency = result.tangency;
     const slope =
       tangency.volatility > 0
         ? (tangency.expected_return - result.risk_free_rate) / tangency.volatility
         : 0;
+    const calStartReturn = result.risk_free_rate + slope * minVol;
     const calEndReturn = result.risk_free_rate + slope * maxVol;
 
-    return { frontierPoints, cloudPoints, specials, maxVol, minRet, maxRet, calEndReturn };
+    return {
+      frontierPoints,
+      cloudPoints,
+      specials,
+      minVol,
+      maxVol,
+      minRet,
+      maxRet,
+      calStartReturn,
+      calEndReturn,
+    };
   }, [result]);
 
   const selected = result.frontier[Math.min(selectedIndex, result.frontier.length - 1)];
 
   return (
-    <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
+    <Card compact className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">Risk and return</h3>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
+        <h3 className="text-sm font-medium text-fg">Risk and return</h3>
+        <span className="font-mono text-xs tabular-nums text-fg-muted">
           {cloudLabel(result)} &middot; {result.frontier.length} frontier points
         </span>
       </div>
 
       <div
-        className="mt-2 flex flex-wrap gap-2 text-xs"
+        className="flex flex-wrap gap-2 text-xs"
         role="group"
         aria-label="Show or hide chart layers"
       >
@@ -240,11 +296,11 @@ export function FrontierChart({
           type="button"
           onClick={() => setShowCloud((value) => !value)}
           aria-pressed={showCloud}
-          className={
+          className={`rounded-md border px-2.5 py-1 transition-colors duration-150 ease-unslop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
             showCloud
-              ? "rounded-full border border-gray-300 bg-gray-100 px-2 py-0.5 dark:border-gray-700 dark:bg-gray-800"
-              : "rounded-full border border-gray-300 px-2 py-0.5 text-gray-400 dark:border-gray-700"
-          }
+              ? "border-strong bg-raised font-medium text-fg"
+              : "border-hairline bg-surface text-fg-muted hover:text-fg"
+          }`}
         >
           Random mixes
         </button>
@@ -252,29 +308,28 @@ export function FrontierChart({
           type="button"
           onClick={() => setShowCapital((value) => !value)}
           aria-pressed={showCapital}
-          className={
+          className={`rounded-md border px-2.5 py-1 transition-colors duration-150 ease-unslop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
             showCapital
-              ? "rounded-full border border-gray-300 bg-gray-100 px-2 py-0.5 dark:border-gray-700 dark:bg-gray-800"
-              : "rounded-full border border-gray-300 px-2 py-0.5 text-gray-400 dark:border-gray-700"
-          }
+              ? "border-strong bg-raised font-medium text-fg"
+              : "border-hairline bg-surface text-fg-muted hover:text-fg"
+          }`}
         >
           Capital line
         </button>
       </div>
 
       <div
-        className="mt-2"
         role="img"
         aria-label="Efficient frontier: yearly volatility (risk) on the horizontal axis, yearly return on the vertical axis, with random portfolios, minimum-variance, maximum-Sharpe, equal-weight and your current portfolio."
       >
         <ResponsiveContainer width="100%" height={360}>
-          <ScatterChart margin={{ top: 8, right: 20, bottom: 28, left: 4 }}>
+          <ScatterChart margin={{ top: 12, right: 24, bottom: 28, left: 8 }}>
             <CartesianGrid stroke={GRID_STROKE} strokeDasharray="3 3" />
             <XAxis
               type="number"
               dataKey="volatility"
               name="Volatility"
-              domain={[0, layout.maxVol]}
+              domain={[layout.minVol, layout.maxVol]}
               tickFormatter={formatAxisPercent}
               tick={AXIS_TICK}
               tickCount={6}
@@ -313,7 +368,7 @@ export function FrontierChart({
               <Scatter
                 data={layout.cloudPoints}
                 fill={CHART_COLORS.cloud}
-                fillOpacity={0.35}
+                fillOpacity={0.32}
                 isAnimationActive={false}
               />
             )}
@@ -327,12 +382,12 @@ export function FrontierChart({
             {showCapital && (
               <ReferenceLine
                 segment={[
-                  { x: 0, y: result.risk_free_rate },
+                  { x: layout.minVol, y: layout.calStartReturn },
                   { x: layout.maxVol, y: layout.calEndReturn },
                 ]}
                 stroke={CHART_COLORS.capitalLine}
                 strokeDasharray="4 3"
-                strokeWidth={1.2}
+                strokeWidth={1.25}
               />
             )}
             {selected && (
@@ -341,20 +396,18 @@ export function FrontierChart({
                 y={selected.expected_return}
                 r={7}
                 fill={CHART_COLORS.selected}
-                stroke="#ffffff"
+                stroke="var(--bg-surface)"
                 strokeWidth={2}
               />
             )}
           </ScatterChart>
         </ResponsiveContainer>
       </div>
-      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+      <p className="text-xs text-fg-muted">
         Each grey dot is a random mix of the same stocks. The blue line is the best return you can
         get for each level of risk; the dashed line connects cash to the best mix. Click a point on
         the blue line to load that mix.
       </p>
-    </div>
+    </Card>
   );
 }
-
-
