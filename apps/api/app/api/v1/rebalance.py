@@ -36,6 +36,7 @@ from core.rebalance import rebalance as run_rebalance_engine
 from core.registry import Registry
 from core.settings import UserSettings
 from core.universe import normalize_exchange
+from core.validation import FiniteFloat, TickerSymbol, format_validation_error
 from data.service import DataService
 
 router = APIRouter(tags=["rebalance"])
@@ -138,10 +139,13 @@ def rebalance_options(response: Response) -> RebalanceOptionsResponse:
 class RebalanceRequest(BaseModel):
     """Inputs for one rebalance. Settings default when omitted."""
 
-    holdings: list[Holding] = Field(default_factory=list, description="Current holdings.")
+    holdings: list[Holding] = Field(
+        default_factory=list, max_length=200, description="Current holdings."
+    )
     cash: int = Field(default=0, ge=0, description="Cash balance in whole VND.")
-    target_weights: dict[str, float] = Field(
+    target_weights: dict[TickerSymbol, FiniteFloat] = Field(
         default_factory=dict,
+        max_length=200,
         description=(
             "Target weight per symbol as a fraction of total value "
             "(the remainder is target cash)."
@@ -230,7 +234,7 @@ def run_rebalance(
     try:
         portfolio = Portfolio(holdings=request.holdings, cash=request.cash)
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail=format_validation_error(exc)) from exc
 
     targets = _normalize_targets(request.target_weights)
     symbols = _symbols(portfolio, targets)
@@ -257,7 +261,9 @@ def run_rebalance(
         identifier = exc.args[0] if exc.args else "?"
         raise HTTPException(status_code=422, detail=f"unknown id {identifier!r}") from exc
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=f"invalid parameters: {exc}") from exc
+        raise HTTPException(
+            status_code=422, detail=f"invalid parameters: {format_validation_error(exc)}"
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

@@ -30,6 +30,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import date
 from typing import Any, ClassVar
+from urllib.parse import quote
 
 from data.errors import EmptyResultError, SchemaError
 from data.models import PriceBar, SymbolInfo
@@ -84,9 +85,11 @@ class KbsProvider(ProviderBase):
 
     def _history(self, kind: str, symbol: str, start: date, end: date) -> list[PriceBar]:
         rows: list[Mapping[str, Any]] = []
+        safe_kind = quote(kind, safe="")
+        safe_symbol = quote(symbol, safe="")
         for window_start, window_end in self._chunks(start, end):
             payload = self._get_json(
-                f"{self.BASE_URL}/{kind}/{symbol}/data_day",
+                f"{self.BASE_URL}/{safe_kind}/{safe_symbol}/data_day",
                 params={
                     "sdate": window_start.strftime("%d-%m-%Y"),
                     "edate": window_end.strftime("%d-%m-%Y"),
@@ -120,7 +123,7 @@ class KbsProvider(ProviderBase):
                 f"KBS publishes no group for index {code}", provider=self.id
             )
         payload = self._get_json(
-            self.BASE_URL + self.GROUP_MEMBERS_PATH.format(group=group)
+            self.BASE_URL + self.GROUP_MEMBERS_PATH.format(group=quote(group, safe=""))
         )
         rows: Any = payload.get("data") if isinstance(payload, Mapping) else payload
         if not isinstance(rows, list):

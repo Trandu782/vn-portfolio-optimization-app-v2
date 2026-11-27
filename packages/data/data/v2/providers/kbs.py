@@ -18,6 +18,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import date
 from typing import ClassVar
+from urllib.parse import quote
 
 from data.errors import EmptyResultError, SchemaError
 from data.v2.providers.base import V2ProviderBase, unwrap_rows
@@ -65,8 +66,10 @@ class KbsAdapter(V2ProviderBase):
     }
 
     def _history(self, kind: str, symbol: str, start: date, end: date) -> list[AdjustedOHLCV]:
+        safe_kind = quote(kind, safe="")
+        safe_symbol = quote(symbol, safe="")
         payload = self._get_json(
-            self.BASE_URL + self.HISTORY_PATH.format(kind=kind, symbol=symbol),
+            self.BASE_URL + self.HISTORY_PATH.format(kind=safe_kind, symbol=safe_symbol),
             params={"sdate": start.strftime("%d-%m-%Y"), "edate": end.strftime("%d-%m-%Y")},
         )
         if not isinstance(payload, Mapping) or not isinstance(payload.get("data_day"), list):
@@ -94,7 +97,9 @@ class KbsAdapter(V2ProviderBase):
         group = self.INDEX_GROUP_MAP.get(code)
         if group is None:
             raise EmptyResultError(f"KBS publishes no group for index {code}", provider=self.id)
-        payload = self._get_json(self.BASE_URL + self.GROUP_MEMBERS_PATH.format(group=group))
+        payload = self._get_json(
+            self.BASE_URL + self.GROUP_MEMBERS_PATH.format(group=quote(group, safe=""))
+        )
         members = [str(row).upper() for row in unwrap_rows(payload) if isinstance(row, str) and row]
         if not members:
             raise EmptyResultError("KBS returned no constituents", provider=self.id)
@@ -129,7 +134,7 @@ class KbsAdapter(V2ProviderBase):
         """Return annual ratios from KBS (candidate, unverified endpoint)."""
         code = ticker.upper()
         payload = self._get_json(
-            self.BASE_URL + self.RATIOS_PATH.format(symbol=code),
+            self.BASE_URL + self.RATIOS_PATH.format(symbol=quote(code, safe="")),
             params={"timeFrame": "data_year"},
         )
         return parse_financial_ratios(payload, ticker=code, provider=self.id, period_type="annual")

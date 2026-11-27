@@ -11,6 +11,8 @@
  */
 
 import type { RebalanceOrder } from "./api";
+import { isValidTickerSymbol } from "./portfolio.ts";
+import { sanitizeCsvCell } from "./portfolio-csv.ts";
 
 export const ORDER_CSV_COLUMNS = [
   "symbol",
@@ -27,14 +29,14 @@ export const ORDER_CSV_COLUMNS = [
 export function ordersToCsv(orders: readonly RebalanceOrder[]): string {
   const rows = orders.map((order) =>
     [
-      order.symbol,
-      order.side,
-      order.lots,
-      order.shares,
-      Math.round(order.reference_price),
-      order.value,
-      order.fee,
-      order.tax,
+      sanitizeCsvCell(order.symbol),
+      sanitizeCsvCell(order.side),
+      sanitizeCsvCell(order.lots),
+      sanitizeCsvCell(order.shares),
+      sanitizeCsvCell(Math.round(order.reference_price)),
+      sanitizeCsvCell(order.value),
+      sanitizeCsvCell(order.fee),
+      sanitizeCsvCell(order.tax),
     ].join(","),
   );
   return [ORDER_CSV_COLUMNS.join(","), ...rows].join("\n");
@@ -49,7 +51,9 @@ export interface TargetWeightRow {
 
 /** Serialise target weights to CSV (header plus one line per symbol). */
 export function targetWeightsToCsv(rows: readonly TargetWeightRow[]): string {
-  const lines = rows.map((row) => `${row.symbol},${row.weight_percent}`);
+  const lines = rows.map(
+    (row) => `${sanitizeCsvCell(row.symbol)},${sanitizeCsvCell(row.weight_percent)}`,
+  );
   return [TARGET_WEIGHT_COLUMNS.join(","), ...lines].join("\n");
 }
 
@@ -86,6 +90,10 @@ export function parseTargetWeightsCsv(text: string): TargetWeightParseResult {
     const symbol = cell(line, 0).toUpperCase();
     if (symbol === "") {
       errors.push(`line ${lineNumber}: symbol is required`);
+      return;
+    }
+    if (!isValidTickerSymbol(symbol)) {
+      errors.push(`line ${lineNumber}: symbol "${symbol}" is invalid`);
       return;
     }
 

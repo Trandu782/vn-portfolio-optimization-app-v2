@@ -60,13 +60,20 @@ function downloadTextFile(filename: string, text: string, mime: string): void {
   URL.revokeObjectURL(url);
 }
 
+const MAX_UPLOAD_BYTES = 1_048_576;
+
 async function readTextFile(
   event: ChangeEvent<HTMLInputElement>,
   onText: (text: string) => void,
+  onError: (message: string) => void,
 ): Promise<void> {
   const file = event.target.files?.[0];
   event.target.value = "";
   if (!file) {
+    return;
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    onError("CSV import: file is too large (maximum size is 1 MB).");
     return;
   }
   onText(await file.text());
@@ -348,6 +355,7 @@ export function RebalanceCalculator() {
         onUpdate={updateHolding}
         onRemove={removeHolding}
         onImportCsv={importHoldingsCsv}
+        onImportError={setError}
       />
 
       <TargetEditor
@@ -362,6 +370,7 @@ export function RebalanceCalculator() {
         onMatchCurrent={matchCurrent}
         onUseOptimized={useOptimizedWeights}
         onImportCsv={importTargetsCsv}
+        onImportError={setError}
       />
 
       {options ? (
@@ -479,9 +488,11 @@ function SymbolSearch({
 function UploadLabel({
   label,
   onText,
+  onError,
 }: {
   label: string;
   onText: (text: string) => void;
+  onError: (message: string) => void;
 }) {
   return (
     <label className="inline-flex cursor-pointer items-center rounded-md border border-gray-300 px-2 py-1.5 text-xs text-gray-600 hover:border-blue-400 dark:border-gray-700 dark:text-gray-300 dark:hover:border-blue-400">
@@ -490,7 +501,7 @@ function UploadLabel({
         type="file"
         accept=".csv,text/csv"
         className="hidden"
-        onChange={(event) => void readTextFile(event, onText)}
+        onChange={(event) => void readTextFile(event, onText, onError)}
       />
     </label>
   );
@@ -505,6 +516,7 @@ function HoldingsEditor({
   onUpdate,
   onRemove,
   onImportCsv,
+  onImportError,
 }: {
   holdings: PortfolioHolding[];
   cash: number;
@@ -514,6 +526,7 @@ function HoldingsEditor({
   onUpdate: (symbol: string, changes: Partial<Omit<PortfolioHolding, "symbol">>) => void;
   onRemove: (symbol: string) => void;
   onImportCsv: (text: string) => void;
+  onImportError: (message: string) => void;
 }) {
   const existing = useMemo(() => new Set(holdings.map((holding) => holding.symbol)), [holdings]);
   return (
@@ -527,7 +540,11 @@ function HoldingsEditor({
             universe={universe}
             placeholder="Add holding"
           />
-          <UploadLabel label="Upload holdings CSV" onText={onImportCsv} />
+          <UploadLabel
+            label="Upload holdings CSV"
+            onText={onImportCsv}
+            onError={onImportError}
+          />
         </div>
       </div>
       <label className="block text-xs">
@@ -625,6 +642,7 @@ function TargetEditor({
   onMatchCurrent,
   onUseOptimized,
   onImportCsv,
+  onImportError,
 }: {
   targets: TargetWeightRow[];
   universe: SymbolInfo[];
@@ -637,6 +655,7 @@ function TargetEditor({
   onMatchCurrent: () => void;
   onUseOptimized: () => void;
   onImportCsv: (text: string) => void;
+  onImportError: (message: string) => void;
 }) {
   const existing = useMemo(() => new Set(targets.map((row) => row.symbol)), [targets]);
   return (
@@ -670,7 +689,11 @@ function TargetEditor({
           >
             Use current weights
           </button>
-          <UploadLabel label="Upload target CSV" onText={onImportCsv} />
+          <UploadLabel
+            label="Upload target CSV"
+            onText={onImportCsv}
+            onError={onImportError}
+          />
         </div>
       </div>
       {targetsFrom === "optimized" && (

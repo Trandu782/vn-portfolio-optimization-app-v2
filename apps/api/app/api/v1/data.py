@@ -15,6 +15,8 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
+from core.settings import Settings as CoreSettings
+from core.validation import MarketDate, TickerSymbol, validate_ticker_symbol
 from data.context import get_context
 from data.models import (
     DataFreshness,
@@ -44,16 +46,27 @@ def get_sync_service() -> SyncService:
     return get_context().sync
 
 
+_WEAK_TOKENS = frozenset({"change-me", "changeme", "secret"})
+_MIN_PROD_TOKEN_LENGTH = 32
+
+
 def require_token(
     authorization: Annotated[str | None, Header()] = None,
     x_refresh_token: Annotated[str | None, Header()] = None,
 ) -> None:
     """Reject the request unless it carries the configured refresh token."""
     expected = get_settings().refresh_token
-    if not expected:
+    is_prod = CoreSettings().environment.strip().lower() == "production"
+    if not expected or (
+        is_prod
+        and (
+            expected.strip().lower() in _WEAK_TOKENS
+            or len(expected) < _MIN_PROD_TOKEN_LENGTH
+        )
+    ):
         raise HTTPException(
             status_code=503,
-            detail="refresh token is not configured (set VNOPT_REFRESH_TOKEN)",
+            detail="endpoint is not configured",
         )
     provided = x_refresh_token
     if authorization and authorization.lower().startswith("bearer "):
@@ -86,21 +99,21 @@ def list_symbols(
 
 @router.get("/prices/{symbol}", response_model=PriceSeries)
 def get_prices(
-    symbol: str,
+    symbol: TickerSymbol,
     service: Annotated[DataService, Depends(get_data_service)],
-    start: Annotated[date | None, Query()] = None,
-    end: Annotated[date | None, Query()] = None,
+    start: Annotated[MarketDate | None, Query()] = None,
+    end: Annotated[MarketDate | None, Query()] = None,
 ) -> PriceSeries:
-    """Return daily prices for a symbol, backfilling once if it is unknown."""
+    """Return daily prices for a symbol, backfilling once if it is known."""
     return service.get_prices(symbol, start=start, end=end)
 
 
 @router.get("/data/index/{index_code}", response_model=PriceSeries)
 def get_index_prices(
-    index_code: str,
+    index_code: TickerSymbol,
     service: Annotated[DataService, Depends(get_data_service)],
-    start: Annotated[date | None, Query()] = None,
-    end: Annotated[date | None, Query()] = None,
+    start: Annotated[MarketDate | None, Query()] = None,
+    end: Annotated[MarketDate | None, Query()] = None,
 ) -> PriceSeries:
     """Return daily prices for a benchmark index (VNINDEX, VN30, ...)."""
     return service.get_index_prices(index_code, start=start, end=end)
@@ -108,7 +121,7 @@ def get_index_prices(
 
 @router.get("/data/quality/{symbol}", response_model=QualityReport)
 def get_quality(
-    symbol: str,
+    symbol: TickerSymbol,
     service: Annotated[DataService, Depends(get_data_service)],
 ) -> QualityReport:
     """Run every registered quality check for ``symbol``."""
@@ -162,16 +175,22 @@ def list_providers() -> list[ProviderCatalogueEntry]:
 @router.get("/data/probe", response_model=ProbeReport, dependencies=[Depends(require_token)])
 def probe_providers(
     tickers: Annotated[str, Query()] = ",".join(DEFAULT_TICKERS),
-    index_code: Annotated[str, Query()] = DEFAULT_INDEX,
-    start: Annotated[date | None, Query()] = None,
-    end: Annotated[date | None, Query()] = None,
+    index_code: TickerSymbol = DEFAULT_INDEX,
+    start: Annotated[MarketDate | None, Query()] = None,
+    end: Annotated[MarketDate | None, Query()] = None,
     years: Annotated[int, Query(ge=1, le=20)] = 5,
 ) -> ProbeReport:
     """Call every provider and report what works on the current (hosted) network."""
     context = get_context()
     range_end = end or date.today()
     range_start = start or (range_end - timedelta(days=365 * years))
-    ticker_list = [item.strip().upper() for item in tickers.split(",") if item.strip()]
+    raw_items = [item for item in tickers.split(",") if item.strip()]
+    if len(raw_items) > 10:
+        raise HTTPException(status_code=422, detail="at most 10 tickers per probe request")
+    try:
+        ticker_list = [validate_ticker_symbol(item, field_name="tickers") for item in raw_items]
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return run_probe(
         context.providers,
         start=range_start,
@@ -193,8 +212,8 @@ def probe_providers(
 def refresh(
     sync: Annotated[SyncService, Depends(get_sync_service)],
     cursor: Annotated[int, Query(ge=0, description="Resume from a prior call.")] = 0,
-    limit: Annotated[int | None, Query(ge=1)] = None,
-    time_budget: Annotated[float | None, Query(gt=0)] = None,
+    limit: Annotated[int | None, Query(ge=1, le=500)] = None,
+    time_budget: Annotated[float | None, Query(gt=0, le=110.0)] = None,
 ) -> RefreshResult:
     """Run a bounded incremental sync batch and report what remains."""
     return sync.refresh_batch(cursor=cursor, limit=limit, time_budget=time_budget)
@@ -203,10 +222,13 @@ def refresh(
 class BackfillRequest(BaseModel):
     """Symbols to backfill on demand (the Universe page's Refresh data action)."""
 
-    symbols: list[str] = Field(default_factory=list, description="Ticker codes to sync.")
+    symbols: list[TickerSymbol] = Field(
+        default_factory=list, max_length=25, description="Ticker codes to sync."
+    )
     history_days: int | None = Field(
         default=None,
         ge=1,
+        le=3650,
         description="History depth to fetch when a symbol has no stored bars.",
     )
 
@@ -230,7 +252,11 @@ class BackfillResponse(BaseModel):
     results: list[BackfillSymbolResult]
 
 
-@router.post("/data/backfill", response_model=BackfillResponse)
+@router.post(
+    "/data/backfill",
+    response_model=BackfillResponse,
+    dependencies=[Depends(require_token)],
+)
 def backfill(
     request: BackfillRequest,
     sync: Annotated[SyncService, Depends(get_sync_service)],
@@ -239,7 +265,9 @@ def backfill(
     codes = [code.strip().upper() for code in request.symbols if code.strip()]
     results: list[BackfillSymbolResult] = []
     for code in codes:
-        outcome = sync.sync_symbol(code, history_days=request.history_days)
+        outcome = sync.sync_symbol(
+            code, history_days=request.history_days, allow_unknown=True
+        )
         message = outcome.message
         if message is None and outcome.warnings:
             message = "; ".join(outcome.warnings)

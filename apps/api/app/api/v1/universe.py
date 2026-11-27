@@ -29,6 +29,7 @@ from core.universe import (
     normalize_exchange,
     universe_filters,
 )
+from core.validation import MarketDate, TickerSymbol, format_validation_error
 from data.calendar import last_trading_day, trading_days_between
 from data.models import PriceBar
 from data.presets import INDEX_PRESETS, PRESET_BY_CODE
@@ -78,12 +79,16 @@ class UniverseFilterRequest(BaseModel):
 class UniverseBuildRequest(BaseModel):
     """Inputs for building the universe."""
 
-    symbols: list[str] = Field(default_factory=list, description="Explicit ticker codes.")
+    symbols: list[TickerSymbol] = Field(
+        default_factory=list, max_length=200, description="Explicit ticker codes."
+    )
     preset: str | None = Field(default=None, description="Index preset, for example VN30.")
-    filters: list[UniverseFilterRequest] = Field(default_factory=list)
-    start: date
-    end: date
-    adv_sessions: int = Field(default=20, ge=1, description="Sessions used for the ADV metric.")
+    filters: list[UniverseFilterRequest] = Field(default_factory=list, max_length=20)
+    start: MarketDate
+    end: MarketDate
+    adv_sessions: int = Field(
+        default=20, ge=1, le=252, description="Sessions used for the ADV metric."
+    )
 
 
 class DroppedTickerResponse(BaseModel):
@@ -197,7 +202,8 @@ def build_universe_endpoint(
         ) from exc
     except ValidationError as exc:
         raise HTTPException(
-            status_code=422, detail=f"invalid filter parameters: {exc}"
+            status_code=422,
+            detail=f"invalid filter parameters: {format_validation_error(exc)}",
         ) from exc
 
     series, _sources = _load_symbol_series_batch(

@@ -69,6 +69,11 @@ def test_refresh_and_read_through_api(client: TestClient) -> None:
     assert body["done"] is True
     assert body["processed"] == 4  # four benchmarks, no symbols yet
 
+    with session_scope(data_pkg.get_context().session_factory) as session:
+        SqlSymbolRepository(session).upsert(
+            SymbolInfo(code="VNM", exchange="HOSE", type="stock", source="test")
+        )
+
     prices = client.get("/api/v1/prices/VNM")
     assert prices.status_code == 200
     payload = prices.json()

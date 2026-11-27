@@ -32,6 +32,7 @@ from core.pnl import (
 )
 from core.portfolio import Holding, Portfolio
 from core.settings import UserSettings
+from core.validation import format_validation_error
 from data.models import PriceBar, PriceSeries
 from data.service import DataService
 
@@ -46,6 +47,7 @@ class PnLRequest(BaseModel):
 
     holdings: list[Holding] = Field(
         default_factory=list,
+        max_length=200,
         description="Holdings (with optional average cost and buy date).",
     )
     cash: int = Field(default=0, ge=0, description="Cash balance in whole VND.")
@@ -114,7 +116,7 @@ def evaluate_pnl(
     try:
         portfolio = Portfolio(holdings=request.holdings, cash=request.cash)
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail=format_validation_error(exc)) from exc
 
     settings = request.settings or UserSettings()
     # Every price/return query resolves from the unified V2 dataset (no silent V1

@@ -14,14 +14,16 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from core.market_rules import DEFAULT_MARKET_RULES
+from core.validation import MIN_MARKET_DATE
 from data.benchmarks import BENCHMARK_BY_CODE, BENCHMARKS, Benchmark
 from data.calendar import last_trading_day
 from data.consistency import compare_overlap
 from data.db.base import session_scope
-from data.db.models import utcnow
+from data.db.models import V2TickerMaster, utcnow
 from data.db.repositories import (
     SqlConstituentRepository,
     SqlIndexRepository,
@@ -89,6 +91,7 @@ class SyncService:
         history_days: int | None = None,
         force_full: bool = False,
         start: date | None = None,
+        allow_unknown: bool = False,
     ) -> SymbolSyncResult:
         """Fetch and store only the days missing from ``prices_daily``.
 
@@ -96,16 +99,49 @@ class SyncService:
         begins after it, the missing older days are fetched and added, so a long
         analysis window (3Y/5Y/Max) can reach the full available history instead
         of being capped at the first fetch depth.
+
+        When ``allow_unknown`` is ``False`` (the default for unauthenticated read
+        paths), unknown tickers not present in ``symbols`` or ``v2_ticker_master``
+        return immediately with ``status="unknown_symbol"`` without mutating
+        ``symbols`` or ``sync_log`` or issuing outbound HTTP requests.
         """
-        code = symbol.upper()
+        code = symbol.strip().upper()
         with session_scope(self._session_factory) as session:
             symbols = SqlSymbolRepository(session)
             prices = SqlPriceRepository(session)
             logs = SqlSyncLogRepository(session)
             started = utcnow()
-            if symbols.get(code) is None:
+            symbol_info = symbols.get(code)
+            v2_record = (
+                session.scalar(
+                    select(V2TickerMaster).where(V2TickerMaster.ticker == code)
+                )
+                if symbol_info is None
+                else None
+            )
+            if symbol_info is None and v2_record is None and not allow_unknown:
+                return SymbolSyncResult(
+                    code,
+                    "symbol",
+                    False,
+                    "unknown_symbol",
+                    message="unknown symbol",
+                )
+            if symbol_info is None:
                 symbols.upsert(
-                    SymbolInfo(code=code, exchange="UNKNOWN", type="stock", source="manual")
+                    SymbolInfo(
+                        code=code,
+                        exchange=(
+                            v2_record.exchange if v2_record is not None else "UNKNOWN"
+                        ),
+                        name=v2_record.name if v2_record is not None else None,
+                        type=(
+                            (v2_record.security_type or "stock")
+                            if v2_record is not None
+                            else "stock"
+                        ),
+                        source=v2_record.source if v2_record is not None else "manual",
+                    )
                 )
             earliest = prices.earliest_date(code)
             last = None if force_full else prices.latest_date(code)
@@ -141,6 +177,12 @@ class SyncService:
                 fetch_start = max(earliest or last, last - timedelta(days=10))
                 fetch_end = today
                 replacing = False
+            fetch_start = max(fetch_start, MIN_MARKET_DATE)
+            fetch_end = min(fetch_end, today)
+            if fetch_start > fetch_end:
+                return self._finish(
+                    logs, started, SymbolSyncResult(code, "symbol", True, "up_to_date")
+                )
             try:
                 result = self._fallback.get_daily_prices(code, fetch_start, fetch_end)
             except AllProvidersFailedError as exc:
@@ -299,6 +341,20 @@ class SyncService:
             else:
                 fetch_start = last - timedelta(days=10)
                 fetch_end = today
+            fetch_start = max(fetch_start, MIN_MARKET_DATE)
+            fetch_end = min(fetch_end, today)
+            if fetch_start > fetch_end:
+                return self._finish(
+                    logs,
+                    started,
+                    SymbolSyncResult(
+                        benchmark.code,
+                        "index",
+                        True,
+                        "up_to_date",
+                        warnings=reference_warnings,
+                    ),
+                )
             try:
                 result = self._fallback.get_index_daily(
                     benchmark.code, fetch_start, fetch_end

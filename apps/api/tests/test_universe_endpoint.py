@@ -222,8 +222,37 @@ def test_build_rejects_unknown_filter(client: TestClient) -> None:
     assert response.status_code == 422
 
 
-def test_backfill_endpoint_runs_per_symbol(client: TestClient) -> None:
+def test_backfill_endpoint_requires_token(client: TestClient) -> None:
     response = client.post("/api/v1/data/backfill", json={"symbols": ["liq"]})
+    assert response.status_code in (401, 503)
+
+    # With a token configured, unauthenticated calls return 401.
+    get_settings.cache_clear()
+    import os
+
+    prev = os.environ.get("VNOPT_REFRESH_TOKEN")
+    os.environ["VNOPT_REFRESH_TOKEN"] = "unit-test-backfill-token"
+    try:
+        unauth = client.post("/api/v1/data/backfill", json={"symbols": ["liq"]})
+        assert unauth.status_code == 401
+    finally:
+        if prev is None:
+            os.environ.pop("VNOPT_REFRESH_TOKEN", None)
+        else:
+            os.environ["VNOPT_REFRESH_TOKEN"] = prev
+        get_settings.cache_clear()
+
+
+def test_backfill_endpoint_runs_per_symbol(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("VNOPT_REFRESH_TOKEN", "unit-test-backfill-token")
+    get_settings.cache_clear()
+    response = client.post(
+        "/api/v1/data/backfill",
+        headers={"Authorization": "Bearer unit-test-backfill-token"},
+        json={"symbols": ["liq"]},
+    )
     assert response.status_code == 200
     body = response.json()
     assert body["requested"] == 1

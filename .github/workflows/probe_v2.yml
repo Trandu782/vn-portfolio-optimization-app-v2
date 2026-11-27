@@ -23,12 +23,13 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
 
@@ -38,13 +39,24 @@ jobs:
           python -m pip install -e packages/core -e packages/data
 
       - name: Run provider probe
+        shell: bash
         env:
           GITHUB_ACTIONS: "true"
+          INPUT_TICKERS: ${{ inputs.tickers }}
+          INPUT_YEARS: ${{ inputs.years }}
         run: |
+          if ! [[ "${INPUT_TICKERS}" =~ ^[A-Za-z0-9]+(,[A-Za-z0-9]+)*$ ]]; then
+            echo "Invalid tickers input: must be alphanumeric/comma-separated" >&2
+            exit 1
+          fi
+          if ! [[ "${INPUT_YEARS}" =~ ^[0-9]+$ ]] || [ "${INPUT_YEARS}" -lt 1 ] || [ "${INPUT_YEARS}" -gt 20 ]; then
+            echo "Invalid years input: must be an integer in 1..20" >&2
+            exit 1
+          fi
           python scripts/probe_v2.py \
             --environment ci \
-            --tickers "${{ inputs.tickers }}" \
-            --years "${{ inputs.years }}"
+            --tickers "${INPUT_TICKERS}" \
+            --years "${INPUT_YEARS}"
 
       - name: Run candidate probe
         env:
@@ -53,7 +65,7 @@ jobs:
           python scripts/probe_v2_candidates.py | tee docs/V2_CANDIDATES_PROBE.md
 
       - name: Upload provider probe report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: provider-probe-report
           path: |

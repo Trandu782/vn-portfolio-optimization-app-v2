@@ -113,7 +113,7 @@ class HttpxHttpClient:
         self._host_cooldowns: dict[str, float] = {}
         self._client = httpx.Client(
             timeout=self._timeout,
-            follow_redirects=True,
+            follow_redirects=False,
             limits=httpx.Limits(max_connections=16, max_keepalive_connections=10),
             transport=transport,
         )

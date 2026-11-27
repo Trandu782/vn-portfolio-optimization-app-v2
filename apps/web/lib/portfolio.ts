@@ -25,6 +25,19 @@ export const PORTFOLIO_STORAGE_SCHEMA_VERSION = 1;
 
 export const EMPTY_PORTFOLIO: Portfolio = { holdings: [], cash: 0 };
 
+/** Strict ticker validation matching the backend ``TICKER_SYMBOL_RE``. */
+export const TICKER_SYMBOL_RE = /^[A-Z0-9._-]{1,16}$/;
+
+/** True when ``symbol`` is a safe, valid 1-16 character ticker code. */
+export function isValidTickerSymbol(symbol: string): boolean {
+  return (
+    TICKER_SYMBOL_RE.test(symbol) &&
+    !symbol.includes("..") &&
+    !symbol.startsWith(".") &&
+    !symbol.startsWith("-")
+  );
+}
+
 function isWholeAmount(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
@@ -44,7 +57,7 @@ function sanitizeHolding(value: unknown): PortfolioHolding | null {
   }
   const record = value as Record<string, unknown>;
   const symbol = typeof record.symbol === "string" ? record.symbol.trim().toUpperCase() : "";
-  if (symbol === "") {
+  if (symbol === "" || !isValidTickerSymbol(symbol)) {
     return null;
   }
   const shares = record.shares;

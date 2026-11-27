@@ -101,12 +101,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     for symbol in [item.upper() for item in args.backfill]:
         results.append(
             context.sync.sync_symbol(
-                symbol, history_days=args.history_days, force_full=True
+                symbol, history_days=args.history_days, force_full=True, allow_unknown=True
             )
         )
     incremental = [item.strip().upper() for item in args.symbols.split(",") if item.strip()]
     for symbol in incremental:
-        results.append(context.sync.sync_symbol(symbol, history_days=args.history_days))
+        results.append(
+            context.sync.sync_symbol(
+                symbol, history_days=args.history_days, allow_unknown=True
+            )
+        )
 
     if args.benchmarks or not (args.backfill or incremental or args.reference):
         results.extend(context.sync.sync_benchmarks(history_days=args.history_days))

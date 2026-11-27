@@ -22,6 +22,8 @@ from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from core.validation import validate_market_date, validate_ticker_symbol
+
 
 class Holding(BaseModel):
     """One portfolio line: a ticker, a whole share count and an optional average cost."""
@@ -51,11 +53,16 @@ class Holding(BaseModel):
     @field_validator("symbol")
     @classmethod
     def _normalize_symbol(cls, value: str) -> str:
-        """Trim and upper-case the ticker and reject an empty code."""
-        code = value.strip().upper()
-        if not code:
-            raise ValueError("symbol must not be empty")
-        return code
+        """Trim, upper-case and validate the ticker symbol."""
+        return validate_ticker_symbol(value, field_name="symbol")
+
+    @field_validator("buy_date")
+    @classmethod
+    def _validate_buy_date(cls, value: date | None) -> date | None:
+        """Reject buy dates earlier than MIN_MARKET_DATE."""
+        if value is not None:
+            return validate_market_date(value, field_name="buy_date")
+        return None
 
     @field_validator("shares", "avg_cost", mode="before")
     @classmethod
@@ -72,7 +79,9 @@ class Portfolio(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     holdings: list[Holding] = Field(
-        default_factory=list, description="One entry per ticker; symbols must be unique."
+        default_factory=list,
+        max_length=200,
+        description="One entry per ticker; symbols must be unique.",
     )
     cash: int = Field(default=0, ge=0, description="Cash balance in whole VND.")
 

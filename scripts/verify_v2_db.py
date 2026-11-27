@@ -47,12 +47,15 @@ def _human_size(num_bytes: int) -> str:
 
 
 def _redacted_database_url(engine) -> str:
-    """Return the target database URL with any password masked as ``***``.
+    """Return a safe database summary without credentials or remote host refs.
 
-    The report is printed to the console and uploaded as a CI artifact, so the
-    credentials inside ``DATABASE_URL`` must never reach ``verify_report.txt``.
+    The report is printed to the console and uploaded as a CI artifact, so
+    credentials, usernames, hosts and Supabase project refs inside
+    ``DATABASE_URL`` must never reach ``verify_report.txt``.
     """
-    return engine.url.render_as_string(hide_password=True)
+    if engine.url.drivername.startswith("sqlite"):
+        return engine.url.render_as_string(hide_password=True)
+    return f"{engine.url.drivername}://***"
 
 
 def _database_size(engine) -> tuple[str, int]:

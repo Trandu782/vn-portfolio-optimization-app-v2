@@ -26,6 +26,8 @@ import { usePortfolio } from "@/lib/portfolio-context";
 import { holdingsToCsv, parseHoldingsCsv } from "@/lib/portfolio-csv";
 import { portfolioFromJson, portfolioToJson } from "@/lib/portfolio";
 
+const MAX_UPLOAD_BYTES = 1_048_576;
+
 function parseWhole(value: string): number {
   const parsed = Math.trunc(Number(value));
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
@@ -140,6 +142,10 @@ export function PortfolioBuilder() {
     }
     setImportError(null);
     setNotice(null);
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setImportError("CSV import: file is too large (maximum size is 1 MB).");
+      return;
+    }
     try {
       const parsed = parseHoldingsCsv(await file.text());
       if (parsed.errors.length > 0) {
@@ -161,6 +167,10 @@ export function PortfolioBuilder() {
     }
     setImportError(null);
     setNotice(null);
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setImportError("JSON import: file is too large (maximum size is 1 MB).");
+      return;
+    }
     try {
       const portfolio = portfolioFromJson(await file.text());
       replacePortfolio(portfolio);
@@ -198,6 +208,10 @@ export function PortfolioBuilder() {
     }
     setImportError(null);
     setNotice(null);
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setImportError("Saved portfolio import: file is too large (maximum size is 1 MB).");
+      return;
+    }
     try {
       const count = importLibraryJson(await file.text());
       setNotice(`Imported ${count} saved portfolios.`);

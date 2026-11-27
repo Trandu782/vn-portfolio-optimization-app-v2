@@ -69,3 +69,38 @@ test("missing symbol or weight is rejected", () => {
   assert.equal(parsed.rows.length, 0);
   assert.equal(parsed.errors.length, 2);
 });
+
+test("rebalance CSV export neutralizes formula-injection characters and quotes", () => {
+  const orderCsv = ordersToCsv([
+    {
+      symbol: "=HYPERLINK(\"http://evil\")",
+      side: "buy",
+      lots: 1,
+      shares: 100,
+      reference_price: 50000,
+      value: 5000000,
+      fee: 7500,
+      tax: 0,
+    },
+  ]);
+  const line = orderCsv.split("\n")[1] ?? "";
+  assert.equal(
+    line,
+    '"\'=HYPERLINK(""http://evil"")",buy,1,100,50000,5000000,7500,0',
+  );
+
+  const targetCsv = targetWeightsToCsv([
+    { symbol: "+SUM(A1)", weight_percent: 50 },
+    { symbol: "@EXEC", weight_percent: 50 },
+  ]);
+  assert.equal(
+    targetCsv,
+    "symbol,weight_percent\n'+SUM(A1),50\n'@EXEC,50",
+  );
+});
+
+test("target weights CSV rejects malformed ticker symbols", () => {
+  const parsed = parseTargetWeightsCsv("=1+1,50\nVCB/foo,50");
+  assert.deepEqual(parsed.rows, []);
+  assert.equal(parsed.errors.length, 2);
+});

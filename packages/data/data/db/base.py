@@ -12,7 +12,10 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 from sqlalchemy import Engine, create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
+
+_LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 
 
 def connect_args_for(database_url: str) -> dict[str, object]:
@@ -23,13 +26,18 @@ def connect_args_for(database_url: str) -> dict[str, object]:
     pgbouncer transaction pooler (Supabase port 6543), which cannot keep
     server-side prepared statements between transactions; psycopg3's automatic
     prepared statements then collide with "DuplicatePreparedStatement", so they
-    are disabled for every psycopg connection.
+    are disabled for every psycopg connection. Remote Postgres connections also
+    default to ``sslmode=require`` unless ``sslmode`` is already in the URL.
     """
     connect_args: dict[str, object] = {}
     if database_url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
     elif database_url.startswith("postgresql+psycopg"):
         connect_args["prepare_threshold"] = None
+        parsed = make_url(database_url)
+        host = (parsed.host or "").lower()
+        if host and host not in _LOCAL_HOSTS and "sslmode" not in parsed.query:
+            connect_args["sslmode"] = "require"
     return connect_args
 
 

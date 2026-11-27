@@ -56,6 +56,27 @@ class Settings(BaseSettings):
     # covariance trustworthy. The UI reads the effective value from /optimize/options.
     max_optimize_stocks: int = 30
 
+    # Comma-separated allowed CORS origins (VNOPT_CORS_ORIGINS). Wildcard '*' is
+    # rejected; when empty, defaults to local Next.js dev origins in development
+    # and [] in production.
+    cors_origins: str = ""
+
+    # Toggle for the in-memory API rate limiter (VNOPT_RATE_LIMIT_ENABLED).
+    rate_limit_enabled: bool = True
+
+    def parsed_cors_origins(self) -> list[str]:
+        """Return allowed CORS origins, never allowing wildcard ``*``."""
+        origins = [
+            item.strip()
+            for item in self.cors_origins.split(",")
+            if item.strip() and item.strip() != "*"
+        ]
+        if origins:
+            return origins
+        if self.environment.strip().lower() == "production":
+            return []
+        return ["http://localhost:3000", "http://127.0.0.1:3000"]
+
 
 class UserSettings(BaseModel):
     """Values supplied by the user and sent with every API request.

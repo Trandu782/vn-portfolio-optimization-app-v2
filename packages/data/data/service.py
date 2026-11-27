@@ -184,7 +184,7 @@ class DataService:
                 else not self._has_prices(code)
             )
             if needs_sync:
-                result = self._sync.sync_symbol(code, start=start)
+                result = self._sync.sync_symbol(code, start=start, allow_unknown=False)
                 if not result.ok:
                     status = "queued"
                     warnings.append(

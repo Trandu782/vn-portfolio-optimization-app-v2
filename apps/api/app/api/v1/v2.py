@@ -10,11 +10,11 @@ index, exchange or sector name maps to a 422.
 
 from __future__ import annotations
 
-from datetime import date
 from typing import Annotated, cast
 
 from fastapi import APIRouter, HTTPException, Query, Response
 
+from core.validation import MarketDate, TickerSymbol
 from data.context import get_context
 from data.v2.analytics.index import WEIGHTING_EQUAL, WEIGHTING_MARKET_CAP
 from data.v2.analytics.liquidity import DEFAULT_PRESET_ID
@@ -37,10 +37,10 @@ _V2_CACHE_CONTROL = "public, max-age=300, s-maxage=1800, stale-while-revalidate=
 
 @router.get("/v2/ticker/{symbol}", response_model=TickerSnapshot)
 def get_ticker_snapshot(
-    symbol: str,
+    symbol: TickerSymbol,
     response: Response,
-    start: Annotated[date | None, Query()] = None,
-    end: Annotated[date | None, Query()] = None,
+    start: Annotated[MarketDate | None, Query()] = None,
+    end: Annotated[MarketDate | None, Query()] = None,
 ) -> TickerSnapshot:
     """Return adjusted returns, liquidity, market cap and sector for ``symbol``."""
     snapshot = ticker_snapshot(get_context().session_factory, symbol, start, end)
@@ -60,10 +60,10 @@ def get_sector_coverage(response: Response) -> CoverageSummary:
 def get_universe(
     response: Response,
     preset: Annotated[str, Query()] = DEFAULT_PRESET_ID,
-    sectors: Annotated[list[str] | None, Query()] = None,
-    indexes: Annotated[list[str] | None, Query()] = None,
+    sectors: Annotated[list[str] | None, Query(max_length=50)] = None,
+    indexes: Annotated[list[str] | None, Query(max_length=10)] = None,
     exchange: Annotated[str | None, Query()] = None,
-    as_of: Annotated[date | None, Query()] = None,
+    as_of: Annotated[MarketDate | None, Query()] = None,
     exclude_adjustment_flagged: Annotated[bool, Query()] = False,
 ) -> UniverseFilterResponse:
     """Return the tickers that pass the preset and facets, using ``filter_universe``."""
@@ -109,11 +109,11 @@ def get_analytics(
     response: Response,
     benchmark: Annotated[str, Query()] = "VNINDEX",
     timeframe: Annotated[str, Query()] = "1Y",
-    custom_start: Annotated[date | None, Query()] = None,
-    custom_end: Annotated[date | None, Query()] = None,
+    custom_start: Annotated[MarketDate | None, Query()] = None,
+    custom_end: Annotated[MarketDate | None, Query()] = None,
     grouping: Annotated[str, Query()] = "sector",
     liquidity_preset: Annotated[str, Query()] = DEFAULT_PRESET_ID,
-    indexes: Annotated[list[str] | None, Query()] = None,
+    indexes: Annotated[list[str] | None, Query(max_length=10)] = None,
     exchange: Annotated[str | None, Query()] = None,
     weighting: Annotated[str, Query()] = WEIGHTING_MARKET_CAP,
     cap_percent: Annotated[float | None, Query()] = None,
@@ -170,9 +170,9 @@ def get_analytics(
 
 @router.get("/v2/fundamentals/{symbol}", response_model=FundamentalsComparison)
 def get_fundamentals(
-    symbol: str,
+    symbol: TickerSymbol,
     response: Response,
-    period: Annotated[date | None, Query()] = None,
+    period: Annotated[MarketDate | None, Query()] = None,
     period_type: Annotated[str | None, Query()] = None,
     peer_variant: Annotated[str, Query()] = "all",
     preset: Annotated[str, Query()] = DEFAULT_PRESET_ID,

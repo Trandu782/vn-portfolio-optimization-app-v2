@@ -51,6 +51,7 @@ from core.optimize import (
 from core.registry import Registry
 from core.settings import Settings, UserSettings
 from core.universe import UniverseBuildResult, build_universe
+from core.validation import FiniteFloat, MarketDate, TickerSymbol, format_validation_error
 from data.service import DataService
 
 router = APIRouter(tags=["optimize"])
@@ -119,12 +120,16 @@ def _default_constraints() -> list[ConstraintSelection]:
 class OptimizeRequest(BaseModel):
     """Inputs for one optimization run. Settings default when omitted."""
 
-    symbols: list[str] = Field(default_factory=list, description="Ticker codes to optimize.")
-    start: date
-    end: date
+    symbols: list[TickerSymbol] = Field(
+        default_factory=list, max_length=100, description="Ticker codes to optimize."
+    )
+    start: MarketDate
+    end: MarketDate
     capital: int = Field(..., ge=0, description="Capital to invest in VND.")
     objective: str = Field(default=DEFAULT_OBJECTIVE, description="Objective id.")
-    constraints: list[ConstraintSelection] = Field(default_factory=_default_constraints)
+    constraints: list[ConstraintSelection] = Field(
+        default_factory=_default_constraints, max_length=20
+    )
     risk_free_rate_provider: str = Field(
         default="user_settings",
         description="Risk-free-rate provider id (user settings today).",
@@ -133,7 +138,7 @@ class OptimizeRequest(BaseModel):
         default=None,
         description="User settings. Defaults apply when omitted.",
     )
-    sectors: dict[str, str] | None = Field(
+    sectors: dict[TickerSymbol, str] | None = Field(
         default=None,
         description=(
             "Optional ticker -> sector map for the maximum-sector-weight constraint. "
@@ -186,11 +191,13 @@ class OptimizeResponse(BaseModel):
 class FrontierRequest(BaseModel):
     """Inputs for one efficient-frontier run. Settings default when omitted."""
 
-    symbols: list[str] = Field(default_factory=list, description="Ticker codes to optimize.")
-    start: date
-    end: date
+    symbols: list[TickerSymbol] = Field(
+        default_factory=list, max_length=100, description="Ticker codes to optimize."
+    )
+    start: MarketDate
+    end: MarketDate
     capital: int = Field(..., ge=0, description="Capital to invest in VND (for lots and cash).")
-    max_weight: float = Field(
+    max_weight: FiniteFloat = Field(
         default=DEFAULT_MAX_WEIGHT,
         gt=0.0,
         le=1.0,
@@ -206,8 +213,9 @@ class FrontierRequest(BaseModel):
         ),
     )
     seed: int | None = Field(default=None, description="Seed for the random cloud.")
-    current_weights: dict[str, float] = Field(
+    current_weights: dict[TickerSymbol, FiniteFloat] = Field(
         default_factory=dict,
+        max_length=200,
         description="The user's current portfolio weights, plotted as a marker.",
     )
     risk_free_rate_provider: str = Field(
@@ -218,14 +226,14 @@ class FrontierRequest(BaseModel):
         default=None,
         description="User settings. Defaults apply when omitted.",
     )
-    sectors: dict[str, str] | None = Field(
+    sectors: dict[TickerSymbol, str] | None = Field(
         default=None,
         description=(
             "Optional ticker -> sector map for the maximum-sector-weight constraint. "
             "Symbols missing from the map are grouped as 'Unknown'."
         ),
     )
-    max_sector_weight: float | None = Field(
+    max_sector_weight: FiniteFloat | None = Field(
         default=None,
         gt=0.0,
         le=1.0,
@@ -402,7 +410,9 @@ def run_optimize(
         identifier = exc.args[0] if exc.args else "?"
         raise HTTPException(status_code=422, detail=f"unknown id {identifier!r}") from exc
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=f"invalid parameters: {exc}") from exc
+        raise HTTPException(
+            status_code=422, detail=f"invalid parameters: {format_validation_error(exc)}"
+        ) from exc
     except InfeasibleConstraintsError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ValueError as exc:
@@ -599,7 +609,9 @@ def run_frontier(
         identifier = exc.args[0] if exc.args else "?"
         raise HTTPException(status_code=422, detail=f"unknown id {identifier!r}") from exc
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=f"invalid parameters: {exc}") from exc
+        raise HTTPException(
+            status_code=422, detail=f"invalid parameters: {format_validation_error(exc)}"
+        ) from exc
     except InfeasibleConstraintsError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except ValueError as exc:

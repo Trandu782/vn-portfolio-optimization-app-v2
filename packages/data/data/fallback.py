@@ -65,6 +65,28 @@ class FallbackResult[T]:
     failovers: list[FailoverEvent] = field(default_factory=list)
 
 
+_SAFE_ERROR_SUMMARIES: dict[str, str] = {
+    "auth": "provider requires authentication",
+    "rate_limit": "provider rate limited",
+    "timeout": "provider request timed out",
+    "network": "provider network error",
+    "http": "provider HTTP error",
+    "schema": "provider returned unexpected payload",
+    "empty": "provider returned no data",
+    "stale": "provider returned stale data",
+}
+
+
+def _safe_error_summary(error_type: str | None, message: str | None) -> str | None:
+    """Return a short, non-sensitive summary suitable for public status endpoints."""
+    if message is None:
+        return None
+    if message.startswith("unexpected ") or "://" in message:
+        return _SAFE_ERROR_SUMMARIES.get(error_type or "", "provider error")
+    cleaned = " ".join(message.split())
+    return cleaned[:160]
+
+
 class FallbackProvider:
     """Serve data from the first healthy provider in priority order."""
 
@@ -274,7 +296,9 @@ class FallbackProvider:
                     consecutive_failures=runtime.consecutive_failures,
                     in_cooldown=is_open,
                     cooldown_until=runtime.cooldown_until,
-                    last_error=runtime.last_error,
+                    last_error=_safe_error_summary(
+                        runtime.last_error_type, runtime.last_error
+                    ),
                     last_error_type=runtime.last_error_type,
                     last_success_at=runtime.last_success_at,
                     last_failure_at=runtime.last_failure_at,

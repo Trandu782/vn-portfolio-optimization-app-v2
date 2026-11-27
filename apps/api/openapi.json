@@ -362,6 +362,7 @@
           "history_days": {
             "anyOf": [
               {
+                "maximum": 3650.0,
                 "minimum": 1.0,
                 "type": "integer"
               },
@@ -377,6 +378,7 @@
             "items": {
               "type": "string"
             },
+            "maxItems": 25,
             "title": "Symbols",
             "type": "array"
           }
@@ -1241,6 +1243,7 @@
               "type": "number"
             },
             "description": "The user's current portfolio weights, plotted as a marker.",
+            "maxProperties": 200,
             "title": "Current Weights",
             "type": "object"
           },
@@ -1252,8 +1255,8 @@
           "max_sector_weight": {
             "anyOf": [
               {
-                "exclusiveMinimum": 0.0,
-                "maximum": 1.0,
+                "gt": 0.0,
+                "le": 1.0,
                 "type": "number"
               },
               {
@@ -1332,6 +1335,7 @@
             "items": {
               "type": "string"
             },
+            "maxItems": 100,
             "title": "Symbols",
             "type": "array"
           }
@@ -2153,6 +2157,7 @@
             "items": {
               "$ref": "#/components/schemas/ConstraintSelection"
             },
+            "maxItems": 20,
             "title": "Constraints",
             "type": "array"
           },
@@ -2209,6 +2214,7 @@
             "items": {
               "type": "string"
             },
+            "maxItems": 100,
             "title": "Symbols",
             "type": "array"
           }
@@ -2511,6 +2517,7 @@
             "items": {
               "$ref": "#/components/schemas/Holding"
             },
+            "maxItems": 200,
             "title": "Holdings",
             "type": "array"
           },
@@ -2647,6 +2654,7 @@
             "items": {
               "$ref": "#/components/schemas/Holding"
             },
+            "maxItems": 200,
             "title": "Holdings",
             "type": "array"
           }
@@ -3653,6 +3661,7 @@
             "items": {
               "$ref": "#/components/schemas/Holding"
             },
+            "maxItems": 200,
             "title": "Holdings",
             "type": "array"
           },
@@ -3690,6 +3699,7 @@
               "type": "number"
             },
             "description": "Target weight per symbol as a fraction of total value (the remainder is target cash).",
+            "maxProperties": 200,
             "title": "Target Weights",
             "type": "object"
           }
@@ -3889,6 +3899,7 @@
                 "additionalProperties": {
                   "type": "number"
                 },
+                "maxProperties": 200,
                 "type": "object"
               },
               {
@@ -3916,6 +3927,7 @@
             "items": {
               "type": "string"
             },
+            "maxItems": 30,
             "title": "Metrics",
             "type": "array"
           },
@@ -3925,6 +3937,7 @@
                 "additionalProperties": {
                   "type": "number"
                 },
+                "maxProperties": 200,
                 "type": "object"
               },
               {
@@ -3955,6 +3968,7 @@
             "items": {
               "type": "string"
             },
+            "maxItems": 200,
             "title": "Symbols",
             "type": "array"
           }
@@ -4120,6 +4134,7 @@
             "items": {
               "type": "string"
             },
+            "maxItems": 30,
             "title": "Metrics",
             "type": "array"
           },
@@ -4144,6 +4159,7 @@
             "items": {
               "type": "string"
             },
+            "maxItems": 200,
             "title": "Symbols",
             "type": "array"
           },
@@ -4152,6 +4168,7 @@
               "type": "number"
             },
             "description": "Portfolio weight per symbol (fractions; cash is the remainder).",
+            "maxProperties": 200,
             "title": "Weights",
             "type": "object"
           }
@@ -4615,6 +4632,7 @@
           "adv_sessions": {
             "default": 20,
             "description": "Sessions used for the ADV metric.",
+            "maximum": 252.0,
             "minimum": 1.0,
             "title": "Adv Sessions",
             "type": "integer"
@@ -4628,6 +4646,7 @@
             "items": {
               "$ref": "#/components/schemas/UniverseFilterRequest"
             },
+            "maxItems": 20,
             "title": "Filters",
             "type": "array"
           },
@@ -4653,6 +4672,7 @@
             "items": {
               "type": "string"
             },
+            "maxItems": 200,
             "title": "Symbols",
             "type": "array"
           }
@@ -5229,6 +5249,40 @@
       "post": {
         "description": "Run an incremental on-demand backfill for the requested symbols.",
         "operationId": "backfill_api_v1_data_backfill_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-refresh-token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Refresh-Token"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -5618,6 +5672,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maximum": 500,
                   "minimum": 1,
                   "type": "integer"
                 },
@@ -5636,6 +5691,7 @@
               "anyOf": [
                 {
                   "exclusiveMinimum": 0,
+                  "maximum": 110.0,
                   "type": "number"
                 },
                 {
@@ -5729,6 +5785,7 @@
             "schema": {
               "anyOf": [
                 {
+                  "maximum": 500,
                   "minimum": 1,
                   "type": "integer"
                 },
@@ -5747,6 +5804,7 @@
               "anyOf": [
                 {
                   "exclusiveMinimum": 0,
+                  "maximum": 110.0,
                   "type": "number"
                 },
                 {
@@ -6031,7 +6089,7 @@
     },
     "/api/v1/prices/{symbol}": {
       "get": {
-        "description": "Return daily prices for a symbol, backfilling once if it is unknown.",
+        "description": "Return daily prices for a symbol, backfilling once if it is known.",
         "operationId": "get_prices_api_v1_prices__symbol__get",
         "parameters": [
           {
@@ -6630,6 +6688,7 @@
                   "items": {
                     "type": "string"
                   },
+                  "maxItems": 10,
                   "type": "array"
                 },
                 {
@@ -6994,6 +7053,7 @@
                   "items": {
                     "type": "string"
                   },
+                  "maxItems": 50,
                   "type": "array"
                 },
                 {
@@ -7013,6 +7073,7 @@
                   "items": {
                     "type": "string"
                   },
+                  "maxItems": 10,
                   "type": "array"
                 },
                 {

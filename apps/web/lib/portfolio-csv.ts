@@ -13,7 +13,22 @@
  * unit-tested with Node's built-in test runner.
  */
 
-import { isIsoDate } from "./portfolio.ts";
+import { isIsoDate, isValidTickerSymbol } from "./portfolio.ts";
+
+const FORMULA_PREFIX_RE = /^[=+\-@\t\r]/;
+
+/**
+ * Neutralize spreadsheet formula prefixes on string cells and apply RFC 4180 quoting.
+ */
+export function sanitizeCsvCell(value: string | number): string {
+  const text = String(value);
+  const guarded =
+    typeof value === "string" && FORMULA_PREFIX_RE.test(text) ? `'${text}` : text;
+  if (/[,"\n\r]/.test(guarded)) {
+    return `"${guarded.replace(/"/g, '""')}"`;
+  }
+  return guarded;
+}
 
 export interface CsvHolding {
   symbol: string;
@@ -85,6 +100,10 @@ export function parseHoldingsCsv(text: string): CsvParseResult {
       errors.push(`line ${lineNumber}: symbol is required`);
       return;
     }
+    if (!isValidTickerSymbol(symbol)) {
+      errors.push(`line ${lineNumber}: symbol "${symbol}" is invalid`);
+      return;
+    }
     const shares = wholeNumber(cell(line, 1), "shares", lineNumber, errors);
     if (shares === null) {
       return;
@@ -119,9 +138,13 @@ export function parseHoldingsCsv(text: string): CsvParseResult {
 
 /** Serialise holdings to CSV text (header plus one line per holding). */
 export function holdingsToCsv(holdings: readonly CsvHolding[]): string {
-  const rows = holdings.map(
-    (holding) =>
-      `${holding.symbol},${holding.shares},${holding.avg_cost ?? ""},${holding.buy_date ?? ""}`,
+  const rows = holdings.map((holding) =>
+    [
+      sanitizeCsvCell(holding.symbol),
+      sanitizeCsvCell(holding.shares),
+      sanitizeCsvCell(holding.avg_cost ?? ""),
+      sanitizeCsvCell(holding.buy_date ?? ""),
+    ].join(","),
   );
   return [CSV_COLUMNS.join(","), ...rows].join("\n");
 }

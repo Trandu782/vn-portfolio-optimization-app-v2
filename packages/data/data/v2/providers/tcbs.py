@@ -12,6 +12,7 @@ confirmed on the deployed / GitHub runner.
 from __future__ import annotations
 
 from typing import ClassVar
+from urllib.parse import quote
 
 from data.v2.providers.base import V2ProviderBase
 from data.v2.providers.parsing import parse_financial_ratios
@@ -37,7 +38,7 @@ class TcbsAdapter(V2ProviderBase):
         """Return ratios from TCBS (candidate endpoint; unverified)."""
         code = ticker.upper()
         payload = self._get_json(
-            self.BASE_URL + self.RATIOS_PATH.format(ticker=code),
+            self.BASE_URL + self.RATIOS_PATH.format(ticker=quote(code, safe="")),
             params={"yearly": 0, "isAll": "true"},
             headers=self.HEADERS,
         )

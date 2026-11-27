@@ -13,7 +13,6 @@ zero variance for beta).
 
 from __future__ import annotations
 
-from datetime import date
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -34,6 +33,7 @@ from core.risk import (
 )
 from core.settings import UserSettings
 from core.universe import build_universe
+from core.validation import FiniteFloat, MarketDate, TickerSymbol, format_validation_error
 from data.benchmarks import BENCHMARK_BY_CODE, BENCHMARKS
 from data.service import DataService
 
@@ -46,10 +46,10 @@ DEFAULT_BENCHMARK = "VNINDEX"
 class SharpeRequest(BaseModel):
     """Inputs for the Sharpe ratio calculation. Settings default when omitted."""
 
-    mean_return: float = Field(
+    mean_return: FiniteFloat = Field(
         ..., description="Expected annual return as a fraction (0.10 == 10%)."
     )
-    volatility: float = Field(
+    volatility: FiniteFloat = Field(
         ..., description="Annualized volatility as a fraction (0.20 == 20%)."
     )
     settings: UserSettings | None = Field(
@@ -104,21 +104,24 @@ class RiskRequest(BaseModel):
     the portfolio (the current or the optimized one) measured against it.
     """
 
-    weights: dict[str, float] = Field(
+    weights: dict[TickerSymbol, FiniteFloat] = Field(
         default_factory=dict,
+        max_length=200,
         description="Portfolio weight per symbol (fractions; cash is the remainder).",
     )
-    symbols: list[str] = Field(
-        default_factory=list, description="Universe tickers to analyse."
+    symbols: list[TickerSymbol] = Field(
+        default_factory=list, max_length=200, description="Universe tickers to analyse."
     )
-    start: date
-    end: date
+    start: MarketDate
+    end: MarketDate
     benchmark: str = Field(
         default=DEFAULT_BENCHMARK,
         description="Benchmark index code (VNINDEX, VN30, HNXINDEX, UPCOMINDEX).",
     )
     metrics: list[str] = Field(
-        default_factory=list, description="Metric ids; empty computes every metric."
+        default_factory=list,
+        max_length=30,
+        description="Metric ids; empty computes every metric.",
     )
     metric_params: dict[str, dict[str, Any]] = Field(default_factory=dict)
     settings: UserSettings | None = Field(
@@ -166,24 +169,32 @@ class RiskCompareRequest(BaseModel):
     the benchmark is measured as a one-asset portfolio.
     """
 
-    symbols: list[str] = Field(
-        default_factory=list, description="Shared universe tickers to analyse."
+    symbols: list[TickerSymbol] = Field(
+        default_factory=list,
+        max_length=200,
+        description="Shared universe tickers to analyse.",
     )
-    start: date
-    end: date
+    start: MarketDate
+    end: MarketDate
     benchmark: str = Field(
         default=DEFAULT_BENCHMARK,
         description="Benchmark index code (VNINDEX, VN30, HNXINDEX, UPCOMINDEX).",
     )
     metrics: list[str] = Field(
-        default_factory=list, description="Metric ids; empty computes every metric."
+        default_factory=list,
+        max_length=30,
+        description="Metric ids; empty computes every metric.",
     )
     metric_params: dict[str, dict[str, Any]] = Field(default_factory=dict)
-    current_weights: dict[str, float] | None = Field(
-        default=None, description="Current portfolio weights (fractions of holdings)."
+    current_weights: dict[TickerSymbol, FiniteFloat] | None = Field(
+        default=None,
+        max_length=200,
+        description="Current portfolio weights (fractions of holdings).",
     )
-    optimized_weights: dict[str, float] | None = Field(
-        default=None, description="Chosen optimized portfolio weights (fractions)."
+    optimized_weights: dict[TickerSymbol, FiniteFloat] | None = Field(
+        default=None,
+        max_length=200,
+        description="Chosen optimized portfolio weights (fractions).",
     )
     settings: UserSettings | None = Field(
         default=None,
@@ -321,7 +332,9 @@ def analyse_risk(
         identifier = exc.args[0] if exc.args else "?"
         raise HTTPException(status_code=422, detail=f"unknown id {identifier!r}") from exc
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=f"invalid parameters: {exc}") from exc
+        raise HTTPException(
+            status_code=422, detail=f"invalid parameters: {format_validation_error(exc)}"
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -432,7 +445,9 @@ def compare_risk(
         identifier = exc.args[0] if exc.args else "?"
         raise HTTPException(status_code=422, detail=f"unknown id {identifier!r}") from exc
     except ValidationError as exc:
-        raise HTTPException(status_code=422, detail=f"invalid parameters: {exc}") from exc
+        raise HTTPException(
+            status_code=422, detail=f"invalid parameters: {format_validation_error(exc)}"
+        ) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 

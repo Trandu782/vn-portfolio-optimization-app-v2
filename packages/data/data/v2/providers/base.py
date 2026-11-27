@@ -19,6 +19,7 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
+from core.validation import MAX_CHUNKS
 from data.errors import (
     AuthRequiredError,
     HttpStatusError,
@@ -241,9 +242,15 @@ class V2ProviderBase:
     @staticmethod
     def _chunks(start: date, end: date, days: int = 365) -> list[tuple[date, date]]:
         """Split ``[start, end]`` into inclusive windows of at most ``days`` days."""
+        if start > end:
+            raise ValueError("start must not be after end")
+        if days <= 0:
+            raise ValueError("days must be positive")
         windows: list[tuple[date, date]] = []
         cursor = start
         while cursor <= end:
+            if len(windows) >= MAX_CHUNKS:
+                raise ValueError(f"date range exceeds maximum of {MAX_CHUNKS} chunks")
             window_end = min(cursor + timedelta(days=days - 1), end)
             windows.append((cursor, window_end))
             cursor = window_end + timedelta(days=1)

@@ -303,7 +303,7 @@ export interface paths {
         };
         /**
          * Get Prices
-         * @description Return daily prices for a symbol, backfilling once if it is unknown.
+         * @description Return daily prices for a symbol, backfilling once if it is known.
          */
         get: operations["get_prices_api_v1_prices__symbol__get"];
         put?: never;
@@ -3030,7 +3030,10 @@ export interface operations {
     backfill_api_v1_data_backfill_post: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                authorization?: string | null;
+                "x-refresh-token"?: string | null;
+            };
             path?: never;
             cookie?: never;
         };

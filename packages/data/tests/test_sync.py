@@ -11,10 +11,10 @@ from support import FakeProvider, daily_bars
 
 from data.benchmarks import BENCHMARK_BY_CODE
 from data.db.base import create_all, create_engine_for, create_session_factory, session_scope
-from data.db.repositories import SqlIndexRepository, SqlPriceRepository
+from data.db.repositories import SqlIndexRepository, SqlPriceRepository, SqlSymbolRepository
 from data.errors import NetworkError
 from data.fallback import FallbackProvider
-from data.models import PriceBar
+from data.models import PriceBar, SymbolInfo
 from data.service import DataService
 from data.settings import DataSettings
 from data.sync import SyncService
@@ -65,9 +65,17 @@ def _service(
     )
 
 
+def _seed_symbol(factory: sessionmaker[Session], code: str = "VNM") -> None:
+    with session_scope(factory) as session:
+        SqlSymbolRepository(session).upsert(
+            SymbolInfo(code=code, exchange="HOSE", type="stock", source="test")
+        )
+
+
 def test_sync_symbol_is_incremental_and_idempotent(
     factory: sessionmaker[Session],
 ) -> None:
+    _seed_symbol(factory, "VNM")
     service = _service(factory, [FakeProvider("a", bars=daily_bars(date(2024, 1, 2), 5))])
     first = service.sync_symbol("VNM")
     assert first.ok and first.status == "updated" and first.rows == 5
@@ -80,6 +88,7 @@ def test_sync_symbol_is_incremental_and_idempotent(
 
 
 def test_all_providers_down_returns_queued(factory: sessionmaker[Session]) -> None:
+    _seed_symbol(factory, "VNM")
     a = FakeProvider("a", error=NetworkError("down", provider="a"), always_fail=True)
     service = _service(factory, [a])
     result = service.sync_symbol("VNM")
@@ -92,6 +101,7 @@ def test_all_providers_down_returns_queued(factory: sessionmaker[Session]) -> No
 def test_source_change_with_mismatch_replaces_history(
     factory: sessionmaker[Session],
 ) -> None:
+    _seed_symbol(factory, "VNM")
     first = _service(factory, [FakeProvider("a", bars=daily_bars(date(2024, 1, 2), 5, base=100.0))])
     assert first.sync_symbol("VNM").status == "updated"
 
@@ -115,6 +125,7 @@ def test_source_change_with_mismatch_replaces_history(
 def test_source_change_within_tolerance_does_not_replace(
     factory: sessionmaker[Session],
 ) -> None:
+    _seed_symbol(factory, "VNM")
     first = _service(factory, [FakeProvider("a", bars=daily_bars(date(2024, 1, 2), 5, base=100.0))])
     first.sync_symbol("VNM")
     second = _service(
@@ -215,6 +226,7 @@ def _data_service(
 
 
 def test_sync_symbol_extends_history_backwards(factory: sessionmaker[Session]) -> None:
+    _seed_symbol(factory, "VNM")
     full = daily_bars(date(2024, 1, 2), 7)
     provider = _RangeProvider("a", bars=full)
     service = _service(factory, [provider])
@@ -262,6 +274,7 @@ def test_sync_benchmark_extends_history_backwards(
 def test_get_prices_extends_to_the_requested_start(
     factory: sessionmaker[Session],
 ) -> None:
+    _seed_symbol(factory, "VNM")
     full = daily_bars(date(2023, 12, 1), 40)
     provider = _RangeProvider("a", bars=full)
     service = _data_service(factory, [provider])

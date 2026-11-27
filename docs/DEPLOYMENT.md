@@ -220,7 +220,9 @@ anyway so a preview cannot silently inherit a stale dashboard value.
 Vercel.
 
 Optional API variables (all have in-code defaults): `VNOPT_ENVIRONMENT=production`,
-`VNOPT_SYNC_BATCH_SIZE`, `VNOPT_SYNC_TIME_BUDGET_SECONDS`,
+`VNOPT_CORS_ORIGINS` (comma-separated allowed origins; empty defaults to `[]` in
+production and local dev origins in development), `VNOPT_RATE_LIMIT_ENABLED`
+(default `true`), `VNOPT_SYNC_BATCH_SIZE`, `VNOPT_SYNC_TIME_BUDGET_SECONDS`,
 `VNOPT_ON_DEMAND_HISTORY_DAYS`, `VNOPT_FRONTIER_MAX_PORTFOLIOS` (default 100,000),
 `VNOPT_FRONTIER_CLOUD_POINTS` (default 6,000 plotted scatter points),
 `VNOPT_FRONTIER_TIME_BUDGET`, `VNOPT_MAX_OPTIMIZE_STOCKS`.
@@ -299,7 +301,9 @@ provider (`ssi_statistics` once the V2 precompute is current). The
 | `VNOPT_V2_*_ORDER` | API | recommended | Seven V2 failover chains; defaults in `data/v2/config.py`. |
 | `VNOPT_V2_*_RATE_LIMIT_PER_MINUTE` | API | no | Per-data-type budget for the V2 runner (defaults 10-20/min). |
 | `API_URL` | Web | yes | Base URL for the `/api/*` rewrite (build time). |
-| `VNOPT_ENVIRONMENT` | API | no | `production` on Vercel. |
+| `VNOPT_ENVIRONMENT` | API | no | `production` on Vercel (disables `/docs`, `/redoc`, `/openapi.json` and enforces strong `REFRESH_TOKEN`). |
+| `VNOPT_CORS_ORIGINS` | API | no | Comma-separated allowed browser origins (wildcard `*` rejected; defaults to `[]` in production). |
+| `VNOPT_RATE_LIMIT_ENABLED` | API | no | In-memory per-IP rate limiter toggle (default `true`). |
 | `VNOPT_SYNC_BATCH_SIZE` | API | no | Symbols per sync batch (default 50). |
 | `VNOPT_SYNC_TIME_BUDGET_SECONDS` | API | no | Wall-clock budget per batch (default 45). |
 | `VNOPT_ON_DEMAND_HISTORY_DAYS` | API | no | History depth for first fetch (default 365). |
