@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 import { InfoTip } from "@/components/InfoTip";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
@@ -14,6 +16,7 @@ import { formatPercent, formatSignedPercent } from "@/lib/chart-theme";
 import {
   isRowGreyed,
   rowBadge,
+  sectorSelectionSummary,
   type SectorRow,
   type SectorSortKey,
   type SortDirection,
@@ -77,6 +80,7 @@ export function SectorBetaTable({
   rows,
   selected,
   onToggle,
+  onToggleAll,
   sortKey,
   sortDirection,
   onSort,
@@ -84,10 +88,20 @@ export function SectorBetaTable({
   rows: SectorRow[];
   selected: Set<string>;
   onToggle: (name: string) => void;
+  onToggleAll: () => void;
   sortKey: SectorSortKey;
   sortDirection: SortDirection;
   onSort: (key: SectorSortKey) => void;
 }) {
+  const checkboxRef = useRef<HTMLInputElement>(null);
+  const { selectableCount, allSelected, someSelected } = sectorSelectionSummary(rows, selected);
+
+  useEffect(() => {
+    if (checkboxRef.current) {
+      checkboxRef.current.indeterminate = someSelected;
+    }
+  }, [someSelected]);
+
   return (
     <Card className="space-y-3">
       <div>
@@ -107,7 +121,15 @@ export function SectorBetaTable({
           <thead>
             <tr className={tableHeaderRowClass}>
               <th scope="col" className="px-3 py-2.5">
-                <span className="sr-only">Send to Optimizer</span>
+                <input
+                  ref={checkboxRef}
+                  type="checkbox"
+                  disabled={selectableCount === 0}
+                  checked={allSelected}
+                  onChange={onToggleAll}
+                  aria-label={allSelected ? "Clear all sectors" : "Select all sectors"}
+                  className="h-4 w-4 accent-accent"
+                />
               </th>
               {COLUMNS.map((column) => (
                 <th

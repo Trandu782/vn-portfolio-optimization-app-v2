@@ -155,6 +155,22 @@ export function UniverseFilterPanel({
     [v2Filter, setV2Filter],
   );
 
+  const clearSectors = useCallback(
+    function () {
+      setTrimMessage(null);
+      setV2Filter({ ...v2Filter, sectors: [] });
+    },
+    [v2Filter, setV2Filter],
+  );
+
+  const clearFilters = useCallback(
+    function () {
+      setTrimMessage(null);
+      setV2Filter({ ...v2Filter, sectors: [], indexes: [] });
+    },
+    [v2Filter, setV2Filter],
+  );
+
   const addAllPassing = useCallback(
     function () {
       setTrimMessage(null);
@@ -250,7 +266,18 @@ export function UniverseFilterPanel({
         </p>
       ) : (
         <div className="space-y-1.5">
-          <span className="block text-sm font-medium text-fg">Sectors (ICB level 2)</span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="block text-sm font-medium text-fg">Sectors (ICB level 2)</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={clearSectors}
+              disabled={v2Filter.sectors.length === 0}
+              aria-label="Clear selected sectors"
+            >
+              Clear
+            </Button>
+          </div>
           {sectors && !sectors.available && (
             <p className="text-xs text-warn">
               Sector list unavailable; type tickers manually below.
@@ -295,6 +322,14 @@ export function UniverseFilterPanel({
           disabled={loading || unavailable || passingCount === 0}
         >
           Add all passing (max {maxStocks})
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={clearFilters}
+          disabled={v2Filter.sectors.length === 0 && v2Filter.indexes.length === 0}
+        >
+          Clear filters
         </Button>
         <label className="flex min-h-[36px] cursor-pointer items-center gap-2 text-xs text-fg-secondary">
           <input

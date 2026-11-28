@@ -17,6 +17,7 @@ import {
   sectorColor,
   sortSectorRows,
   toSectorRow,
+  toggleAllSelectableSectors,
   type SectorSortKey,
   type SortDirection,
 } from "@/lib/sector-analysis";
@@ -173,6 +174,14 @@ export function SectorAnalysis() {
     });
   }, []);
 
+  const toggleAllSectors = useCallback(() => {
+    setSelected((current) => toggleAllSelectableSectors(rows, current));
+  }, [rows]);
+
+  const clearAllSectors = useCallback(() => {
+    setSelected(new Set());
+  }, []);
+
   const sendToOptimizer = useCallback(() => {
     setV2Filter({ ...v2Filter, sectors: [...selected] });
     router.push("/optimize");
@@ -233,6 +242,7 @@ export function SectorAnalysis() {
             rows={rows}
             selected={selected}
             onToggle={toggleSector}
+            onToggleAll={toggleAllSectors}
             sortKey={sortKey}
             sortDirection={sortDirection}
             onSort={handleSort}
@@ -245,6 +255,14 @@ export function SectorAnalysis() {
               disabled={selected.size === 0}
             >
               Send {selected.size} sector(s) to Optimizer
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={clearAllSectors}
+              disabled={selected.size === 0}
+            >
+              Clear all
             </Button>
             <Button
               variant="secondary"

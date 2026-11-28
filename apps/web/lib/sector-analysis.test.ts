@@ -13,10 +13,13 @@ import {
   rowBadge,
   sectorColor,
   SECTOR_COLORS,
+  sectorSelectionSummary,
+  selectableSectorNames,
   sortSectorRows,
   summarizeExcluded,
   toExcludedView,
   toSectorRow,
+  toggleAllSelectableSectors,
   toggleHidden,
   type SectorRow,
 } from "./sector-analysis.ts";
@@ -202,5 +205,51 @@ test("toExcludedView falls back to the first detail when no main reason is set",
   assert.equal(view.categoryLabel, "Data glitch");
   assert.equal(view.affectedDates.length, 0);
   assert.match(view.summary, /detail line/);
+});
+
+test("selectableSectorNames excludes insufficient rows", () => {
+  assert.deepEqual(selectableSectorNames(ROWS), ["Banks", "Technology"]);
+});
+
+test("sectorSelectionSummary tracks empty, partial, full, and zero-selectable states", () => {
+  assert.deepEqual(sectorSelectionSummary(ROWS, new Set()), {
+    selectableCount: 2,
+    selectedCount: 0,
+    allSelected: false,
+    someSelected: false,
+  });
+  assert.deepEqual(sectorSelectionSummary(ROWS, new Set(["Banks", "Utilities"])), {
+    selectableCount: 2,
+    selectedCount: 1,
+    allSelected: false,
+    someSelected: true,
+  });
+  assert.deepEqual(sectorSelectionSummary(ROWS, new Set(["Banks", "Technology"])), {
+    selectableCount: 2,
+    selectedCount: 2,
+    allSelected: true,
+    someSelected: false,
+  });
+  assert.deepEqual(sectorSelectionSummary([ROWS[2]], new Set(["Utilities"])), {
+    selectableCount: 0,
+    selectedCount: 0,
+    allSelected: false,
+    someSelected: false,
+  });
+});
+
+test("toggleAllSelectableSectors selects all valid rows or clears when all are selected", () => {
+  assert.deepEqual(
+    [...toggleAllSelectableSectors(ROWS, new Set())],
+    ["Banks", "Technology"],
+  );
+  assert.deepEqual(
+    [...toggleAllSelectableSectors(ROWS, new Set(["Banks"]))],
+    ["Banks", "Technology"],
+  );
+  assert.deepEqual(
+    [...toggleAllSelectableSectors(ROWS, new Set(["Banks", "Technology"]))],
+    [],
+  );
 });
 

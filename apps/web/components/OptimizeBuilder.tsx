@@ -127,7 +127,7 @@ function frontierSentence(frontier: FrontierResult, point: FrontierPoint, goalId
 }
 
 export function OptimizeBuilder() {
-  const { selection, setSelection } = useUniverse();
+  const { selection, setSelection, clearSelection } = useUniverse();
   const { evaluation, symbols: portfolioSymbols } = usePortfolio();
   const { setResult: publishResult, clearResult } = useOptimize();
   const { timeframes, setTimeframe } = useTimeframes();
@@ -258,6 +258,16 @@ export function OptimizeBuilder() {
       }
       return next;
     });
+  }
+
+  function clearAllSelected() {
+    setSelected([]);
+    setUniverseResult(null);
+    setFrontier(null);
+    setRanWindow(null);
+    setError(null);
+    setNotice(null);
+    clearSelection();
   }
 
   function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
@@ -425,6 +435,14 @@ export function OptimizeBuilder() {
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => void startFromVn30()} disabled={presetLoading}>
             {presetLoading ? "Loading\u2026" : "Start from VN30"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={clearAllSelected}
+            disabled={selected.length === 0}
+          >
+            Clear all
           </Button>
         </div>
 

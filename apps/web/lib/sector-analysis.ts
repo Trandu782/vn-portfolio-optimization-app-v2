@@ -307,3 +307,35 @@ export function analyticsViewState(
 export function hasPublishedSector(payload: SectorAnalytics | null): boolean {
   return (payload?.groups ?? []).some((group) => group.index.status === "ok");
 }
+
+/** Names of sectors that can be selected and sent to the Optimizer. */
+export function selectableSectorNames(rows: readonly SectorRow[]): string[] {
+  return rows.filter(isRowSelectable).map((row) => row.name);
+}
+
+/** Summary of how many selectable sectors are currently checked. */
+export function sectorSelectionSummary(
+  rows: readonly SectorRow[],
+  selected: ReadonlySet<string>,
+): {
+  selectableCount: number;
+  selectedCount: number;
+  allSelected: boolean;
+  someSelected: boolean;
+} {
+  const selectable = selectableSectorNames(rows);
+  const selectableCount = selectable.length;
+  const selectedCount = selectable.filter((name) => selected.has(name)).length;
+  const allSelected = selectableCount > 0 && selectedCount === selectableCount;
+  const someSelected = selectedCount > 0 && selectedCount < selectableCount;
+  return { selectableCount, selectedCount, allSelected, someSelected };
+}
+
+/** Toggle all selectable sectors: clears when all are selected, otherwise selects all. */
+export function toggleAllSelectableSectors(
+  rows: readonly SectorRow[],
+  selected: ReadonlySet<string>,
+): Set<string> {
+  const { allSelected } = sectorSelectionSummary(rows, selected);
+  return allSelected ? new Set() : new Set(selectableSectorNames(rows));
+}
