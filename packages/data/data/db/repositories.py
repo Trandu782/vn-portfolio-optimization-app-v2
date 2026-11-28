@@ -193,6 +193,17 @@ class SqlSymbolRepository:
         row = self._session.get(Symbol, code)
         return _symbol_to_info(row) if row is not None else None
 
+    def get_many(self, codes: Sequence[str]) -> dict[str, SymbolInfo]:
+        """Return stored symbol metadata keyed by upper-cased ticker in one query."""
+        unique = sorted({code.strip().upper() for code in codes if code.strip()})
+        if not unique:
+            return {}
+        statement = select(Symbol).where(Symbol.code.in_(unique))
+        return {
+            row.code.upper(): _symbol_to_info(row)
+            for row in self._session.scalars(statement)
+        }
+
     def list(self, exchange: str | None = None) -> list[SymbolInfo]:
         statement = select(Symbol).order_by(Symbol.code)
         if exchange:

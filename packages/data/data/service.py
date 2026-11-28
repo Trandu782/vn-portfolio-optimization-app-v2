@@ -57,6 +57,9 @@ class DataService:
         self._fallback = fallback
         self._settings = settings
         self._today: Callable[[], date] = today_provider or date.today
+        self._symbol_cache: dict[str, SymbolInfo] = {}
+        self._v2_price_cache: dict[tuple[str, date, date], tuple[PriceSeries, bool]] = {}
+        self._v2_cache_stamp: tuple[date | None, date] | None = None
 
     @property
     def today(self) -> date:
@@ -82,8 +85,32 @@ class DataService:
 
     def get_symbol(self, code: str) -> SymbolInfo | None:
         """Return the stored metadata for ``code`` (or ``None`` when unknown)."""
+        key = code.strip().upper()
+        if key in self._symbol_cache:
+            return self._symbol_cache[key]
         with session_scope(self._session_factory) as session:
-            return SqlSymbolRepository(session).get(code.strip().upper())
+            info = SqlSymbolRepository(session).get(key)
+        if info is not None:
+            self._symbol_cache[key] = info
+        return info
+
+    def get_symbols_batch(self, codes: Sequence[str]) -> dict[str, SymbolInfo]:
+        """Return stored symbol metadata for ``codes`` using cache + one batch query."""
+        unique = list(dict.fromkeys(c.strip().upper() for c in codes if c.strip()))
+        result: dict[str, SymbolInfo] = {}
+        missing: list[str] = []
+        for code in unique:
+            cached = self._symbol_cache.get(code)
+            if cached is not None:
+                result[code] = cached
+            else:
+                missing.append(code)
+        if missing:
+            with session_scope(self._session_factory) as session:
+                fetched = SqlSymbolRepository(session).get_many(missing)
+            self._symbol_cache.update(fetched)
+            result.update(fetched)
+        return result
 
     def get_index_constituents(self, index_code: str) -> list[str]:
         """Return an index's members, populating them on first use.
@@ -340,6 +367,7 @@ class DataService:
         *,
         start: date | None = None,
         end: date | None = None,
+        include_volume: bool = False,
     ) -> dict[str, PriceSeries]:
         """Return V2-only :class:`PriceSeries` keyed by upper-cased ticker in one query."""
         codes = list(
@@ -354,13 +382,38 @@ class DataService:
         range_start = start or (
             range_end - timedelta(days=self._settings.on_demand_history_days)
         )
-        with session_scope(self._session_factory) as session:
-            bars_by_code = V2Store(session).get_prices_batch(codes, range_start, range_end)
         result: dict[str, PriceSeries] = {}
-        for code in codes:
+        with session_scope(self._session_factory) as session:
+            store = V2Store(session)
+            data_as_of = store.overall_latest_price_date()
+            stamp = (data_as_of, today)
+            if self._v2_cache_stamp != stamp:
+                self._v2_price_cache.clear()
+                self._v2_cache_stamp = stamp
+
+            missing: list[str] = []
+            for code in codes:
+                cached = self._v2_price_cache.get((code, range_start, range_end))
+                if cached is not None and (not include_volume or cached[1]):
+                    result[code] = cached[0]
+                else:
+                    missing.append(code)
+
+            bars_by_code = (
+                store.get_prices_slim_batch(
+                    missing, range_start, range_end, include_volume=include_volume
+                )
+                if missing
+                else {}
+            )
+
+        if missing and data_as_of is not None and len(self._v2_price_cache) > 500:
+            self._v2_price_cache.clear()
+
+        for code in missing:
             bars = bars_by_code.get(code)
             if not bars:
-                result[code] = PriceSeries(
+                series = PriceSeries(
                     symbol=code,
                     source=None,
                     stale=False,
@@ -372,7 +425,13 @@ class DataService:
                     rows=[],
                 )
             else:
-                result[code] = self._price_series_from_v2(code, bars, today)
+                series = self._price_series_from_v2(code, bars, today)
+            result[code] = series
+            if data_as_of is not None:
+                self._v2_price_cache[(code, range_start, range_end)] = (
+                    series,
+                    include_volume,
+                )
         return result
 
     def _price_series_from_v2(

@@ -92,7 +92,7 @@ def list_symbols(
     """Return the stored symbols."""
     symbols = service.list_symbols(exchange)
     response.headers["Cache-Control"] = (
-        "public, max-age=300, s-maxage=3600, stale-while-revalidate=7200"
+        "public, max-age=3600, s-maxage=43200, stale-while-revalidate=86400"
     )
     return SymbolListResponse(exchange=exchange, count=len(symbols), symbols=symbols)
 

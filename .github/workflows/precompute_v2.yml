@@ -33,9 +33,10 @@ name: Precompute V2 datasets
 # from the job log instead of guessed at. The job itself targets the last
 # *completed* session, so a late or pre-close run still processes settled data.
 on:
-  schedule:
-    # Weekdays 12:47 UTC = 19:47 ICT (single EOD run to save Actions minutes & Supabase egress).
-    - cron: "47 12 * * 1-5"
+  # Temporarily disabled to stay within Supabase egress budget until 21 Dec reset:
+  # schedule:
+  #   # Weekdays 12:47 UTC = 19:47 ICT (single EOD run to save Actions minutes & Supabase egress).
+  #   - cron: "47 12 * * 1-5"
   workflow_dispatch:
     inputs:
       mode:

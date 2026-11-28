@@ -142,7 +142,7 @@ class PresetResponse(BaseModel):
 def read_universe_options(response: Response) -> UniverseOptionsResponse:
     """Publish the filter catalogue (from the registry) and the available presets."""
     response.headers["Cache-Control"] = (
-        "public, max-age=300, s-maxage=3600, stale-while-revalidate=7200"
+        "public, max-age=3600, s-maxage=43200, stale-while-revalidate=86400"
     )
     return UniverseOptionsResponse(
         filters=[
@@ -164,6 +164,7 @@ def read_universe_options(response: Response) -> UniverseOptionsResponse:
 @router.get("/universe/presets/{index_code}", response_model=PresetResponse)
 def read_preset(
     index_code: str,
+    response: Response,
     service: Annotated[DataService, Depends(get_data_service)],
 ) -> PresetResponse:
     """Return a curated preset's members, populating them on first use."""
@@ -175,6 +176,9 @@ def read_preset(
         raise HTTPException(
             status_code=503, detail=f"constituents for {code} are temporarily unavailable"
         )
+    response.headers["Cache-Control"] = (
+        "public, max-age=3600, s-maxage=43200, stale-while-revalidate=86400"
+    )
     return PresetResponse(index_code=code, symbols=symbols, count=len(symbols))
 
 
@@ -207,7 +211,7 @@ def build_universe_endpoint(
         ) from exc
 
     series, _sources = _load_symbol_series_batch(
-        service, codes, request.start, request.end
+        service, codes, request.start, request.end, include_volume=True
     )
     result = build_universe(
         series, filters, request.start, request.end, adv_sessions=request.adv_sessions
@@ -236,15 +240,23 @@ def _resolve_symbols(request: UniverseBuildRequest, service: DataService) -> lis
 
 
 def _load_symbol_series_batch(
-    service: DataService, codes: Sequence[str], start: date, end: date
+    service: DataService,
+    codes: Sequence[str],
+    start: date,
+    end: date,
+    *,
+    include_volume: bool = False,
 ) -> tuple[list[SymbolSeries], dict[str, str]]:
     """Load V2 series for ``codes`` in one batched query and return ``(series, sources)``."""
-    price_by_code = service.get_prices_v2_batch(codes, start=start, end=end)
+    price_by_code = service.get_prices_v2_batch(
+        codes, start=start, end=end, include_volume=include_volume
+    )
+    symbols_by_code = service.get_symbols_batch(codes)
     series: list[SymbolSeries] = []
     sources: dict[str, str] = {}
     for code in codes:
         key = code.upper()
-        info = service.get_symbol(code)
+        info = symbols_by_code.get(key)
         exchange = normalize_exchange(info.exchange) if info and info.exchange else "HOSE"
         price_series = price_by_code.get(key)
         rows = price_series.rows if price_series is not None else []

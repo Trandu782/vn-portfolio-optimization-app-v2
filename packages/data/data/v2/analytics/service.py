@@ -294,7 +294,7 @@ class AnalyticsService:
 
         returns_by_ticker: dict[str, dict[date, float]] = {}
         stored_flags, flags_available, flags_policy_current = load_adjustment_flags(
-            self._session_factory
+            self._session_factory, anomalies_for_excluded_only=True
         )
         flags: dict[str, AdjustmentQualityFlag] = {}
         for row in kept:

@@ -215,3 +215,76 @@ def test_flags_available_when_the_job_has_computed_them(tmp_path: Path) -> None:
     )
     assert response.flags_available is True
     assert any(flag.ticker == "BANK2" for flag in response.adjustment_flags)
+    # GET /v2/universe omits heavy anomalies payload while keeping ticker/reasons.
+    bank2 = next(flag for flag in response.adjustment_flags if flag.ticker == "BANK2")
+    assert bank2.anomalies == []
+
+
+def test_slim_prices_and_filtered_adjustment_flags(tmp_path: Path) -> None:
+    from data.v2.precompute_schemas import AdjustmentAnomalyRecord
+
+    factory = _seed(tmp_path, with_flags=False)
+    with session_scope(factory) as session:
+        store = V2Store(session)
+        store.upsert_adjustment_flags(
+            [
+                AdjustmentFlagRecord(
+                    ticker="BANK1",
+                    severity="warning",
+                    flagged=True,
+                    exclude_from_group_indices=False,
+                    reasons=["thin trading"],
+                    dates=[_AS_OF],
+                    anomalies=[
+                        AdjustmentAnomalyRecord(
+                            date=_AS_OF,
+                            exclude=False,
+                            category="thin_trading",
+                            reason="thin trading",
+                        )
+                    ],
+                    source="test",
+                    data_as_of=_AS_OF,
+                ),
+                AdjustmentFlagRecord(
+                    ticker="BANK2",
+                    severity="warning",
+                    flagged=True,
+                    exclude_from_group_indices=True,
+                    reasons=["unadjusted split"],
+                    dates=[_AS_OF],
+                    anomalies=[
+                        AdjustmentAnomalyRecord(
+                            date=_AS_OF,
+                            exclude=True,
+                            category="data_glitch",
+                            reason="unadjusted split",
+                        )
+                    ],
+                    source="test",
+                    data_as_of=_AS_OF,
+                ),
+            ]
+        )
+
+        slim = store.get_prices_slim_batch(["BANK1"], include_volume=False)
+        assert len(slim["BANK1"]) == 60
+        assert slim["BANK1"][0].close == 100.0
+        assert slim["BANK1"][0].volume == 0
+
+        with_vol = store.get_prices_slim_batch(["BANK1"], include_volume=True)
+        assert with_vol["BANK1"][0].volume == 1_000_000
+
+        no_anomalies = {
+            f.ticker: f for f in store.list_adjustment_flags(include_anomalies=False)
+        }
+        assert no_anomalies["BANK1"].anomalies == []
+        assert no_anomalies["BANK2"].anomalies == []
+
+        excl_only = {
+            f.ticker: f
+            for f in store.list_adjustment_flags(anomalies_for_excluded_only=True)
+        }
+        assert excl_only["BANK1"].anomalies == []
+        assert len(excl_only["BANK2"].anomalies) == 1
+

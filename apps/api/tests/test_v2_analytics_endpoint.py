@@ -321,5 +321,8 @@ def test_freshness_and_options_emit_cache_control_headers(client: TestClient) ->
         opt_resp = client.get(path)
         assert opt_resp.status_code == 200, path
         opt_cc = opt_resp.headers.get("cache-control", "")
-        assert "public" in opt_cc and "s-maxage=3600" in opt_cc, (path, opt_cc)
+        assert "public" in opt_cc and "max-age=3600" in opt_cc and "s-maxage=43200" in opt_cc, (
+            path,
+            opt_cc,
+        )
 

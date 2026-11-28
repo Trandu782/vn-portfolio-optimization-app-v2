@@ -268,7 +268,7 @@ def _benchmark_options() -> list[BenchmarkOption]:
 def read_risk_options(response: Response) -> RiskOptionsResponse:
     """Publish every risk metric, the benchmark list and the defaults."""
     response.headers["Cache-Control"] = (
-        "public, max-age=300, s-maxage=3600, stale-while-revalidate=7200"
+        "public, max-age=3600, s-maxage=43200, stale-while-revalidate=86400"
     )
     return RiskOptionsResponse(
         metrics=_describe(risk_metrics),

@@ -11,7 +11,7 @@ read endpoint never recomputes them per request.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -46,6 +46,7 @@ class UniverseSnapshot:
     latest_price_date: date | None
     sector_gaps: list[str]
     flags_available: bool
+    history_starts: dict[str, date] = field(default_factory=dict)
 
 
 def build_universe_row(
@@ -79,11 +80,11 @@ def join_labels(values: Sequence[str]) -> str | None:
 
 
 _snapshot_cache: dict[
-    tuple[int, str, bool],
+    tuple[int, str, bool, bool],
     tuple[tuple[date | None, int, int, int, int], UniverseSnapshot],
 ] = {}
 _flags_cache: dict[
-    tuple[int, str],
+    tuple[int, str, bool, bool],
     tuple[
         tuple[date | None, int, date | None],
         tuple[dict[str, AdjustmentQualityFlag], bool, bool],
@@ -104,11 +105,14 @@ def clear_universe_cache() -> None:
 
 
 def load_universe_snapshot(
-    session_factory: sessionmaker[Session], *, include_price_bases: bool = True
+    session_factory: sessionmaker[Session],
+    *,
+    include_price_bases: bool = True,
+    include_history_starts: bool = False,
 ) -> UniverseSnapshot:
     """Load the bulk V2 inputs once (cached by DB snapshot stamp)."""
     fid, furl = _factory_key(session_factory)
-    cache_key = (fid, furl, include_price_bases)
+    cache_key = (fid, furl, include_price_bases, include_history_starts)
     with session_scope(session_factory) as session:
         store = V2Store(session)
         stamp = store.universe_snapshot_stamp()
@@ -133,6 +137,7 @@ def load_universe_snapshot(
             record.symbol.strip().upper(): record for record in store.list_market_cap()
         }
         bases = store.price_adjustment_bases() if include_price_bases else {}
+        history_starts = store.history_starts() if include_history_starts else {}
         flags_available = stamp[4] > 0
 
     rows = [
@@ -154,6 +159,7 @@ def load_universe_snapshot(
         latest_price_date=latest_price,
         sector_gaps=sector_gaps,
         flags_available=flags_available,
+        history_starts=history_starts,
     )
     if latest_price is not None:
         _snapshot_cache[cache_key] = (stamp, snapshot)
@@ -188,9 +194,13 @@ def flags_policy_current(records: Sequence[AdjustmentFlagRecord]) -> bool:
 
 def load_adjustment_flags(
     session_factory: sessionmaker[Session],
+    *,
+    include_anomalies: bool = True,
+    anomalies_for_excluded_only: bool = False,
 ) -> tuple[dict[str, AdjustmentQualityFlag], bool, bool]:
     """Return the stored flags, whether they were computed, and whether they are current."""
-    cache_key = _factory_key(session_factory)
+    fid, furl = _factory_key(session_factory)
+    cache_key = (fid, furl, include_anomalies, anomalies_for_excluded_only)
     with session_scope(session_factory) as session:
         store = V2Store(session)
         latest_price = store.overall_latest_price_date()
@@ -199,7 +209,10 @@ def load_adjustment_flags(
         cached = _flags_cache.get(cache_key)
         if cached is not None and flag_count > 0 and cached[0] == stamp:
             return cached[1]
-        records = store.list_adjustment_flags()
+        records = store.list_adjustment_flags(
+            include_anomalies=include_anomalies,
+            anomalies_for_excluded_only=anomalies_for_excluded_only,
+        )
     result = (
         {record.ticker: _to_flag(record) for record in records},
         bool(records),

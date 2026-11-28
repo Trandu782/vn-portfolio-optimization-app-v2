@@ -325,7 +325,7 @@ def _describe(registry: Registry[Any]) -> list[OptionResponse]:
 def read_optimize_options(response: Response) -> OptimizeOptionsResponse:
     """Publish every optimizer concept and the conservative defaults."""
     response.headers["Cache-Control"] = (
-        "public, max-age=300, s-maxage=3600, stale-while-revalidate=7200"
+        "public, max-age=3600, s-maxage=43200, stale-while-revalidate=86400"
     )
     return OptimizeOptionsResponse(
         objectives=_describe(objectives),

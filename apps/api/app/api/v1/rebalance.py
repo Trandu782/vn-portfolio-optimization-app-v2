@@ -120,7 +120,7 @@ def _describe[T](registry: Registry[T]) -> list[OptionResponse]:
 def rebalance_options(response: Response) -> RebalanceOptionsResponse:
     """Return the cost-model and policy catalogues and the defaults."""
     response.headers["Cache-Control"] = (
-        "public, max-age=300, s-maxage=3600, stale-while-revalidate=7200"
+        "public, max-age=3600, s-maxage=43200, stale-while-revalidate=86400"
     )
     return RebalanceOptionsResponse(
         cost_models=_describe(cost_models),

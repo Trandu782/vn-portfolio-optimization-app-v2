@@ -14,7 +14,6 @@ from datetime import date
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session, sessionmaker
 
-from data.db.base import session_scope
 from data.v2.analytics.liquidity import (
     DEFAULT_PRESET_ID,
     UniverseFilterSpec,
@@ -27,7 +26,6 @@ from data.v2.analytics.universe_reader import (
     load_adjustment_flags,
     load_universe_snapshot,
 )
-from data.v2.store import V2Store
 
 #: Index codes the universe facet accepts.
 VALID_INDEXES: frozenset[str] = frozenset({"VN30", "VN100"})
@@ -170,7 +168,9 @@ class UniverseService:
         indexes = self._validated_indexes(request.indexes)
         exchange = self._validated_exchange(request.exchange)
 
-        snapshot = load_universe_snapshot(self._session_factory)
+        snapshot = load_universe_snapshot(
+            self._session_factory, include_history_starts=True
+        )
         if not snapshot.master:
             return UniverseFilterResponse(
                 available=False, preset_id=request.preset, warnings=[_UNAVAILABLE]
@@ -196,7 +196,7 @@ class UniverseService:
             as_of=data_as_of,
         )
         stored_flags, flags_available, flags_policy_current = load_adjustment_flags(
-            self._session_factory
+            self._session_factory, include_anomalies=False
         )
         warnings: list[str] = []
 
@@ -269,8 +269,7 @@ class UniverseService:
                 "returns with caution."
             )
 
-        with session_scope(self._session_factory) as session:
-            starts = V2Store(session).history_starts()
+        starts = snapshot.history_starts
         missing_history = [row.ticker for row in kept_rows if row.ticker not in starts]
         if missing_history:
             warnings.append(
@@ -316,7 +315,9 @@ class UniverseService:
             get_preset(preset)
         except KeyError as exc:
             raise ValueError(str(exc)) from exc
-        snapshot = load_universe_snapshot(self._session_factory)
+        snapshot = load_universe_snapshot(
+            self._session_factory, include_price_bases=False
+        )
         if not snapshot.master:
             return SectorListResponse(
                 available=False, preset_id=preset, warnings=[_UNAVAILABLE]

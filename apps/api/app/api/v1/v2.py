@@ -32,7 +32,7 @@ from data.v2.reader import sector_coverage, ticker_snapshot
 
 router = APIRouter(tags=["v2"])
 
-_V2_CACHE_CONTROL = "public, max-age=300, s-maxage=1800, stale-while-revalidate=3600"
+_V2_CACHE_CONTROL = "public, max-age=3600, s-maxage=43200, stale-while-revalidate=86400"
 
 
 @router.get("/v2/ticker/{symbol}", response_model=TickerSnapshot)

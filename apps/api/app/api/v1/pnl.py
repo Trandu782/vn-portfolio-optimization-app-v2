@@ -131,10 +131,10 @@ def evaluate_pnl(
         ),
         default=None,
     )
-    series_by_symbol = {
-        holding.symbol: service.get_prices_v2(holding.symbol, start=earliest_buy)
-        for holding in portfolio.holdings
-    }
+    series_by_symbol = service.get_prices_v2_batch(
+        [holding.symbol for holding in portfolio.holdings],
+        start=earliest_buy,
+    )
     latest_prices = {
         symbol: series.rows[-1].close
         for symbol, series in series_by_symbol.items()

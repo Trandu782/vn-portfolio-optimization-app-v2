@@ -17,7 +17,7 @@ from collections.abc import Sequence
 from datetime import date
 from typing import Literal
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import case, delete, func, select
 from sqlalchemy.orm import Session
 
 from data.db.models import (
@@ -409,6 +409,73 @@ class V2Store:
                 grouped.setdefault(row.symbol_code.upper(), []).append(_price_bar(row))
         return grouped
 
+    def get_prices_slim_batch(
+        self,
+        symbols: Sequence[str],
+        start: date | None = None,
+        end: date | None = None,
+        *,
+        include_volume: bool = False,
+        chunk_size: int = 200,
+    ) -> dict[str, list[AdjustedOHLCV]]:
+        """Return column-projected V2 bars per symbol in ``[start, end]``.
+
+        Fetches only ``symbol_code, date, close_adj, close_raw, source`` (plus
+        ``volume, value`` when ``include_volume=True``) instead of all 15
+        ``V2DailyPrice`` columns.
+        """
+        unique = sorted({symbol.strip().upper() for symbol in symbols if symbol.strip()})
+        if not unique:
+            return {}
+        grouped: dict[str, list[AdjustedOHLCV]] = {}
+        for idx in range(0, len(unique), chunk_size):
+            chunk = unique[idx : idx + chunk_size]
+            if include_volume:
+                statement = select(
+                    V2DailyPrice.symbol_code,
+                    V2DailyPrice.date,
+                    V2DailyPrice.close_adj,
+                    V2DailyPrice.close_raw,
+                    V2DailyPrice.source,
+                    V2DailyPrice.volume,
+                    V2DailyPrice.value,
+                )
+            else:
+                statement = select(
+                    V2DailyPrice.symbol_code,
+                    V2DailyPrice.date,
+                    V2DailyPrice.close_adj,
+                    V2DailyPrice.close_raw,
+                    V2DailyPrice.source,
+                )
+            statement = statement.where(V2DailyPrice.symbol_code.in_(chunk))
+            if start is not None:
+                statement = statement.where(V2DailyPrice.date >= start)
+            if end is not None:
+                statement = statement.where(V2DailyPrice.date <= end)
+            statement = statement.order_by(V2DailyPrice.symbol_code, V2DailyPrice.date)
+            for row in self._session.execute(statement):
+                symbol_code, bar_date, close_adj, close_raw, source = row[:5]
+                adj = float(close_adj)
+                raw = float(close_raw) if close_raw is not None else None
+                spot = raw if raw is not None else adj
+                vol = int(row[5] or 0) if include_volume else 0
+                val = (float(row[6]) if row[6] is not None else None) if include_volume else None
+                grouped.setdefault(symbol_code.upper(), []).append(
+                    AdjustedOHLCV(
+                        date=bar_date,
+                        open=spot,
+                        high=spot,
+                        low=spot,
+                        close=adj,
+                        close_raw=raw,
+                        volume=vol,
+                        value=val,
+                        source=source,
+                    )
+                )
+        return grouped
+
     def get_close_prices_batch(
         self,
         symbols: Sequence[str],
@@ -798,10 +865,55 @@ class V2Store:
             ],
         )
 
-    def list_adjustment_flags(self) -> list[AdjustmentFlagRecord]:
+    def list_adjustment_flags(
+        self,
+        *,
+        include_anomalies: bool = True,
+        anomalies_for_excluded_only: bool = False,
+    ) -> list[AdjustmentFlagRecord]:
         """Return every stored adjustment-quality flag, sorted by ticker."""
-        statement = select(V2AdjustmentFlag).order_by(V2AdjustmentFlag.ticker)
-        return [_adjustment_flag_record(row) for row in self._session.scalars(statement)]
+        if include_anomalies and not anomalies_for_excluded_only:
+            statement = select(V2AdjustmentFlag).order_by(V2AdjustmentFlag.ticker)
+            return [_adjustment_flag_record(row) for row in self._session.scalars(statement)]
+
+        anomalies_col = (
+            case(
+                (V2AdjustmentFlag.exclude_from_group_indices.is_(True), V2AdjustmentFlag.anomalies),
+                else_=None,
+            )
+            if include_anomalies
+            else None
+        )
+        columns = [
+            V2AdjustmentFlag.ticker,
+            V2AdjustmentFlag.severity,
+            V2AdjustmentFlag.flagged,
+            V2AdjustmentFlag.exclude_from_group_indices,
+            V2AdjustmentFlag.reasons,
+            V2AdjustmentFlag.dates,
+            V2AdjustmentFlag.source,
+            V2AdjustmentFlag.data_as_of,
+        ]
+        if anomalies_col is not None:
+            columns.append(anomalies_col)
+        statement = select(*columns).order_by(V2AdjustmentFlag.ticker)
+        records: list[AdjustmentFlagRecord] = []
+        for row in self._session.execute(statement):
+            raw_anomalies = row[8] if anomalies_col is not None else None
+            records.append(
+                AdjustmentFlagRecord(
+                    ticker=row[0],
+                    severity=row[1],
+                    flagged=row[2],
+                    exclude_from_group_indices=row[3],
+                    reasons=list(row[4] or []),
+                    dates=[date.fromisoformat(value) for value in (row[5] or [])],
+                    anomalies=_anomaly_records(raw_anomalies),
+                    source=row[6],
+                    data_as_of=row[7],
+                )
+            )
+        return records
 
     def adjustment_flags_available(self) -> bool:
         """Return ``True`` when the flags were computed (the table is not empty)."""
