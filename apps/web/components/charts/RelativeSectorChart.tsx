@@ -12,6 +12,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import type { SectorReturnPoint } from "@/lib/api";
 import {
@@ -23,7 +24,11 @@ import {
   formatDayMonthTick,
   formatSignedPercent,
 } from "@/lib/chart-theme";
-import { toggleHidden } from "@/lib/sector-analysis";
+import {
+  hideAllSectors,
+  relativeChartVisibility,
+  toggleHidden,
+} from "@/lib/sector-analysis";
 
 import { TooltipBox } from "./TooltipBox";
 
@@ -124,6 +129,9 @@ export function RelativeSectorChart({
     return (last - first) / (1000 * 60 * 60 * 24) <= SHORT_WINDOW_DAYS;
   }, [rows]);
 
+  const sectorIds = useMemo(() => series.map((line) => line.id), [series]);
+  const { allVisible, onlyBenchmarkVisible } = relativeChartVisibility(hidden, sectorIds);
+
   const legend = [
     { id: "benchmark", label: benchmarkLabel, color: BENCHMARK_COLOR },
     ...series.map((line) => ({ id: line.id, label: line.label, color: line.color })),
@@ -131,13 +139,35 @@ export function RelativeSectorChart({
 
   return (
     <Card className="space-y-3">
-      <div>
-        <h2 className="text-base font-medium text-fg">Relative sector movement</h2>
-        <p className="mt-1 text-xs text-fg-muted">
-          Each line is a sector index set to 0% at the start of the window (
-          <span className="font-mono tabular-nums">{windowLabel}</span>). The dashed grey line is{" "}
-          {benchmarkLabel}; hover a sector chip to isolate it.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-medium text-fg">Relative sector movement</h2>
+          <p className="mt-1 text-xs text-fg-muted">
+            Each line is a sector index set to 0% at the start of the window (
+            <span className="font-mono tabular-nums">{windowLabel}</span>). The dashed grey line is{" "}
+            {benchmarkLabel}; hover a sector chip to isolate it.
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setHidden({})}
+            disabled={allVisible}
+            aria-label="Show all lines"
+          >
+            Show all
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setHidden(hideAllSectors(sectorIds))}
+            disabled={onlyBenchmarkVisible}
+            aria-label="Hide all sector lines"
+          >
+            Clear all
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-1.5 text-xs" role="group" aria-label="Toggle a sector">

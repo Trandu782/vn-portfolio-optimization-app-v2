@@ -6,10 +6,12 @@ import {
   benchmarkLabel,
   capOffWarning,
   correlationColor,
+  hideAllSectors,
   isCorrelationMatrixValid,
   isRowGreyed,
   isRowSelectable,
   orderedHeatmap,
+  relativeChartVisibility,
   rowBadge,
   sectorColor,
   SECTOR_COLORS,
@@ -76,6 +78,41 @@ test("an asymmetric matrix is flagged invalid", () => {
 test("legend toggle flips one id", () => {
   assert.deepEqual(toggleHidden({}, "Banks"), { Banks: true });
   assert.deepEqual(toggleHidden({ Banks: true }, "Banks"), { Banks: false });
+});
+
+test("hideAllSectors hides every sector and keeps benchmark visible", () => {
+  assert.deepEqual(hideAllSectors(["Banks", "Technology"]), {
+    benchmark: false,
+    Banks: true,
+    Technology: true,
+  });
+});
+
+test("relativeChartVisibility tracks allVisible and onlyBenchmarkVisible", () => {
+  const sectorIds = ["Banks", "Technology"];
+  assert.deepEqual(relativeChartVisibility({}, sectorIds), {
+    allVisible: true,
+    onlyBenchmarkVisible: false,
+  });
+  assert.deepEqual(relativeChartVisibility(hideAllSectors(sectorIds), sectorIds), {
+    allVisible: false,
+    onlyBenchmarkVisible: true,
+  });
+  assert.deepEqual(
+    relativeChartVisibility({ benchmark: true, Banks: true, Technology: true }, sectorIds),
+    {
+      allVisible: false,
+      onlyBenchmarkVisible: false,
+    },
+  );
+  assert.deepEqual(relativeChartVisibility({ Banks: true }, sectorIds), {
+    allVisible: false,
+    onlyBenchmarkVisible: false,
+  });
+  assert.deepEqual(relativeChartVisibility({}, []), {
+    allVisible: true,
+    onlyBenchmarkVisible: true,
+  });
 });
 
 test("excluded summary groups by sector with counts", () => {

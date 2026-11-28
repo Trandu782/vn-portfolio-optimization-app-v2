@@ -147,6 +147,29 @@ export function toggleHidden(
   return { ...hidden, [id]: !hidden[id] };
 }
 
+/** Hide every sector line while keeping the benchmark line visible. */
+export function hideAllSectors(sectorIds: readonly string[]): Record<string, boolean> {
+  const next: Record<string, boolean> = { benchmark: false };
+  for (const id of sectorIds) {
+    next[id] = true;
+  }
+  return next;
+}
+
+/** Summarize whether all chart lines are visible or only the benchmark is visible. */
+export function relativeChartVisibility(
+  hidden: Readonly<Record<string, boolean>>,
+  sectorIds: readonly string[],
+): { allVisible: boolean; onlyBenchmarkVisible: boolean } {
+  const benchmarkHidden = hidden.benchmark ?? false;
+  const allSectorsHidden = sectorIds.every((id) => hidden[id] === true);
+  const anySectorHidden = sectorIds.some((id) => hidden[id] === true);
+  const allVisible = !benchmarkHidden && !anySectorHidden;
+  const onlyBenchmarkVisible =
+    sectorIds.length === 0 || (!benchmarkHidden && allSectorsHidden);
+  return { allVisible, onlyBenchmarkVisible };
+}
+
 /** True when every pair is mirrored and the diagonal is 1 within `tolerance`. */
 export function isCorrelationMatrixValid(
   matrix: readonly (readonly number[])[],
